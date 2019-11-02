@@ -40,6 +40,8 @@ def get_spectrum(T,logg,Z,a):
     z_string = '{:.1f}'.format(float(Z))
     if Z > 0:
         z_string = '+'+z_string
+    else:
+        z_string = '-'+z_string
     a_string=''
     if a > 0:
         a_string ='.Alpha=+'+'{:.2f}'.format(float(a))
@@ -67,6 +69,7 @@ def get_spectrum(T,logg,Z,a):
             with open(wavename, 'wb') as f:
                 shutil.copyfileobj(r, f)
     if os.path.exists(specname) == False:
+        print(specurl)
         with closing(request.urlopen(specurl)) as r:
             with open(specname, 'wb') as f:
                 shutil.copyfileobj(r, f)
