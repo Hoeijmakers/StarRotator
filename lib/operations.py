@@ -1,6 +1,5 @@
 #This file contains a collection of functions that operate on spectra.
 
-
 def shift(wl,fx,dv):
     """Doppler-shift a spectrum.
 
@@ -71,3 +70,25 @@ def vactoair(wlnm):
     s = 1e4/wlA
     f = 1.0 + 5.792105e-2/(238.0185e0 - s**2) + 1.67917e-3/( 57.362e0 - s**2)
     return(wlA/f/10.0)
+
+
+
+def limb_darkening(mu,u1,u2):
+    """Evaluate quadratic limb darkening, taken from de Mooij 2017,
+    (https://arxiv.org/pdf/1709.00680.pdf). Provide the mu-angle of grid cell i,j
+    and multiply the resulting weight against spectrum i,j.
+
+        Parameters
+        ----------
+        mu : float, np.array()
+            the cosine of the angle between the line of sight and the stellar
+            surface vertical.
+        u1,u2: float,
+            Linear and quadratic limb-darkening coefficients.
+        Returns
+        -------
+        w: float
+            The weight, <= 1.
+    """
+    w=(1-u1*(1-mu)-u2*(1-mu)**2)
+    return(w)
