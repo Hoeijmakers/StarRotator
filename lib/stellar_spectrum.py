@@ -101,7 +101,8 @@ def read_spectrum(T,logg,metallicity=0,alpha=0):
         Returns
         -------
         wl,f : np.array(),np.array()
-            The wavelength and flux axes of the requested spectrum.
+            The wavelength (nm) and flux (erg/s/cm^2/cm) axes of the requested
+            spectrum.
         """
     import  numpy as np
     import sys
@@ -122,7 +123,7 @@ def read_spectrum(T,logg,metallicity=0,alpha=0):
         wavename,specname=get_spectrum(T,logg,metallicity,alpha)
         f = fits.getdata(specname)
         w = fits.getdata(wavename)
-        return(w,f)
+        return(w/10.0,f)#Implicit unit conversion here.
     else:
         print('Error: Provided combination of T, log(g), Fe/H and a/M is out of bounds.')
         print('The following values are accepted:')

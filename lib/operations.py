@@ -1,3 +1,6 @@
+#This file contains a collection of functions that operate on spectra.
+
+
 def shift(wl,fx,dv):
     """Doppler-shift a spectrum.
 
