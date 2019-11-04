@@ -32,3 +32,27 @@ def test_ld():
 
     if w1 != 1 or w2 !=0 or w3 != 0:
         print('ERROR: limb darkening does not pass.')
+
+
+
+def test_plotting():
+    import numpy as np
+    import imp
+    #We create a fake velocity map with a hole in it.
+    x = np.arange(-200,200,1)
+    y = np.arange(-200,200,1)
+    z = np.zeros((len(x),len(y)))
+    xp = 50
+    yp = 20#Fiducial planet coordinates.
+    for i in x:
+        for j in y:
+            if np.sqrt(x[i]**2 + y[j]**2) <= 190:
+                z[j,i] = x[i]/np.e
+            else:
+                z[j,i] = np.nan
+            if np.sqrt((x[i]-xp)**2 + (y[j]-yp)**2) <= 10:
+                z[j,i] = np.nan
+
+    import lib.plotting
+    imp.reload(lib.plotting)
+    lib.plotting.plot_star_2D(x,y,z,quantities=('x','y','v'),units=('','','km/s'),noshow=True)
