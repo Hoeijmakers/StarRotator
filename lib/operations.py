@@ -1,6 +1,15 @@
 #This file contains a collection of functions that operate on spectra.
 
-def shift(wl,fx,dv):
+def doppler(dv):
+    """This computes the relativistic doppler parameter."""
+    import astropy.constants as const
+    import numpy as np
+    c = const.c.value#Comes out in m/s.
+    beta = dv/c
+    return(np.sqrt((1+beta)/(1-beta)))#Relativistic Doppler effect.
+
+
+def shift(wl,wl_wide,fx,dv):
     """Doppler-shift a spectrum.
 
         Parameters
@@ -24,14 +33,12 @@ def shift(wl,fx,dv):
     from scipy.interpolate import interp1d
     import astropy.constants as const
     import numpy as np
+    import pdb
 
-
-    c = const.c.value#Comes out in m/s.
-
-    beta = dv/c
-    wl_shifted =  wl*np.sqrt((1+beta)/(1-beta))#Relativistic Doppler effect.
+    wl_shifted =  wl_wide*doppler(dv)#Relativistic Doppler effect.
     fx_i=interp1d(wl_shifted,fx,bounds_error=False)#Put NaNs at the edges.
-    fx_shifted=fx_i(wl)#Interpolated onto wl
+    fx_shifted=fx_i(wl)#Interpolated onto the narrower wl.
+    # pdb.set_trace()
     return(fx_shifted)
 
 
