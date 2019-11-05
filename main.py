@@ -10,48 +10,22 @@ import sys
 import numpy as np
 import argparse
 import lib.test as test
-
-#helper function to convert angles in radians
-#comment Julia: maybe we can create a utils.py file?
-def convert_angle_to_rad(angle):
-    return 2.*np.pi/360.*angle
-    
-#import function files
-def calc_vel_stellar(x,y,i_stellar, vel_eq, diff_rot_rate, proj_obliquity):
-    """
-    based on Cegla+2016. See Fig. 3 and equations 2 - 8
-    https://arxiv.org/pdf/1602.00322.pdf
-    It takes the stellar parameters and then calculates the stellar velocities in all bins for one quarter of the stellar disk
-    input: x, y: 1D numpy arrays to create the stellar grid in units of stellar radius
-           i_stellar: inclination in degrees
-           vel_eq: equatorial stellar velocity
-           diff_rot_rate: differential rotation rate
-           proj_obliquity: projected obliquity
-    output: vel_stellar_grid: 2D numpy array of stellar velocities over one quarter of the stellar disk
-    """
-    #careful! all angles have to be in radiant!
-    #Think carefully about which ones of these have to be transposed
-
-    #convert angles to rad
-    alpha = convert_angle_to_rad(proj_obliquity)
-    beta = convert_angle_to_rad(i_stellar)
-    #pre calculate matrices
-    
-    xy = np.einsum('i,j->ij',x,y)
-    x_full = np.tile(x,(len(x),1))
-    y_full = np.tile(y,(len(y),1)).T
-    x_sq = x_full*x_full
-    y_sq=y_full*y_full
-    #this is the z coordinate in the tilted coordinate system from Cegla+2016
-    # with some trigonometry magic
-    z = np.sqrt(1.-x_sq-y_sq)
-
-    #equation 8 from Cegla+2016
-    vel_stellar_grid = (x_full*np.cos(alpha)-y_full*np.sin(alpha))*vel_eq*np.sin(beta)*(1.-diff_rot_rate*(z*np.sin(np.pi/2.-beta)+np.cos(np.pi/2.-beta)*(x_full*np.sin(alpha)-y_full*np.cos(alpha))))
-    
-    return vel_stellar_grid
-
+import lib.vgrid as vgrid
+import lib.plotting as plt
+import lib.operations as ops
+import lib.stellar_spectrum as spectrum
+import pdb
+import time
+import matplotlib.pyplot as pl
 #main body of code
+
+
+def statusbar(i,x):
+    if type(x) == int:
+        print('  '+f"{i/(float(x)-1)*100:.1f} %", end="\r")
+    else:
+        print('  '+f"{i/(len(x)-1)*100:.1f} %", end="\r")#Statusbar.
+
 if __name__ == '__main__':
 
     #call parser, gets the input parameters from the user
@@ -77,11 +51,43 @@ if __name__ == '__main__':
         test.test_parser(args)
     except ValueError as err:
         print("Parser: ",err.args)
-    
+
+
+    T = 5000.0
+    logg = 4.5
+
+
     #two arrays for the x and y axis
     x = np.linspace(-1,1,num=2*args.grid_size) #in units of stellar radius
     y = np.linspace(-1,1,num=2*args.grid_size) #in units of stellar radius
 
     #calculate the velocity grid
-    vel_grid = calc_vel_stellar(x,y,args.stelinc,args.velStar,args.drr, args.pob)
-    print(vel_grid)
+    vel_grid = vgrid.calc_vel_stellar(x,y,args.stelinc,args.velStar,args.drr, args.pob)
+
+    plt.plot_star_2D(x,y,vel_grid,cmap="hot",quantities=['x-coordinate','y-coordinate','Radial velocity'],units=['R_*','R_*','(m/s)'],noshow=False)
+
+    F = 0#output
+    wl,fx = spectrum.read_spectrum(T,logg)
+
+    wlc = wl[(wl >= args.wave_start) & (wl <= args.wave_end)]
+    fxc = fx[(wl >= args.wave_start) & (wl <= args.wave_end)]
+
+    #To do:
+    #De-rotate the axes.
+    #Pre-calculate mu grid along with v grid.
+    #Deal with edge effects interpolation vis a vis wl clipping.
+    #Debug shifting.
+    start = time.time()
+    for i in range(len(x)):
+        for j in range(len(y)):
+            F+=ops.shift(wlc,fxc,vel_grid[j,i])*ops.limb_darkening(np.sqrt(x[i]**2+y[j]**2),0.387,0.178)
+        statusbar(i,len(x))
+    print(time.time()-start)
+    pl.plot(wlc,fxc)
+    pl.plot(wlc,F)
+    pl.show()
+
+    F_behind_planet = =
+    for i_in_planet:
+        for j_in_planet:
+    output = F -
