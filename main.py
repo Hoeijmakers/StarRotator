@@ -44,7 +44,7 @@ def calc_vel_stellar(x,y,i_stellar, vel_eq, diff_rot_rate, proj_obliquity):
     y_sq=y_full*y_full
     #this is the z coordinate in the tilted coordinate system from Cegla+2016
     # with some trigonometry magic
-    z = np.sqrt(1.-x_sq-y_sq+4.*xy*np.sin(alpha)*np.cos(alpha))
+    z = np.sqrt(1.-x_sq-y_sq)
 
     #equation 8 from Cegla+2016
     vel_stellar_grid = (x_full*np.cos(alpha)-y_full*np.sin(alpha))*vel_eq*np.sin(beta)*(1.-diff_rot_rate*(z*np.sin(np.pi/2.-beta)+np.cos(np.pi/2.-beta)*(x_full*np.sin(alpha)-y_full*np.cos(alpha))))
@@ -79,8 +79,8 @@ if __name__ == '__main__':
         print("Parser: ",err.args)
     
     #two arrays for the x and y axis
-    x = np.linspace(0,1,num=args.grid_size) #in units of stellar radius
-    y = np.linspace(0,1,num=args.grid_size) #in units of stellar radius
+    x = np.linspace(-1,1,num=2*args.grid_size) #in units of stellar radius
+    y = np.linspace(-1,1,num=2*args.grid_size) #in units of stellar radius
 
     #calculate the velocity grid
     vel_grid = calc_vel_stellar(x,y,args.stelinc,args.velStar,args.drr, args.pob)
