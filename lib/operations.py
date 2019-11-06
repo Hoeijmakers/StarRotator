@@ -1,5 +1,6 @@
 #This file contains a collection of functions that operate on spectra.
 
+
 def doppler(dv):
     """This computes the relativistic doppler parameter."""
     import astropy.constants as const
@@ -59,6 +60,53 @@ def airtovac(wlnm):
     s = 1e4 / wlA
     n = 1 + 0.00008336624212083 + 0.02408926869968 / (130.1065924522 - s**2) + 0.0001599740894897 / (38.92568793293 - s**2)
     return(wlA*n/10.0)
+
+
+
+def clip_spectrum(wl,fx,wlmin,wlmax,pad=0):
+    """This crops a spectrum wl,fx to wlmin and wlmax.
+    If pad !=0, it should be set to a positive velocity
+    by which the output spectrum will be padded around wlmin,wlmax,
+    which is returned as well as the narrower cropped spectrum.
+
+        Parameters
+        ----------
+        wl : np.array()
+            The stellar model wavelength(s) in nm.
+
+        fx : np.array()
+            The stellar model flux.
+
+        wlmin: float
+            The minimum cropping wavelength.
+
+        wlmax: float
+            The maximum cropping wavelength.
+
+        pad: float, m/s, optional
+            A velocity corresponding to a shift around which the cropped array will
+            be padded.
+
+        Returns
+        -------
+        wl,fx: np.array(), np.array()
+            The wavelength and flux of the integrated spectrum.
+            """
+
+
+
+    wlc = wl[(wl >= wlmin) & (wl <= wlmax)]#This is the wavelength grid onto which we will interpolate the final result.
+    fxc = fx[(wl >= wlmin) & (wl <= wlmax)]
+
+    if pad > 0:
+        wlmin_wide = wlmin*doppler(pad)#x2 to have some margin.
+        wlmax_wide = wlmax*doppler(pad)
+        wlc_wide = wl[(wl >= wlmin_wide) & (wl <= wlmax_wide)]
+        fxc_wide = fx[(wl >= wlmin_wide) & (wl <= wlmax_wide)]
+        return(wlc,fxc,wlc_wide,fxc_wide)
+    else:
+        return(wlc,fxc)
+
 
 def vactoair(wlnm):
     """Convert vaccuum to air wavelengths.

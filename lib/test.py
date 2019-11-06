@@ -33,6 +33,45 @@ def test_ld():
     if w1 != 1 or w2 !=0 or w3 != 0:
         print('ERROR: limb darkening does not pass.')
 
+def test_integrators():
+    """This tests the consistency of the fast and the slow surface integrators."""
+    import numpy as np
+    import lib.vgrid as vgrid
+    import lib.plotting as plt
+    import lib.operations as ops
+    import lib.stellar_spectrum as spectrum
+    import lib.integrate as integrate
+    import time
+    import matplotlib.pyplot as pl
+    T = 5000.0
+    logg = 4.5
+    u1 = 0.387
+    u2 = 0.178
+
+    #two arrays for the x and y axis
+    x = np.linspace(-1,1,num=2*200) #in units of stellar radius
+    y = np.linspace(-1,1,num=2*200) #in units of stellar radius
+
+    #calculate the velocity grid
+    print('Calculating vgrid')
+    vel_grid = vgrid.calc_vel_stellar(x,y,90.0,30000.0,0.0,0.0)
+    print('Calculating flux grid')
+    flux_grid = vgrid.calc_flux_stellar(x,y,u1,u2)
+    print('Reading spectrum')
+    wl,fx = spectrum.read_spectrum(T,logg)
+    print('Integrating (fast)')
+    wlF,F = integrate.build_spectrum_fast(wl,fx,350.0,760.0,x,y,vel_grid,flux_grid)
+    print('Integrating (slow)')
+    wlF2,F2 = integrate.build_spectrum_slow(wl,fx,350.0,760.0,x,y,vel_grid,flux_grid)
+    epsilon = np.abs(np.nansum(F-F2)/np.nansum(F))
+    if epsilon > 1e-8:
+        raise Exception("Error: The integrated difference of the spectra built with the slow and fast integrators differs by more than 1e-8 times the integrated spectrum.")
+
+    pl.plot(wl,fx)
+    pl.plot(wlF,F)
+    pl.plot(wlF2,F2)
+    pl.xlim((350.0,760.0))
+    pl.show()
 
 
 def test_plotting():
@@ -56,3 +95,7 @@ def test_plotting():
     import lib.plotting
     imp.reload(lib.plotting)
     lib.plotting.plot_star_2D(x,y,z,quantities=('x','y','v'),units=('','','km/s'),noshow=True)
+
+def test_plot_3D():
+    import lib.plotting
+    lib.plotting.plot_star_3D()

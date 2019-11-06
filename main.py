@@ -14,6 +14,7 @@ import lib.vgrid as vgrid
 import lib.plotting as plt
 import lib.operations as ops
 import lib.stellar_spectrum as spectrum
+import lib.integrate as integrate
 import pdb
 import time
 import matplotlib.pyplot as pl
@@ -21,11 +22,7 @@ import math
 #main body of code
 
 
-def statusbar(i,x):
-    if type(x) == int:
-        print('  '+f"{i/(float(x)-1)*100:.1f} %", end="\r")
-    else:
-        print('  '+f"{i/(len(x)-1)*100:.1f} %", end="\r")#Statusbar.
+
 
 if __name__ == '__main__':
 
@@ -53,10 +50,12 @@ if __name__ == '__main__':
     except ValueError as err:
         print("Parser: ",err.args)
 
-
+    test.test_integrators()
+    pdb.set_trace()
     T = 5000.0
     logg = 4.5
-
+    u1 = 0.387
+    u2 = 0.178
 
     #two arrays for the x and y axis
     x = np.linspace(-1,1,num=2*args.grid_size) #in units of stellar radius
@@ -64,41 +63,14 @@ if __name__ == '__main__':
 
     #calculate the velocity grid
     vel_grid = vgrid.calc_vel_stellar(x,y,args.stelinc,args.velStar,args.drr, args.pob)
-
-    # plt.plot_star_2D(x,y,vel_grid,cmap="hot",quantities=['x-coordinate','y-coordinate','Radial velocity'],units=['R_*','R_*','(m/s)'],noshow=False)
-
-    F = 0#output
+    flux_grid = vgrid.calc_flux_stellar(x,y,u1,u2)
+    # plt.plot_star_2D(x,y,flux_grid,cmap="hot",quantities=['x-coordinate','y-coordinate','Radial velocity'],units=['R_*','R_*','(m/s)'],noshow=False)
     wl,fx = spectrum.read_spectrum(T,logg)
 
-    wlmin = args.wave_start
-    wlmax = args.wave_end
-    wlmin_wide = args.wave_start*ops.doppler(np.nanmin(2.0*vel_grid))#x2 to have some margin.
-    wlmax_wide = args.wave_end*ops.doppler(np.nanmax(2.0*vel_grid))
-
-    wlc_wide = wl[(wl >= wlmin_wide) & (wl <= wlmax_wide)]
-    fxc_wide = fx[(wl >= wlmin_wide) & (wl <= wlmax_wide)]
-    wlc = wl[(wl >= wlmin) & (wl <= wlmax)]#This is the wavelength grid onto which we will interpolate the final result.
-
-    #To do:
-    #De-rotate the axes.
-    #Pre-calculate mu grid along with v grid.
-    #Deal with edge effects interpolation vis a vis wl clipping.
-    #Debug shifting.
-
-    N=np.nansum(vel_grid*0.0+1.0)#This is the total number of non-nan gridpoints.
-    # plt.plot_star_2D(x,y,vel_grid*0.0+1.0)
-    start = time.time()
-    for i in range(len(x)):
-        for j in range(len(y)):
-            if math.isnan(vel_grid[j,i]) == False:
-                F+=ops.shift(wlc,wlc_wide,fxc_wide,vel_grid[j,i])*ops.limb_darkening(np.sqrt(x[i]**2+y[j]**2),0.387,0.178)
-        statusbar(i,len(x))
-    F/=N
-    #Flux is not yet conserved because the limbdarkening doesnt integrate to 1. Need a limbdarkening map!
-    print(time.time()-start)
-    pl.plot(wlc_wide,fxc_wide)
-    pl.plot(wlc,F)
-    pl.show()
+    if args.drr == 0:
+        wlF,F = integrate.build_spectrum_fast(wl,fx,args.wave_start,args.wave_end,x,y,vel_grid,flux_grid)
+    else:
+        wlF,F = integrate.build_spectrum_slow(wl,fx,args.wave_start,args.wave_end,x,y,vel_grid,flux_grid)
 
     # F_behind_planet = =
     # for i_in_planet:
