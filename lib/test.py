@@ -49,8 +49,8 @@ def test_integrators():
     u2 = 0.178
 
     #two arrays for the x and y axis
-    x = np.linspace(-1,1,num=2*200) #in units of stellar radius
-    y = np.linspace(-1,1,num=2*200) #in units of stellar radius
+    x = np.linspace(-1,1,num=2*20) #in units of stellar radius
+    y = np.linspace(-1,1,num=2*20) #in units of stellar radius
 
     #calculate the velocity grid
     print('Calculating vgrid')
@@ -60,18 +60,17 @@ def test_integrators():
     print('Reading spectrum')
     wl,fx = spectrum.read_spectrum(T,logg)
     print('Integrating (fast)')
-    wlF,F = integrate.build_spectrum_fast(wl,fx,350.0,760.0,x,y,vel_grid,flux_grid)
+    wlF,F = integrate.build_spectrum_fast(wl,fx,550.0,560.0,x,y,vel_grid,flux_grid)
     print('Integrating (slow)')
-    wlF2,F2 = integrate.build_spectrum_slow(wl,fx,350.0,760.0,x,y,vel_grid,flux_grid)
+    wlF2,F2 = integrate.build_spectrum_slow(wl,fx,550.0,560.0,x,y,vel_grid,flux_grid)
     epsilon = np.abs(np.nansum(F-F2)/np.nansum(F))
     if epsilon > 1e-8:
         raise Exception("Error: The integrated difference of the spectra built with the slow and fast integrators differs by more than 1e-8 times the integrated spectrum.")
-
-    pl.plot(wl,fx)
-    pl.plot(wlF,F)
-    pl.plot(wlF2,F2)
-    pl.xlim((350.0,760.0))
-    pl.show()
+    # pl.plot(wl,fx)
+    # pl.plot(wlF,F)
+    # pl.plot(wlF2,F2)
+    # pl.xlim((550.0,560.0))
+    # pl.show()
 
 
 def test_plotting():
