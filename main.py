@@ -51,7 +51,7 @@ if __name__ == '__main__':
         print("Parser: ",err.args)
 
     test.test_integrators()
-    pdb.set_trace()
+
     T = 5000.0
     logg = 4.5
     u1 = 0.387
@@ -64,15 +64,9 @@ if __name__ == '__main__':
     #calculate the velocity grid
     vel_grid = vgrid.calc_vel_stellar(x,y,args.stelinc,args.velStar,args.drr, args.pob)
     flux_grid = vgrid.calc_flux_stellar(x,y,u1,u2)
-    # plt.plot_star_2D(x,y,flux_grid,cmap="hot",quantities=['x-coordinate','y-coordinate','Radial velocity'],units=['R_*','R_*','(m/s)'],noshow=False)
     wl,fx = spectrum.read_spectrum(T,logg)
 
     if args.drr == 0:
         wlF,F = integrate.build_spectrum_fast(wl,fx,args.wave_start,args.wave_end,x,y,vel_grid,flux_grid)
     else:
         wlF,F = integrate.build_spectrum_slow(wl,fx,args.wave_start,args.wave_end,x,y,vel_grid,flux_grid)
-
-    # F_behind_planet = =
-    # for i_in_planet:
-    #     for j_in_planet:
-    # output = F -
