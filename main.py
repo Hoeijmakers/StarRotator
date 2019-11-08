@@ -19,6 +19,7 @@ import pdb
 import time
 import matplotlib.pyplot as pl
 import math
+import matplotlib.animation as animation
 #main body of code
 
 
@@ -52,10 +53,12 @@ if __name__ == '__main__':
 
     test.test_integrators()
 
-    T = 5000.0
+    T = 6000.0
     logg = 4.5
     u1 = 0.387
+    u1 = 0.0
     u2 = 0.178
+    u2 = 0.1
 
     #two arrays for the x and y axis
     x = np.linspace(-1,1,num=2*args.grid_size) #in units of stellar radius
@@ -70,3 +73,57 @@ if __name__ == '__main__':
         wlF,F = integrate.build_spectrum_fast(wl,fx,args.wave_start,args.wave_end,x,y,vel_grid,flux_grid)
     else:
         wlF,F = integrate.build_spectrum_slow(wl,fx,args.wave_start,args.wave_end,x,y,vel_grid,flux_grid)
+
+
+    #The following creates a transiting planet. We will need to offload it to some
+    #tutorial-kind of script, but I put it here for now.
+
+    RpRs = 0.2
+    nsteps = 100
+    xp = np.linspace(-2.0,2.0,nsteps)
+    yp = np.linspace(-0.5,0.2,nsteps)
+    lightcurve = []
+    void1,void2,minflux,void3 = integrate.build_local_spectrum_fast(0,0,RpRs,wl,fx,args.wave_start,args.wave_end,x,y,vel_grid,flux_grid)
+    for i in range(len(xp)):
+        wlp,Fp,flux,mask = integrate.build_local_spectrum_fast(xp[i],yp[i],RpRs,wl,fx,args.wave_start,args.wave_end,x,y,vel_grid,flux_grid)
+        lightcurve.append(flux)
+        fig,ax = pl.subplots(nrows=2, ncols=2,figsize=(8,8))
+        ax[0][0].pcolormesh(x,y,flux_grid*mask,vmin=0,vmax=1.0*np.nanmax(flux_grid),cmap='autumn')
+        ax[1][0].pcolormesh(x,y,vel_grid*mask,cmap='bwr')
+        ax[0][0].axes.set_aspect('equal')
+        ax[1][0].axes.set_aspect('equal')
+
+        ax[0][1].plot(lightcurve,'.',color='black')
+        ax[0][1].set_xlim((0,nsteps))
+        ax[0][1].set_ylim((minflux-0.1*RpRs**2.0),1.0+0.1*RpRs**2)
+        ax[1][1].plot(wlF,F/np.nanmax(F),color='black',alpha = 0.5)
+        ax[1][1].plot(wlF,(F-Fp)/np.nanmax(F-Fp),color='black')
+        ax[1][1].set_xlim((589.0,589.3))
+
+        ax[0][0].set_ylabel('Y (Rs)',fontsize=7)
+        ax[0][0].tick_params(axis='both', which='major', labelsize=8)
+        ax[0][0].tick_params(axis='both', which='minor', labelsize=6)
+
+        ax[1][0].set_ylabel('Y (Rs)',fontsize=7)
+        ax[1][0].set_xlabel('X (Rs)',fontsize=7)
+        ax[1][0].tick_params(axis='both', which='major', labelsize=8)
+        ax[1][0].tick_params(axis='both', which='minor', labelsize=6)
+
+        ax[0][1].set_ylabel('Normalised flux',fontsize=7)
+        ax[0][1].set_xlabel('Timestep',fontsize='small')
+        ax[0][1].tick_params(axis='both', which='major', labelsize=8)
+        ax[0][1].tick_params(axis='both', which='minor', labelsize=6)
+
+        ax[1][1].set_ylabel('Normalised flux',fontsize=7)
+        ax[1][1].set_xlabel('Wavelength (nm)',fontsize=7)
+        ax[1][1].tick_params(axis='both', which='major', labelsize=8)
+        ax[1][1].tick_params(axis='both', which='minor', labelsize=6)
+        # pl.show()
+        # sys.exit()
+        if len(str(i)) == 1:
+            out = '000'+str(i)
+        if len(str(i)) == 2:
+            out = '00'+str(i)
+        if len(str(i)) == 3:
+            out = '0'+str(i)
+        fig.savefig('anim/'+out+'.png', dpi=fig.dpi)
