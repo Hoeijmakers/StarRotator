@@ -33,6 +33,7 @@ def test_ld():
     if w1 != 1 or w2 !=0 or w3 != 0:
         print('ERROR: limb darkening does not pass.')
 
+
 def test_integrators():
     """This tests the consistency of the fast and the slow surface integrators."""
     import numpy as np
@@ -43,29 +44,43 @@ def test_integrators():
     import lib.integrate as integrate
     import time
     import matplotlib.pyplot as pl
-    T = 5000.0
+    import sys
+    import pdb
+    T = 10000.0
     logg = 4.5
     u1 = 0.387
     u2 = 0.178
-
+    wlmin = 588.2
+    wlmax = 590.0
     #two arrays for the x and y axis
-    x = np.linspace(-1,1,num=2*20) #in units of stellar radius
-    y = np.linspace(-1,1,num=2*20) #in units of stellar radius
+    x = np.linspace(-1,1,num=2*25) #in units of stellar radius
+    y = np.linspace(-1,1,num=2*25) #in units of stellar radius
 
     #calculate the velocity grid
-    print('Calculating vgrid')
-    vel_grid = vgrid.calc_vel_stellar(x,y,90.0,30000.0,0.0,0.0)
-    print('Calculating flux grid')
+    vel_grid = vgrid.calc_vel_stellar(x,y,90.0,100000.0,0.0,0.0)
     flux_grid = vgrid.calc_flux_stellar(x,y,u1,u2)
-    print('Reading spectrum')
     wl,fx = spectrum.read_spectrum(T,logg)
-    print('Integrating (fast)')
-    wlF,F = integrate.build_spectrum_fast(wl,fx,550.0,560.0,x,y,vel_grid,flux_grid)
-    print('Integrating (slow)')
-    wlF2,F2 = integrate.build_spectrum_slow(wl,fx,550.0,560.0,x,y,vel_grid,flux_grid)
+    wlF,F = integrate.build_spectrum_fast(wl,fx,wlmin,wlmax,x,y,vel_grid,flux_grid)
+
+
+    #Test the building of the local spectrum in-between.
+    wlFp,Fp,fluxp,mask = integrate.build_local_spectrum_fast(0.4,0.0,0.15,wl,fx,wlmin,wlmax,x,y,vel_grid,flux_grid)
+    wlFp2,Fp2,fluxp2,mask2 = integrate.build_local_spectrum_slow(0.4,0.0,0.15,wl,fx,wlmin,wlmax,x,y,vel_grid,flux_grid)
+    epsilon = np.abs(np.nansum(Fp-Fp2)/np.nansum(Fp))#Test that they are consistent within error.
+    if epsilon > 1e-8:
+        raise Exception("Error: The integrated difference of the local spectra built with the slow and fast integrators differs by more than 1e-8 times the integrated spectrum.")
+
+    #
+    # pdb.set_trace()
+    # pl.plot(wlF,F-np.nanmax(F))
+    # pl.plot(wlF,(F-Fp)-np.nanmax(F-Fp))
+    # pl.show()
+
+    #Test the slow star integrator and compare.
+    wlF2,F2 = integrate.build_spectrum_slow(wl,fx,wlmin,wlmax,x,y,vel_grid,flux_grid)
     epsilon = np.abs(np.nansum(F-F2)/np.nansum(F))
     if epsilon > 1e-8:
-        raise Exception("Error: The integrated difference of the spectra built with the slow and fast integrators differs by more than 1e-8 times the integrated spectrum.")
+        raise Exception("Error: The integrated difference of the disk-integrated spectra built with the slow and fast integrators differs by more than 1e-8 times the integrated spectrum.")
     # pl.plot(wl,fx)
     # pl.plot(wlF,F)
     # pl.plot(wlF2,F2)
