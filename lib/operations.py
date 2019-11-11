@@ -132,6 +132,9 @@ def limb_darkening(mu,u1,u2):
     """Evaluate quadratic limb darkening, taken from de Mooij 2017,
     (https://arxiv.org/pdf/1709.00680.pdf). Provide the mu-angle of grid cell i,j
     and multiply the resulting weight against spectrum i,j.
+    
+    This formula has been updated for a
+    potential typo from (1-mu)**2 to (1-mu**2)
 
         Parameters
         ----------
@@ -145,5 +148,6 @@ def limb_darkening(mu,u1,u2):
         w: float
             The weight, <= 1.
     """
-    w=(1-u1*(1-mu)-u2*(1-mu)**2)
+    w=(1-u1*(1-mu)-u2*(1-mu**2))
+    
     return(w)
