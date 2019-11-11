@@ -4,7 +4,7 @@
 #
 #
 #####################
-
+#Call like: python3 main.py 586.0 592.0 110000.0 90.0 90.0 0.0 0.0 500
 #import statements
 import sys
 import numpy as np
@@ -55,9 +55,9 @@ if __name__ == '__main__':
     T = 10000.0
     logg = 4.5
     u1 = 0.387
-    u1 = 0.008
+    # u1 = 0.008
     u2 = 0.178
-    u2 = 0.1
+    # u2 = 0.1
 
     #two arrays for the x and y axis
     x = np.linspace(-1,1,num=2*args.grid_size) #in units of stellar radius
@@ -83,13 +83,15 @@ if __name__ == '__main__':
     nsteps = 100
     xp1 = np.linspace(-1.5,1.5,nsteps)
     yp1 = np.linspace(-0.5,0.2,nsteps)
-    xp2 = np.linspace(-0.1,-0.5,int(nsteps*1.0))
-    yp2 = np.linspace(2.5,-2.5,int(nsteps*1.0))
-    xp3 = np.linspace(1.3,0.0,nsteps)
-    yp3 = np.linspace(-0.5,1.3,nsteps)
+    # xp2 = np.linspace(-0.1,-0.5,int(nsteps*1.0))
+    # yp2 = np.linspace(2.5,-2.5,int(nsteps*1.0))
+    # xp3 = np.linspace(1.3,0.0,nsteps)
+    # yp3 = np.linspace(-0.5,1.3,nsteps)
 
-    xp = np.concatenate((xp1,xp2,xp3))
-    yp = np.concatenate((yp1,yp2,yp3))
+    # xp = np.concatenate((xp1,xp2,xp3))
+    # yp = np.concatenate((yp1,yp2,yp3))
+    xp=xp1
+    yp=yp1
     lightcurve = []
     void1,void2,minflux,void3 = integrate.build_local_spectrum_fast(0,0,0.16,wl,fx,args.wave_start,args.wave_end,x,y,vel_grid,flux_grid)
     for i in range(len(xp)):
@@ -159,6 +161,7 @@ if __name__ == '__main__':
             out = '0'+str(i)
         if len(str(i)) == 4:
             out = str(i)
+
         fig.savefig('anim/'+out+'.png', dpi=fig.dpi)
         integrate.statusbar(i,xp)
         pl.close()
