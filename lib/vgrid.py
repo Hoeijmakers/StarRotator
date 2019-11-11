@@ -33,9 +33,9 @@ def calc_vel_stellar(x,y,i_stellar, vel_eq, diff_rot_rate, proj_obliquity):
 #    vel_stellar_grid = (x_full*np.cos(alpha)-y_full*np.sin(alpha))*vel_eq*np.sin(beta)*(1.-diff_rot_rate*(z*np.sin(np.pi/2.-beta)+np.cos(np.pi/2.-beta)*(x_full*np.sin(alpha)-y_full*np.cos(alpha))))
 
      #this has the star aligned to the coordinate system. Like this the projected obliquity is not incorporated here. The tilt of the star compared to the planet has to be incorporated in the planet's path.
-     vel_stellar_grid = x_full*vel_eq*np.sin(beta)*(1.-diff_rot_rate*(z*np.sin(np.pi/2.-beta)+np.cos(np.pi/2.-beta)*y_full)
-     
-    return vel_stellar_grid
+    vel_stellar_grid = x_full*vel_eq*np.sin(beta)*(1.-diff_rot_rate*(z*np.sin(np.pi/2.-beta)+np.cos(np.pi/2.-beta)*y_full))
+
+    return(vel_stellar_grid)
 
 
 def calc_flux_stellar(x,y,u1,u2):
@@ -54,7 +54,7 @@ def calc_flux_stellar(x,y,u1,u2):
     for i in range(len(x)):
         for j in range(len(y)):
             if np.sqrt(x[i]**2+y[j]**2) <= 1.0:
-                flux_grid[j,i]=ops.limb_darkening((1.0-np.sqrt(x[i]**2+y[j]**2)),u1,u2)*(z[j,i]*0.0+1.0)#Last multiplication is to put NaNs back into place.
+                flux_grid[j,i]=ops.limb_darkening((np.sqrt(x[i]**2+y[j]**2)),u1,u2)*(z[j,i]*0.0+1.0)#Last multiplication is to put NaNs back into place.
 
     # plotting.plot_star_2D(x,y,mu_grid,cmap="hot",quantities=['','',''],units=['','',''],noshow=False)
     flux_grid /= np.nansum(flux_grid)
