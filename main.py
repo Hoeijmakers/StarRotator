@@ -55,9 +55,15 @@ if __name__ == '__main__':
     T = 10000.0
     logg = 4.5
     u1 = 0.387
+<<<<<<< HEAD
     # u1 = 0.008
     u2 = 0.178
     # u2 = 0.1
+=======
+    #u1 = 0.0
+    u2 = 0.178
+#    u2 = 0.1
+>>>>>>> c838650572c33aa34b147322916c94993c502f9e
 
     #two arrays for the x and y axis
     x = np.linspace(-1,1,num=2*args.grid_size) #in units of stellar radius
