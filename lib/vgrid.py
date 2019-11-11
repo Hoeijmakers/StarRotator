@@ -26,11 +26,15 @@ def calc_vel_stellar(x,y,i_stellar, vel_eq, diff_rot_rate, proj_obliquity):
     y_sq=y_full*y_full
     #this is the z coordinate in the tilted coordinate system from Cegla+2016
     # with some trigonometry magic
+    #it's also the z coordinate in the untilted system for similarity reasons
     z = np.sqrt(1.-x_sq-y_sq)
 
     #equation 8 from Cegla+2016
-    vel_stellar_grid = (x_full*np.cos(alpha)-y_full*np.sin(alpha))*vel_eq*np.sin(beta)*(1.-diff_rot_rate*(z*np.sin(np.pi/2.-beta)+np.cos(np.pi/2.-beta)*(x_full*np.sin(alpha)-y_full*np.cos(alpha))))
+#    vel_stellar_grid = (x_full*np.cos(alpha)-y_full*np.sin(alpha))*vel_eq*np.sin(beta)*(1.-diff_rot_rate*(z*np.sin(np.pi/2.-beta)+np.cos(np.pi/2.-beta)*(x_full*np.sin(alpha)-y_full*np.cos(alpha))))
 
+     #this has the star aligned to the coordinate system. Like this the projected obliquity is not incorporated here. The tilt of the star compared to the planet has to be incorporated in the planet's path.
+     vel_stellar_grid = x_full*vel_eq*np.sin(beta)*(1.-diff_rot_rate*(z*np.sin(np.pi/2.-beta)+np.cos(np.pi/2.-beta)*y_full)
+     
     return vel_stellar_grid
 
 
