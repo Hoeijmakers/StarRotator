@@ -3,3 +3,5 @@ lib/__pycache__
 lib/.DS_Store
 data/
 .DS_Store
+anim/
+*.gif
