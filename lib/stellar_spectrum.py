@@ -33,6 +33,19 @@ def get_spectrum(T,logg,Z,a):
     from contextlib import closing
     import sys
     import os.path
+    import lib.test as test
+
+    #First run standard tests on the input
+    test.typetest(T,[int,float],varname='T in get_spectrum')
+    test.typetest(logg,[int,float],varname='logg in get_spectrum')
+    test.typetest(Z,[int,float],varname='metallicity in get_spectrum')
+    test.typetest(a,[int,float],varname='alpha in get_spectrum')
+    test.nantest(T,varname='T in get_spectrum')
+    test.nantest(logg,varname='logg in get_spectrum')
+    test.nantest(Z,varname='Z in get_spectrum')
+    test.nantest(a,varname='a in get_spectrum')
+    test.notnegativetest(T,varname='T in get_spectrum')
+
     #This is where phoenix spectra are located.
     root = 'ftp://phoenix.astro.physik.uni-goettingen.de/HiResFITS/'
 
@@ -75,7 +88,7 @@ def get_spectrum(T,logg,Z,a):
                 shutil.copyfileobj(r, f)
     return(wavename,specname)
 
-def read_spectrum(T,logg,metallicity=0,alpha=0):
+def read_spectrum(T,logg,metallicity=0.0,alpha=0.0):
     """Wrapper for the function get_spectrum() above, that checks that the input
         T, log(g), metallicity and alpha are in accordance with what is provided by
         PHOENIX (as of November 1st, 2019), and passes them on to get_spectrum().
@@ -83,18 +96,18 @@ def read_spectrum(T,logg,metallicity=0,alpha=0):
 
         Parameters
         ----------
-        T : int, float
+        T : int,float
             The model photosphere temperature. Acceptable values are:
             2300 - 7000 in steps of 100, and 7200 - 12000 in steps of 200.
-        logg : int, float
+        logg : int,float
             The model log(g) value. Acceptable values are:
             -4.0 - 1.5 in steps of 0.5.
-        metallicity : int, float (optional, default = 0)
+        metallicity : int,float (optional, default = 0)
             The model metallicity [Fe/H] value. Acceptable values are:
             -4.0, -3.0, -2.0 and -1.5 to +1.0 in steps of 0.5.
             If no location is given, the ``location`` attribute of the Time
             object is used
-        alpha : int, float (optional, default = 0)
+        alpha : int,float (optional, default = 0)
             The model alpha element enhancement [alpha/M]. Acceptable values are:
             -0.2 to 1.2 in steps of 0.2, but only for Fe/H of -3.0 to 0.0.
 
@@ -104,9 +117,21 @@ def read_spectrum(T,logg,metallicity=0,alpha=0):
             The wavelength (nm) and flux (erg/s/cm^2/cm) axes of the requested
             spectrum.
         """
-    import  numpy as np
+    import numpy as np
     import sys
     import astropy.io.fits as fits
+    import lib.test as test
+    #First run standard tests on the input:
+    test.typetest(T,[int,float],varname='T in read_spectrum')
+    test.typetest(logg,[int,float],varname='logg in read_spectrum')
+    test.typetest(metallicity,[int,float],varname='metallicity in read_spectrum')
+    test.typetest(alpha,[int,float],varname='alpha in read_spectrum')
+    test.nantest(T,varname='T in get_spectrum')
+    test.nantest(logg,varname='logg in get_spectrum')
+    test.nantest(metallicity,varname='Z in get_spectrum')
+    test.nantest(alpha,varname='a in get_spectrum')
+    test.notnegativetest(T,varname='T in get_spectrum')
+
 
     #These contain the acceptable values.
     T_a = np.concatenate((np.arange(2300,7100,100),np.arange(7200,12200,200)))
@@ -126,6 +151,7 @@ def read_spectrum(T,logg,metallicity=0,alpha=0):
         return(w/10.0,f)#Implicit unit conversion here.
     else:
         print('Error: Provided combination of T, log(g), Fe/H and a/M is out of bounds.')
+        print('T = %s, log(g) = %s, Fe/H = %s, a/M = %s' % (T,logg,metallicity,alpha))
         print('The following values are accepted:')
         print('T:')
         print(T_a)
