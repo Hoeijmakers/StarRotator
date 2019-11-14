@@ -2,9 +2,22 @@
 
 
 def doppler(dv):
-    """This computes the relativistic doppler parameter."""
+    """This computes the relativistic doppler parameter.
+        Parameters
+        ----------
+        dv : float
+            The radial velocity in m/s
+
+        Returns
+        -------
+        x:  float
+            Returns the doppler parameter.
+    """
     import astropy.constants as const
     import numpy as np
+    import lib.test as test
+    # Do not perform tests because this thing is in a double forloop.
+    # test.typetest(dv,float,varname='dv in doppler(dv)')
     c = const.c.value#Comes out in m/s.
     beta = dv/c
     return(np.sqrt((1+beta)/(1-beta)))#Relativistic Doppler effect.
@@ -30,16 +43,15 @@ def shift(wl,wl_wide,fx,dv):
             The missing edge is set to NaN. The function calling this should better
             be able to handle NaNs.
     """
-
     from scipy.interpolate import interp1d
     import astropy.constants as const
     import numpy as np
     import pdb
 
+    #Do not run tests on the input here because this thing is in a double forloop somewhere.
     wl_shifted =  wl_wide*doppler(dv)#Relativistic Doppler effect.
     fx_i=interp1d(wl_shifted,fx,bounds_error=False)#Put NaNs at the edges.
     fx_shifted=fx_i(wl)#Interpolated onto the narrower wl.
-    # pdb.set_trace()
     return(fx_shifted)
 
 
@@ -56,6 +68,13 @@ def airtovac(wlnm):
         wl: float, np.array()
             The wavelengths.
     """
+    import lib.test as test
+    import numpy
+    #First run standard tests on the input
+    test.typetest(wlnm,[int,float,numpy.ndarray],varname='wlnm in airtovac')
+    test.notnegativetest(wlnm,varname='wlnm in airtovac')
+    test.nantest(wlnm,varname='wlnm in airtovac')
+    #Would still need to test that wl is in a physical range.
     wlA=wlnm*10.0
     s = 1e4 / wlA
     n = 1 + 0.00008336624212083 + 0.02408926869968 / (130.1065924522 - s**2) + 0.0001599740894897 / (38.92568793293 - s**2)
@@ -71,10 +90,10 @@ def clip_spectrum(wl,fx,wlmin,wlmax,pad=0):
 
         Parameters
         ----------
-        wl : np.array()
+        wl : np.ndarray()
             The stellar model wavelength(s) in nm.
 
-        fx : np.array()
+        fx : np.ndarray()
             The stellar model flux.
 
         wlmin: float
@@ -92,6 +111,20 @@ def clip_spectrum(wl,fx,wlmin,wlmax,pad=0):
         wl,fx: np.array(), np.array()
             The wavelength and flux of the integrated spectrum.
             """
+    import lib.test as test
+    import numpy as np
+    #First run standard tests on input
+    test.typetest(wl,np.ndarray,varname='wl in clip_spectrum')
+    test.typetest(fx,np.ndarray,varname='fx in clip_spectrum')
+    test.typetest(wlmin,[int,float],varname='wlmin in clip_spectrum')
+    test.typetest(wlmax,[int,float],varname='wlmax in clip_spectrum')
+    test.typetest(pad,[int,float],varname='pad in clip_spectrum')
+    test.notnegativetest(pad,varname='pad in clip_spectrum')
+    test.nantest(wlmin,varname='wlmin in clip_spectrum')
+    test.nantest(wlmax,varname='wlmax in clip_spectrum')
+    test.nantest(pad,varname='pad in clip_spectrum')
+    if wlmin >= wlmax:
+        raise ValueError('wlmin in clip_spectrum should be smaller than wlmax.')
 
 
 
@@ -121,6 +154,11 @@ def vactoair(wlnm):
         wl: float, np.array()
             The wavelengths.
     """
+    import lib.test as test
+    #First run standard tests on the input
+    test.typetest(wlnm,[int,float,numpy.ndarray],varname='wlnm in vactoair')
+    test.notnegativetest(wlnm,varname='wlnm in vactoair')
+    test.nantest(wlnm,varname='wlnm in vactoair')
     wlA = wlnm*10.0
     s = 1e4/wlA
     f = 1.0 + 5.792105e-2/(238.0185e0 - s**2) + 1.67917e-3/( 57.362e0 - s**2)
@@ -175,6 +213,15 @@ def limb_darkening(z,a1,a2):
         w: float
             The weight, <= 1.
     """
+    import lib.test as test
+    #First run standard tests on the input
+    test.typetest(z,[int,float],varname='z in limb_darkening')
+    test.typetest(a1,[int,float],varname='a1 in limb_darkening')
+    test.typetest(a2,[int,float],varname='a2 in limb_darkening')
+    test.nantest(z,varname='z in limb_darkening')
+    test.nantest(a1,varname='a1 in limb_darkening')
+    test.nantest(a2,varname='a2 in limb_darkening')
+
     import numpy as np
     if z > 1 or z < 0:
         raise ValueError("z coordinate should be in [0,1].")
