@@ -15,7 +15,7 @@ def statusbar(i,x):
         print('  '+f"{i/(len(x)-1)*100:.1f} %", end="\r")#Statusbar.
 
 def input_tests_local(xp,yp,RpRs):
-"""This wraps input tests for the local integrator functions, as these are the same in both cases."""
+    """This wraps input tests for the local integrator functions, as these are the same in both cases."""
     import lib.test as test
     #xp and yp should be ints or floats, and may not be NaN.
     test.typetest(xp,[int,float],varname='xp in build_local_spectrum_fast')
