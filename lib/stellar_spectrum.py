@@ -167,15 +167,14 @@ def read_spectrum(T,logg,metallicity=0.0,alpha=0.0):
         print(alpha_a)
         print('Alpha element enhancement != 0 only available for -3.0<[Fe/H]<0.0')
 
-def download_kurucz():
+def download_kurucz(outpath):
     from contextlib import closing
     import shutil
     import urllib.request as request
-    """ This is a one-time convenience function that downloads all of the stellar
+    """ This is a convenience function that downloads all of the stellar
     atmosphere "supermodel" grids of Robert Kurucz to the data/KURUCZ folder.
     Just the standard ones. For use with SPECTRUM."""
     root = 'http://kurucz.harvard.edu/grids/grid'
-    outpath = 'data/KURUCZ/'
     suffixes = ['M01','M02','M03','M05','M10','M15','M20','M25','M30','M35','M40','M45','M50','P00','P01','P02','P03','P05','P10']
 
     for s in suffixes:
@@ -186,16 +185,33 @@ def download_kurucz():
             with open(name, 'wb') as f:
                 shutil.copyfileobj(r, f)
 
+def available_kurucz_models():
+    """These hard-code the available Kurucz models, as present on Nov 22, 2019 on
+    'http://kurucz.harvard.edu/grids/grid'"""
+    import numpy as np
+    T_a = np.concatenate((np.arange(3500,13250,250),np.arange(13000,1000,51000)))
+    logg_a = np.arange(0,5.5,0.5)
+    Z_a = np.round(np.concatenate((np.arange(-5,0,0.5),np.arange(-0.3,0.4,0.1),np.array([0.5,1.0]))),decimals=1)#I need to do a rounding here because np.concatenate() makes a numerical error on the middle array... Weird!
+    return(T_a,logg_a,Z_a)
+
+def construct_kurucz_path(Z,root):
+    """This constructs the path to the kurucz models after they are downloaded
+    with download_kurucz()"""
+    mstring = str(Z).replace('.','')
+    if Z < 0:
+        s = 'm'
+        mstring=mstring.replace('-','')
+    else:
+        s = 'p'
+    mpath = root+'a'+s+mstring+'k2.dat'
+    return(mpath)
 
 
 
 
 
 
-
-
-
-def compute_spectrum(T,logg,Z,mu,wlmin,wlmax,macroturbulence=2.0,c_norm=False,isotope=True):
+def compute_spectrum(T,logg,Z,mu,wlmin,wlmax,macroturbulence=2.0,c_norm=False):
     """If the CLV effect needs to be taken into account, PHOENIX spectra cannot
         be used, and the SPECTRUM package will be used to calculate spectra.
         For this functionality to work, the user needs to have built the SPECTRUM
@@ -256,22 +272,29 @@ def compute_spectrum(T,logg,Z,mu,wlmin,wlmax,macroturbulence=2.0,c_norm=False,is
     import astropy.io.ascii as ascii
     from lib.integrate import statusbar
     import lib.operations as ops
+    from os import path
+    kurucz_root = 'data/KURUCZ/'#THIS IS THE SECOND TIME THIS IS DEFINED. SHOULD MATCH THE DEFINITION IN test_KURUCZ()!
+    spath = './lib/SPECTRUM/selectmod'#This points to the supermod function.
+    SPECTRUM = './lib/SPECTRUM/spectrum'#This points to spectrum.
+    test.dir_exists('./lib/SPECTRUM/',varname = 'SPECTRUM root folder')
+    test.dir_exists(kurucz_root,varname='Kurucz model folder')
+    test.file_exists(spath,varname=spath+'in compute_spectrum()')
+    test.file_exists(SPECTRUM,varname=spath+'in compute_spectrum()')#These four tests need to be moved into some dedicated test routine for SPECTRUM?
 
+
+    isotope = False #Hardcoded not to use isotope mode because itneeds the massive lukeall2.iso.lst that I dont want to upload to github.
     mode = 'ainMf' #Mode of calling SPECTRUM.
     #a: Prompt user for custom statoms.dat
-    #i: Isotope mode. For use with lukeall2 linelist to enable wider wl range.
+    #i: Isotope mode. For use with lukeall2.iso.lst linelist.
     #n: Silent running.
     #m/M: Specific intensities or normalized?
-    #f:
+    #f: Gives output in specific intensities? Don't know what it does, really. Needs investigating.
     if c_norm == True:
         mode = mode.lower()#Lower the case of the M.
     if isotope == False:
-        print('ohai')
         mode = mode.replace('i','')
 
-    print(mode)
-
-    #wStandard tests on input.
+    #Standard tests on input.
     test.typetest(T,[int,float],varname='T in compute_spectrum')
     test.typetest(logg,[int,float],varname='log(g) in compute_spectrum')
     test.typetest(Z,[int,float],varname='Metallicity in compute_spectrum')
@@ -287,77 +310,57 @@ def compute_spectrum(T,logg,Z,mu,wlmin,wlmax,macroturbulence=2.0,c_norm=False,is
     if wlmax > 4000:
         raise ValueError('Wlmax (%s) in compute_spectrum() should be less than than 4,000 nm.' % wlmin)
 
-
     #These hard-code the acceptable values.
-    T_a = np.concatenate((np.arange(3500,13250,250),np.arange(13000,1000,51000)))
-    logg_a = np.arange(0,5.5,0.5)
-    Z_a = np.round(np.concatenate((np.arange(-5,0,0.5),np.arange(-0.3,0.4,0.1),np.array([0.5,1.0]))),decimals=1)#I need to do a rounding here because np.concatenate() makes a numerical error on the middle array... Weird!
-
+    T_a,logg_a,Z_a = available_kurucz_models()
 
     if T in T_a and Z in Z_a and logg in logg_a:
         #This builds the Kurucz model atmosphere file, extracted from a 'supermodel'
         #grid. This follows the manual of SPECTRUM, section 4.10.
-        spath = './lib/SPECTRUM/selectmod'#This points to the supermod function.
-        SPECTRUM = './lib/SPECTRUM/spectrum'#This points to spectrum.
-        test.dir_exists('./lib/SPECTRUM/',varname = 'SPECTRUM root folder')
-        test.dir_exists('data/KURUCZ',varname='Kurucz model folder')
-        test.file_exists(spath,varname=spath+'in compute_spectrum()')#These three tests need to be moved up up up.
-
-        #We now need to construct the filename of the supermodel, using the provided T and metallicity.
-        #T and Z.
-        mstring = str(Z).replace('.','')
-        if isinstance(Z,str):
-            mstring+='0'
-        if Z < 0:
-            s = 'm'
-        else:
-            s = 'p'
-        mpath = 'data/KURUCZ/a'+s+mstring+'k2.dat'
+        #We first construct the filename of the supermodel, using the provided metallicity.
+        mpath = construct_kurucz_path(Z,kurucz_root)
         test.file_exists(mpath,varname='Kurucz supermodel')
-        #Check that this supermodel actually exists.
-        opath = 'data/KURUCZ/star.mod'
-        rpath = 'data/SPECTRUM.res'#Response file.
+        #Check that this supermodel actually exists. It should, if test_KURUCZ() was run (which tests all allowed values of Z).
+
+        opath = kurucz_root+'star.mod'#This will contain the temporary .mod file that is the model extracted from the Kurucz supermodel file.
+        rpath = 'data/SPECTRUM.res'#This will contain the temporary response file used to < into the bash call of SPECTRUM.
         try:
             res = subprocess.check_output([spath,mpath,opath, str(T),str(logg)])#This executes the command line as >>> selectmod supermodel.dat output.mod teff logg
-            #So now we have made an atmosphere model file.
+            #So now we have made an atmosphere model file that SPECTRUM can use.
         except:
             print('Unexpected file input error.')
             print('Apparently the provided combination of T, log(g), Fe/H is')
             print('not included in this (%s) Kurucz model grid.' % mpath)
             print('T = %s, log(g) = %s, Fe/H = %s' % (T,logg,Z))
 
-        #These are the lines in the SPECTRUM response file, needed when calling
-        #spectrum with the ainmf flags.
-
         if isinstance(mu,float):#Convert into a list so that we can loop.
             mu = [mu]
-        fx = []#This will contain the flux axes.
+        fx = []#This will contain the flux axes, even if there is only one.
 
         bashcmd = SPECTRUM+' '+mode+' < '+rpath+' > temp'#Write to temp to suppress output.
-        i=0
+        i=0#Just a counter for the statusbar.
         print('------ Executing bash cmd:  '+bashcmd)
-        for m in mu:
+        for m in mu:#Loop over all mu angles, keeping the atmosphere model constant.
             statusbar(i,mu)
             line1 = opath#Input .mod file.
-            line2 = 'lib/SPECTRUM/lukeall2.iso.lst'#The linelist.
             line3 = 'lib/SPECTRUM/stdatom.dat'
-            line4 = 'lib/SPECTRUM/isotope.iso'#The isotope file.
             line5 = 'data/SPECTRUM.spc'#The output file.
             line6 = str(macroturbulence)#Macroturbulence, default 2kms.
             line7 = str(m)
             line8 = str(wlmin*10.0)+','+str(wlmax*10.0)#Convert to angstroms
             line9 = '0.01'#Hardcoded to 0.01A, i.e. R = 500,000 at 500nm.
-            if isotope == True:
+            if isotope == True:#This is hardcoded to be off, at present.
+                line2 = 'lib/SPECTRUM/lukeall2.iso.lst'#The linelist.
+                line4 = 'lib/SPECTRUM/isotope.iso'#The isotope file.
                 lines = [line1,line2,line3,line4,line5,line6,line7,line8,line9]
             else:
-                line2 = 'lib/SPECTRUM/luke.lst'
-                lines = [line1,line2,line3,line5,line6,line7,line8,line9]
+                line2 = 'lib/SPECTRUM/merged_linelist.lst'#I made this linelist by hand. Will be part of our SPECTRUM fork.
+                lines = [line1,line2,line3,line5,line6,line7,line8,line9]#Load non-isotope linelist and ingore isotope file on line 4.
+            test.file_exists(line2,varname=line2+' (linelist file) in compute_spectrum()')
             with open(rpath,'w') as f:
                 for line in lines:
                     f.write(line+'\n')#This works because the last line of the response
                     #file must end in a carriage return.
-            void=os.system(bashcmd)#I use os.system() against the advice of teh internet,
-            #because subprocesses.run() hangs forever.
+            void=os.system(bashcmd)#I use os.system() against the advice of teh internet because subprocesses.run() hangs forever.
             # print('Finished computing SPECTRUM')
             # with open('temp','w') as f:
             # process=subprocess.Popen(bashcmd.split(),stdout=subprocess.PIPE,shell=False)
@@ -365,18 +368,18 @@ def compute_spectrum(T,logg,Z,mu,wlmin,wlmax,macroturbulence=2.0,c_norm=False,is
             test.file_exists(line5,varname='SPECTRUM output ('+line5+')')
             d=ascii.read(line5)
 
-            wl = d.columns[0].data#convert back to nm.
+            wl = d.columns[0].data#This is overwritten each time, but that doesn't matter because each time its the same.
             fx.append(d.columns[1].data)
-            #Now we remove all the scratch files we made.
+            #Now we remove all the scratch files we made in this loop.
             os.remove('temp')
             os.remove(line5)
             os.remove(rpath)
             i+=1
         os.remove(opath)
         if len(mu) == 1:
-            return(ops.airtovac(wl/10.0),fx[0])
+            return(ops.airtovac(wl/10.0),fx[0])#Convert back to nm and do airtovac.
         else:
-            return(ops.airtovac(wl/10.0),fx)#Convert back to nm.
+            return(ops.airtovac(wl/10.0),fx)#Convert back to nm and do airtovac.
     else:
         print('Error: Provided combination of T, log(g), Fe/H is out of bounds.')
         print('T = %s, log(g) = %s, Fe/H = %s' % (T,logg,Z))

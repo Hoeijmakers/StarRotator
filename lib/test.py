@@ -33,6 +33,52 @@ def test_ld():
         print('ERROR: limb darkening does not pass.')
 
 
+def test_KURUCZ():
+    """This tests that the Kurucz models used to run SPECTRUM are in place,
+    and asks the user to attempt to automatically download them, otherwise.
+    This test is used to make sure that compute_spectrum() has the necessary files
+    to run.
+
+    After running all of this, all the kurucz models should be in place, and
+    compute_spectrum() should be able to call them safely, as long as it is pointed
+    to the correct kurucz_root folder ('data/KURUCZ' by default)."""
+    import os
+    from os import path
+    import lib.stellar_spectrum
+    import lib.test as test
+    import sys
+    kurucz_root = 'data/KURUCZ/'#THIS IS THE FIRST PLACE WHERE THIS ROOT FOLDER IS DEFINED. THE ONLY OTHER IS IN STELLAR_SPECTRUM.PY.
+    #THESE TWO SHOULD MATCH.
+
+    if path.isdir(kurucz_root) != True:
+        os.mkdir(kurucz_root)
+        print('WARNING: Kurucz model folder does not exist at '+kurucz_root+'.')
+        print('Proceed with automatic download from http://kurucz.harvard.edu?')
+        val = input("Proceed with automatic download from http://kurucz.harvard.edu? (y/n) ")
+        if val == 'Y' or val == 'y':
+            lib.stellar_spectrum.download_kurucz(kurucz_root)
+        else:
+            print('Aborting')
+            sys.exit()
+
+    #This hardcodes the models that should be in the kurucz supermodels.
+    #If the models are present, but these are wrong, compute_spectrum() will raise
+    # an error.
+    T_a,logg_a,Z_a = lib.stellar_spectrum.available_kurucz_models()
+    #We now need to construct the filename of the supermodel, using the provided metallicity.
+    for Z in Z_a:
+        mpath = lib.stellar_spectrum.construct_kurucz_path(Z,kurucz_root)
+        if path.isfile(mpath) != True:
+            print('WARNING: Kurucz model '+mpath+' does not exist.')
+            val = input("Proceed with automatic download from http://kurucz.harvard.edu? (y/n) ")
+            if val == 'Y' or val == 'y':
+                lib.stellar_spectrum.download_kurucz(kurucz_root)
+            else:
+                print('Aborting')
+                sys.exit()
+
+
+
 def test_integrators():
     """This tests the consistency of the fast and the slow surface integrators."""
     import numpy as np

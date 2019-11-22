@@ -60,8 +60,7 @@ if __name__ == '__main__':
     u1 = 0.93
     u2 = -0.23
     mus = 0#Normal operation without CLV.
-
-    mus = np.linspace(0.0,1.0,30)
+    mus = np.linspace(0.0,1.0,3)#Uncomment this to run in CLV mode with SPECTRUM.
 
     #Rwo arrays for the x and y axes
     x = np.linspace(-1,1,num=2*args.grid_size) #in units of stellar radius
@@ -82,7 +81,8 @@ if __name__ == '__main__':
         else:
             print('------ Slow integration')
             wlF,F = integrate.build_spectrum_slow(wl,fx,args.wave_start,args.wave_end,x,y,vel_grid,flux_grid)
-    else:#Meaning, if we have no mu's do consider.
+    else:#Meaning, if we have no mu's do:
+        test.test_KURUCZ()
         print('--- Computing limb-resolved spectra with SPECTRUM')
         wl,fx_list = spectrum.compute_spectrum(T,logg,Z,mus,args.wave_start,args.wave_end,c_norm=False)
         # for fx in fx_list:
@@ -103,7 +103,7 @@ if __name__ == '__main__':
     #     plt.show()
     #     pdb.set_trace()
     #
-    # sys.exit()
+    sys.exit()
 
 
 
