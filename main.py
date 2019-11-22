@@ -91,11 +91,15 @@ if __name__ == '__main__':
         print('--- Integrating limb-resolved disk')
         wlF,F = integrate.build_spectrum_limb_resolved(wl,fx_list,mus,args.wave_start,args.wave_end,x,y,vel_grid)
 
-    #     wl2,fx2 = spectrum.read_spectrum(T,logg)
-    #
-    #     plt.plot(wl,fx_list[-1]/max(fx_list[-1]))
-    #     plt.plot(wl2,fx2/5e15)
-    #     plt.show()
+        wl2,fx2 = spectrum.read_spectrum(T,logg)
+
+        plt.plot(wl,fx_list[-1]/max(fx_list[-1]),label='SPECTRUM')
+        plt.plot(wl2,fx2/5e15,label='PHOENIX')
+        plt.xlabel('Wavelength (nm)')
+        plt.ylabel('Max-normalised flux')
+        plt.title('T = %s K, log(g) = %s' % (T,logg))
+        plt.legend()
+        plt.show()
     #
     #     wlF2,F2 = integrate.build_spectrum_fast(wl2,fx2,args.wave_start,args.wave_end,x,y,vel_grid,flux_grid)
     #     plt.plot(wlF,F/max(F))
