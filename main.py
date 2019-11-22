@@ -90,23 +90,31 @@ if __name__ == '__main__':
         # plt.show()
         print('--- Integrating limb-resolved disk')
         wlF,F = integrate.build_spectrum_limb_resolved(wl,fx_list,mus,args.wave_start,args.wave_end,x,y,vel_grid)
-
         wl2,fx2 = spectrum.read_spectrum(T,logg)
+        wlF2,F2 = integrate.build_spectrum_fast(wl2,fx2,args.wave_start,args.wave_end,x,y,vel_grid,flux_grid)
 
-        plt.plot(wl,fx_list[-1]/max(fx_list[-1]),label='SPECTRUM')
-        plt.plot(wl2,fx2/5e15,label='PHOENIX')
+        wlp,Fp,flux,mask = integrate.build_local_spectrum_limb_resolved(-0.3,0.0,0.1,wl,fx_list,mus,args.wave_start,args.wave_end,x,y,vel_grid)
+        wlp2,Fp2,flux2,mask2 = integrate.build_local_spectrum_fast(-0.3,0.0,0.1,wl2,fx2,args.wave_start,args.wave_end,x,y,vel_grid,flux_grid)
+        #This overplots non-rotating SPECTRUM and PHOENIX spectra, normalised.
+        # plt.plot(wl,fx_list[-1]/max(fx_list[-1]),label='SPECTRUM')
+        # plt.plot(wl2,fx2/5e15,label='PHOENIX')
+        # plt.xlabel('Wavelength (nm)')
+        # plt.ylabel('Max-normalised flux')
+        # plt.title('T = %s K, log(g) = %s' % (T,logg))
+        # plt.legend()
+        # plt.show()
+
+        # pdb.set_trace()
+        plt.plot(wlF,F/max(F),color='skyblue',alpha=0.5)
+        plt.plot(wlF,(F-Fp)/np.nanmax(F-Fp),color='skyblue',label='SPECTRUM')
+        plt.plot(wlF2,F2/max(F2),color='red',alpha=0.5)
+        plt.plot(wlF2,(F2-Fp2)/np.nanmax(F2-Fp2),color='red',label='PHOENIX')
+        plt.legend()
         plt.xlabel('Wavelength (nm)')
         plt.ylabel('Max-normalised flux')
-        plt.title('T = %s K, log(g) = %s' % (T,logg))
-        plt.legend()
+        plt.title('T = %s K, log(g) = %s, vsini = 110km/s' % (T,logg))
         plt.show()
-    #
-    #     wlF2,F2 = integrate.build_spectrum_fast(wl2,fx2,args.wave_start,args.wave_end,x,y,vel_grid,flux_grid)
-    #     plt.plot(wlF,F/max(F))
-    #     plt.plot(wlF2,F2/max(F2))
-    #     plt.show()
-    #     pdb.set_trace()
-    #
+
     sys.exit()
 
 

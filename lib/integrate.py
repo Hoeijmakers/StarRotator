@@ -358,7 +358,6 @@ def build_spectrum_limb_resolved(wl,fx_list,mu_list,wlmin,wlmax,x,y,vel_grid):
     test.typetest(mu_list,np.ndarray,varname='mu_list in build_spectrum_limb_resolved')
     test.dimtest(mu_list,[len(fx_list)],varname='mu_list in build_spectrum_limb_resolved')
     input_tests_global(wlc_wide,fx_list[0],wlmin,wlmax,x,y,vel_grid,vel_grid,fname='build_spectrum_limb_resolved')
-    fx_list_cropped = []
     wlc,fxc = ops.crop_spectrum(wl,fx_list[0],2.0*np.nanmax(np.abs(vel_grid)))#I do this for only one spectrum because I only care about wlc
 
     F = 0#output
@@ -376,3 +375,104 @@ def build_spectrum_limb_resolved(wl,fx_list,mu_list,wlmin,wlmax,x,y,vel_grid):
         statusbar(i,len(x))
     # print(time.time()-start)
     return(wlc,F)
+
+
+def build_local_spectrum_limb_resolved(xp,yp,RpRs,wl,fx_list,mu_list,wlmin,wlmax,x,y,vel_grid):
+    """WRITE THIS
+
+        Parameters
+        ----------
+        xp : float
+            The x position of the planet in units of x (see below).
+
+        yp : float
+            The y position of the planet in units of y (see below).
+
+        RpRs : float
+            The radius of the planet in units of stellar radii.
+
+        wl : np.array()
+            The stellar model wavelength(s) in nm.
+
+        fx : np.array()
+            The stellar model flux.
+
+        wlmin: float
+            The minimum wavelength to be considered, in units of wl.
+
+        wlmax: float
+            The maximum wavelength to be considered, in units of wl.
+
+        x,y:
+            The x and y axis of the velocity grid, typically in units of stellar
+            radius.
+
+        vel_grid: 2D np.array()
+            The velocity grid of the stellar disk. Values outside of the disk are
+            to be set to NaN.
+
+
+        Returns
+        -------
+        wl,fx: np.array(), np.array()
+            The wavelength and flux of the integrated spectrum,
+        flux: float
+            The lightcurve of the remainder of the stellar disk.
+        mask:
+            The inverse mask that shows the stellar disk with the planet masked out.
+
+    """
+    import numpy as np
+    import lib.operations as ops
+    import lib.test as test
+    wlc_wide = wl
+    #Standard tests on input:
+    input_tests_local(xp,yp,RpRs)
+    input_tests_global(wl,fx_list[0],wlmin,wlmax,x,y,vel_grid,vel_grid,fname='build_local_spectrum_limb_resolved')
+    test.typetest(mu_list,np.ndarray,varname='mu_list in build_local_spectrum_limb_resolved')
+    test.dimtest(mu_list,[len(fx_list)],varname='mu_list in build_local_spectrum_limb_resolved')
+
+    #We start by creating a mask that selects just the area of the star that is
+    #covered by the planet, as well as its inverse which we like to return for
+    #plotting purposes.
+    x_full = np.tile(x,(len(y),1))-xp
+    y_full = np.tile(y,(len(x),1)).T-yp
+    d = np.sqrt(x_full**2 + y_full**2)
+    di = d*1.0
+    d[d > RpRs] = np.nan#Mask out everything but the location of the planet.
+    if np.min(d) <= RpRs:
+        di[d <= RpRs] = np.nan#out the location of the planet. Inverse of d.
+    mask = (0.0*vel_grid+1.0)*(d*0.0+1.0)#Set that to 1.0 and multiply with flux grid. Nansum coming!
+    mask_i = (0.0*vel_grid+1.0)*(di*0.0+1.0)#Inverse of mask.
+#MOVE ALL OF THIS INTO A WRAPPER? I THINK THIS IS NOW COPYPASTED 3 TIMES?
+#ACTUALLY, NOW I AM USING VEL GRID INS TEAD OF FLUX GRID. THAT MEANS THAT THE
+#FLUX IS NO LONGER CALCULATED PROPERLY. NO LIGHTCURVE!
+    # wlc,fxc,wlc_wide,fxc_wide = ops.clip_spectrum(wl,fx,wlmin,wlmax,pad=2.0*np.nanmax(np.abs(vel_grid)))
+    wlc,fxc = ops.crop_spectrum(wl,fx_list[0],2.0*np.nanmax(np.abs(vel_grid)))#I do this for only one spectrum because I only care about wlc
+
+
+    F = 0#output
+    # start = time.time()
+    for i in range(len(x)):
+        for j in range(len(y)):
+            if np.isnan(mask[j,i]) == False:
+                mu = 1 - np.sqrt(x[i]**2 + y[j]**2)
+                diff = abs(mu_list - mu)
+                index = np.argmin(diff)
+                if mu_list[index] > 0:
+                    fxc_wide = fx_list[index]
+                    # print(i,j,x[i],y[j],mu,mu_list[index])
+                    F+=ops.shift(wlc,wlc_wide,fxc_wide,vel_grid[j,i])#*flux_grid[j,i]
+    # print(time.time()-start)
+    return(wlc,F,np.nansum(mask_i),(di*0.0)+1.0)
+
+
+
+    # F = 0#output
+    # flux = np.nansum(mask,axis = 0)#This is the sum of the flux grid.
+    # for i in range(len(x)):
+    #     for j in range(len(y)):
+    #         if np.isnan(mask[j,i]) == False:
+    #             F+=ops.shift(wlc,wlc_wide,fxc_wide,vel_grid[j,i])*flux_grid[j,i]
+    #     # statusbar(i,len(x))
+    # return(wlc,F,np.nansum(mask_i),(di*0.0)+1.0)
