@@ -334,3 +334,45 @@ def build_spectrum_slow(wl,fx,wlmin,wlmax,x,y,vel_grid,flux_grid):
         statusbar(i,len(x))
     # print(time.time()-start)
     return(wlc,F)
+
+
+
+def build_spectrum_limb_resolved(wl,fx_list,mu_list,wlmin,wlmax,x,y,vel_grid):
+    """WRITE THIS.
+        Parameters
+        ----------
+
+    """
+    #I copy paste as much as possible from above. The roles of wlc and wlc_wide have
+    #changed because wl,fx is already narrow by construction. Therefore in order to
+    #crop the spectrum with margin, I actually need to crop the wl axis inwards.
+    #To do this, I needed to convert clip_spectrum to crop_spectrum.
+    import numpy as np
+    import lib.operations as ops
+    import lib.stellar_spectrum as spectrum
+    import sys
+    import lib.test as test
+    wlc_wide = wl
+
+    #Standard tests on input
+    test.typetest(mu_list,np.ndarray,varname='mu_list in build_spectrum_limb_resolved')
+    test.dimtest(mu_list,[len(fx_list)],varname='mu_list in build_spectrum_limb_resolved')
+    input_tests_global(wlc_wide,fx_list[0],wlmin,wlmax,x,y,vel_grid,vel_grid,fname='build_spectrum_limb_resolved')
+    fx_list_cropped = []
+    wlc,fxc = ops.crop_spectrum(wl,fx_list[0],2.0*np.nanmax(np.abs(vel_grid)))#I do this for only one spectrum because I only care about wlc
+
+    F = 0#output
+    # start = time.time()
+    for i in range(len(x)):
+        for j in range(len(y)):
+            if np.isnan(vel_grid[j,i]) == False:
+                mu = 1 - np.sqrt(x[i]**2 + y[j]**2)
+                diff = abs(mu_list - mu)
+                index = np.argmin(diff)
+                if mu_list[index] > 0:
+                    fxc_wide = fx_list[index]
+                    # print(i,j,x[i],y[j],mu,mu_list[index])
+                    F+=ops.shift(wlc,wlc_wide,fxc_wide,vel_grid[j,i])#*flux_grid[j,i]
+        statusbar(i,len(x))
+    # print(time.time()-start)
+    return(wlc,F)
