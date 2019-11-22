@@ -132,13 +132,61 @@ def clip_spectrum(wl,fx,wlmin,wlmax,pad=0):
     fxc = fx[(wl >= wlmin) & (wl <= wlmax)]
 
     if pad > 0:
-        wlmin_wide = wlmin*doppler(pad)#x2 to have some margin.
+        wlmin_wide = wlmin/doppler(pad)
         wlmax_wide = wlmax*doppler(pad)
         wlc_wide = wl[(wl >= wlmin_wide) & (wl <= wlmax_wide)]
         fxc_wide = fx[(wl >= wlmin_wide) & (wl <= wlmax_wide)]
         return(wlc,fxc,wlc_wide,fxc_wide)
     else:
         return(wlc,fxc)
+
+def crop_spectrum(wl,fx,pad):
+    """This crops a spectrum wl,fx to wlmin and wlmax.
+    If pad !=0, it should be set to a positive velocity
+    by which the output spectrum will be padded around wlmin,wlmax,
+    which is returned as well as the narrower cropped spectrum.
+
+        Parameters
+        ----------
+        wl : np.ndarray()
+            The stellar model wavelength(s) in nm.
+
+        fx : np.ndarray()
+            The stellar model flux.
+
+        pad: float, m/s
+            A velocity corresponding to a shift around which the cropped array will
+            be padded.
+
+        Returns
+        -------
+        wl,fx: np.array(), np.array()
+            The wavelength and flux of the integrated spectrum.
+            """
+    import lib.test as test
+    import numpy as np
+    wlmin = min(wl)
+    wlmax = max(wl)
+    #First run standard tests on input
+    test.typetest(wl,np.ndarray,varname=       'wl in crop_spectrum')
+    test.typetest(fx,np.ndarray,varname=       'fx in crop_spectrum')
+    test.typetest(pad,[int,float],varname=    'pad in crop_spectrum')
+    test.notnegativetest(pad,varname=         'pad in crop_spectrum')
+    test.nantest(pad,varname=                 'pad in crop_spectrum')
+    if wlmin >= wlmax:
+        raise ValueError('wlmin in crop_spectrum should be smaller than wlmax.')
+
+
+
+
+    wlmin_wide = wlmin*doppler(pad)#Crop towards the inside
+    wlmax_wide = wlmax/doppler(pad)#Crop towards the inside
+    wlc_narrow = wl[(wl >= wlmin_wide) & (wl <= wlmax_wide)]
+    fxc_narrow = fx[(wl >= wlmin_wide) & (wl <= wlmax_wide)]
+    return(wlc_narrow,fxc_narrow)
+
+
+
 
 
 def vactoair(wlnm):

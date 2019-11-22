@@ -138,6 +138,25 @@ def notnegativetest(a,varname=''):
     if np.min(a) < 0:
         raise ValueError('Variable %s is negative.' % varname)
 
+def file_exists(file,varname=''):
+    """This program tests if a file exists, and prints an error otherwise."""
+    from os import path
+    import sys
+    typetest(file,str,varname='file in test.file_exists')
+    if path.isfile(file) != True:
+        print('Error: File %s does not exist.' % varname)
+        sys.exit()
+
+def dir_exists(dir,varname=''):
+    """This program tests if a directory exists, and prints an error otherwise."""
+    from os import path
+    import sys
+    typetest(dir,str,varname='dir in test.dir_exists')
+    if path.isdir(dir) != True:
+        print('Error: Directory %s does not exist.' % varname)
+        sys.exit()
+
+
 def typetest(var,vartype,varname=''):
     """This program tests the type of var which has the name varname against
     the type vartype (or the types in list vartype), and raises an exception if

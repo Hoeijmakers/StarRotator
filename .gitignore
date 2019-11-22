@@ -6,3 +6,4 @@ data/
 anim/
 *.gif
 *.png
+lib/SPECTRUM/*.o
