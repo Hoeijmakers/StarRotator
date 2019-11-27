@@ -125,6 +125,13 @@ def read_spectrum(T,logg,metallicity=0.0,alpha=0.0):
     import sys
     import astropy.io.fits as fits
     import lib.test as test
+    phoenix_factor = np.pi#This is a factor to correct the PHOENIX spectra to produce the correctly calibrated output flux.
+    #If you compare PHOENIX to SPECTRUM, a factor of 3 seems to be missing. Brett Morris encountered this problem when trying
+    #to use PHOENIX to predict the received flux of real sources, to construct an ETC. He also needed a factor of 3, which he
+    #interpreted as a missing factor of pi. So pi it is, until something else is deemed better (or until PHOENIX updates
+    #their grid).
+
+
     #First run standard tests on the input:
     test.typetest(T,[int,float],varname='T in read_spectrum')
     test.typetest(logg,[int,float],varname='logg in read_spectrum')
@@ -152,7 +159,7 @@ def read_spectrum(T,logg,metallicity=0.0,alpha=0.0):
         wavename,specname=get_spectrum(T,logg,metallicity,alpha)
         f = fits.getdata(specname)
         w = fits.getdata(wavename)
-        return(w/10.0,f)#Implicit unit conversion here.
+        return(w/10.0,f/phoenix_factor)#Implicit unit conversion here.
     else:
         print('Error: Provided combination of T, log(g), Fe/H and a/M is out of bounds.')
         print('T = %s, log(g) = %s, Fe/H = %s, a/M = %s' % (T,logg,metallicity,alpha))
@@ -405,7 +412,7 @@ def compute_spectrum(T,logg,Z,mu,wlmin,wlmax,macroturbulence=0.0,mode='an',loud=
             d=ascii.read(sopath)
 
             wl = d.columns[0].data#This is overwritten each time, but that doesn't matter because each time its the same.
-            fx.append(d.columns[1].data*3.0)#IM HARDCODING A FACTOR 3 IN HERE TO MAKE THE FLUX UNIT MATCH THAT OF PHOENIX. COULD BE A FACTOR OF PI AS WELL..... 
+            fx.append(d.columns[1].data*3.0)#IM HARDCODING A FACTOR 3 IN HERE TO MAKE THE FLUX UNIT MATCH THAT OF PHOENIX. COULD BE A FACTOR OF PI AS WELL.....
             #Now we remove all the scratch files we made in this loop.
             # os.remove('temp')
             os.remove(sopath)
