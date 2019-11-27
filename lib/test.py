@@ -74,9 +74,9 @@ def investigate_SPECTRUM():
     wl2,fx2 = spectrum.read_spectrum(T,logg,metallicity=Z)
     wl2*=u.nm
     fx2*=u.erg/u.cm/u.cm/u.cm/u.s
-    plt.plot(wl,fx_list.to(u.erg/u.cm/u.cm/u.cm/u.s),label='SPECTRUM x3 (disk-integrated)')
+    plt.plot(wl,fx_list.to(u.erg/u.cm/u.cm/u.cm/u.s),label='SPECTRUM (disk-integrated)')
     plt.plot(wl2,fx2.to(u.erg/u.cm/u.cm/u.cm/u.s),label='PHOENIX (disk-integrated)')
-    plt.plot(wl3,fx_list3.to(u.erg/u.cm/u.cm/u.cm/u.s),label='SPECTRUM x3 (center of disk)')
+    plt.plot(wl3,fx_list3.to(u.erg/u.cm/u.cm/u.cm/u.s),label='SPECTRUM (center of disk)')
     plt.xlabel('Wavelength (nm)')
     plt.ylabel('Absolute flux (erg/cm^2/cm/s)')
     plt.xlim(wave_start,wave_end)

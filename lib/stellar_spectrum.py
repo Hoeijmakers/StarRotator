@@ -412,7 +412,7 @@ def compute_spectrum(T,logg,Z,mu,wlmin,wlmax,macroturbulence=0.0,mode='an',loud=
             d=ascii.read(sopath)
 
             wl = d.columns[0].data#This is overwritten each time, but that doesn't matter because each time its the same.
-            fx.append(d.columns[1].data*3.0)#IM HARDCODING A FACTOR 3 IN HERE TO MAKE THE FLUX UNIT MATCH THAT OF PHOENIX. COULD BE A FACTOR OF PI AS WELL.....
+            fx.append(d.columns[1].data)
             #Now we remove all the scratch files we made in this loop.
             # os.remove('temp')
             os.remove(sopath)
