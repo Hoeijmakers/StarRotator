@@ -274,6 +274,7 @@ def limb_darkening(z,a1,a2):
     if z > 1 or z < 0:
         raise ValueError("z coordinate should be in [0,1].")
 
+
     psi = np.arcsin(z)
     a0 = 1-a1-a2
     I = a0+a1*np.cos(psi)+a2*np.cos(psi)**2

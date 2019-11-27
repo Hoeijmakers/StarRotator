@@ -10,9 +10,9 @@ def statusbar(i,x):
             The former is useful if you are doing something like 'for i in list'.
         """
     if type(x) == int:
-        print('  '+f"{i/(float(x)-1)*100:.1f} %", end="\r")
+        print('  '+f"{i/(float(x))*100:.1f} %", end="\r")
     else:
-        print('  '+f"{i/(len(x)-1)*100:.1f} %", end="\r")#Statusbar.
+        print('  '+f"{i/(len(x))*100:.1f} %", end="\r")#Statusbar.
 
 def input_tests_local(xp,yp,RpRs):
     """This wraps input tests for the local integrator functions, as these are the same in both cases."""
@@ -110,6 +110,8 @@ def build_local_spectrum_fast(xp,yp,RpRs,wl,fx,wlmin,wlmax,x,y,vel_grid,flux_gri
     import numpy as np
     import lib.operations as ops
     import warnings
+    import pdb
+    import matplotlib.pyplot as plt
 
     #Standard tests on input:
     input_tests_local(xp,yp,RpRs)
@@ -124,11 +126,12 @@ def build_local_spectrum_fast(xp,yp,RpRs,wl,fx,wlmin,wlmax,x,y,vel_grid,flux_gri
     d = np.sqrt(x_full**2 + y_full**2)
     di = d*1.0
     d[d > RpRs] = np.nan#Mask out everything but the location of the planet.
-    if np.min(d) <= RpRs:
-        di[d <= RpRs] = np.nan#out the location of the planet. Inverse of d.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=RuntimeWarning)
+        if np.nanmin(d) <= RpRs:
+            di[d <= RpRs] = np.nan#out the location of the planet. Inverse of d.
     mask = flux_grid*(d*0.0+1.0)#Set that to 1.0 and multiply with flux grid. Nansum coming!
     mask_i = flux_grid*(di*0.0+1.0)#Inverse of mask.
-
     wlc,fxc,wlc_wide,fxc_wide = ops.clip_spectrum(wl,fx,wlmin,wlmax,pad=2.0*np.nanmax(np.abs(vel_grid)))
 
     F = 0#output
@@ -195,6 +198,7 @@ def build_local_spectrum_slow(xp,yp,RpRs,wl,fx,wlmin,wlmax,x,y,vel_grid,flux_gri
     """
     import numpy as np
     import lib.operations as ops
+    import warnings
     #Standard tests on input:
     input_tests_local(xp,yp,RpRs)
     input_tests_global(wl,fx,wlmin,wlmax,x,y,vel_grid,flux_grid,fname='build_local_spectrum_slow')
@@ -208,8 +212,10 @@ def build_local_spectrum_slow(xp,yp,RpRs,wl,fx,wlmin,wlmax,x,y,vel_grid,flux_gri
     d = np.sqrt(x_full**2 + y_full**2)
     di = d*1.0
     d[d > RpRs] = np.nan#Mask out everything but the location of the planet.
-    if np.min(d) <= RpRs:
-        di[d <= RpRs] = np.nan#out the location of the planet. Inverse of d.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=RuntimeWarning)
+        if np.nanmin(d) <= RpRs:
+            di[d <= RpRs] = np.nan#out the location of the planet. Inverse of d.
     mask = flux_grid*(d*0.0+1.0)#Set that to 1.0 and multiply with flux grid. Nansum coming!
     mask_i = flux_grid*(di*0.0+1.0)#Inverse of mask.
 
@@ -425,6 +431,7 @@ def build_local_spectrum_limb_resolved(xp,yp,RpRs,wl,fx_list,mu_list,wlmin,wlmax
     import numpy as np
     import lib.operations as ops
     import lib.test as test
+    import warnings
     wlc_wide = wl
     #Standard tests on input:
     input_tests_local(xp,yp,RpRs)
@@ -440,8 +447,10 @@ def build_local_spectrum_limb_resolved(xp,yp,RpRs,wl,fx_list,mu_list,wlmin,wlmax
     d = np.sqrt(x_full**2 + y_full**2)
     di = d*1.0
     d[d > RpRs] = np.nan#Mask out everything but the location of the planet.
-    if np.min(d) <= RpRs:
-        di[d <= RpRs] = np.nan#out the location of the planet. Inverse of d.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=RuntimeWarning)
+        if np.nanmin(d) <= RpRs:
+            di[d <= RpRs] = np.nan#out the location of the planet. Inverse of d.
     mask = (0.0*vel_grid+1.0)*(d*0.0+1.0)#Set that to 1.0 and multiply with flux grid. Nansum coming!
     mask_i = (0.0*vel_grid+1.0)*(di*0.0+1.0)#Inverse of mask.
 #MOVE ALL OF THIS INTO A WRAPPER? I THINK THIS IS NOW COPYPASTED 3 TIMES?

@@ -52,17 +52,17 @@ if __name__ == '__main__':
 
     # test.test_integrators()
 
-    T = 10000.0
+    T = 6000.0
     logg = 4.5
     Z = 0.0
     # u1 = 0.387
     # u2 = 0.178
     u1 = 0.93
-    u2 = -0.23
+    u2 = -0.23#THESE ARE THE WINN2011 PAREMETERS, NOT KIPPING 2013.
     mus = 0#Normal operation without CLV.
     mus = np.linspace(0.0,1.0,3)#Uncomment this to run in CLV mode with SPECTRUM.
 
-    #Rwo arrays for the x and y axes
+    #Two arrays for the x and y axes
     x = np.linspace(-1,1,num=2*args.grid_size) #in units of stellar radius
     y = np.linspace(-1,1,num=2*args.grid_size) #in units of stellar radius
 
@@ -84,7 +84,9 @@ if __name__ == '__main__':
     else:#Meaning, if we have no mu's do:
         test.test_KURUCZ()
         print('--- Computing limb-resolved spectra with SPECTRUM')
-        wl,fx_list = spectrum.compute_spectrum(T,logg,Z,mus,args.wave_start,args.wave_end,c_norm=False)
+        # print(T,logg,Z)
+        # print(mus)
+        wl,fx_list = spectrum.compute_spectrum(T,logg,Z,mus,args.wave_start,args.wave_end,mode='anM')
         # for fx in fx_list:
         #     plt.plot(wl,fx)
         # plt.show()
@@ -150,10 +152,10 @@ if __name__ == '__main__':
     #tutorial-kind of script, but I put it here for now.
     from matplotlib.patches import Circle
 
-    RpRs = 0.0178
+    RpRs = 0.12247
     nsteps = 100
     xp1 = np.linspace(-1.5,1.5,nsteps)
-    yp1 = np.linspace(-0.5,0.2,nsteps)
+    yp1 = np.linspace(-0.55,-0.45,nsteps)
     # xp2 = np.linspace(-0.1,-0.5,int(nsteps*1.0)) #These lines are for adding additional transits.
     # yp2 = np.linspace(2.5,-2.5,int(nsteps*1.0))
     # xp3 = np.linspace(1.3,0.0,nsteps)
@@ -164,7 +166,7 @@ if __name__ == '__main__':
     xp=xp1
     yp=yp1
     lightcurve = []#flux points will be appended onto this.
-    void1,void2,minflux,void3 = integrate.build_local_spectrum_fast(0,0,0.16,wl,fx,args.wave_start,args.wave_end,x,y,vel_grid,flux_grid)
+    void1,void2,minflux,void3 = integrate.build_local_spectrum_fast(0,0,RpRs,wl,fx,args.wave_start,args.wave_end,x,y,vel_grid,flux_grid)
     for i in range(len(xp)):
         # if i == nsteps-1:
         #     RpRs = 0.1
@@ -174,6 +176,7 @@ if __name__ == '__main__':
         #     RpRs = 0.16
         # i=150
         wlp,Fp,flux,mask = integrate.build_local_spectrum_fast(xp[i],yp[i],RpRs,wl,fx,args.wave_start,args.wave_end,x,y,vel_grid,flux_grid)
+
         lightcurve.append(flux)
         fig,ax = plt.subplots(nrows=2, ncols=2,figsize=(8,8))
         ax[0][0].pcolormesh(x,y,flux_grid*mask,vmin=0,vmax=1.0*np.nanmax(flux_grid),cmap='autumn')
@@ -195,10 +198,12 @@ if __name__ == '__main__':
         linedepth = ymax - ymin
         ax[1][1].plot(wlF,(F-Fp)/np.nanmax(F-Fp),color='black')
         ax[1][1].set_xlim((588.5,590.2))
-        ax[1][1].set_ylim((ymin-0.1*linedepth,ymax+0.3*linedepth))
+        yl = (ymin-0.1*linedepth,ymax+0.3*linedepth)
+        ax[1][1].set_ylim(yl)
         ax2 = ax[1][1].twinx()
         ax2.plot(wlF,(F-Fp)*np.nanmax(F)/F/np.nanmax(F-Fp),color='skyblue')
-        ax2.set_ylim((1.0-(1-ymin-0.1*linedepth)/2,1.0+(ymax+0.3*linedepth-1)/2))
+        sf = 20.0
+        ax2.set_ylim((1.0-(1-yl[0])/sf,1.0+(yl[1]-1)/sf))
         ax2.set_ylabel('Ratio F_in/F_out',fontsize = 7)
         ax2.tick_params(axis='both', which='major', labelsize=6)
         ax2.tick_params(axis='both', which='minor', labelsize=5)
@@ -236,3 +241,4 @@ if __name__ == '__main__':
         fig.savefig('anim/'+out+'.png', dpi=fig.dpi)
         integrate.statusbar(i,xp)
         plt.close()
+        #convert -delay 6 anim/*.png HD209458b.gif

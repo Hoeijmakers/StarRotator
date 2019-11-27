@@ -211,7 +211,7 @@ def construct_kurucz_path(Z,root):
 
 
 
-def compute_spectrum(T,logg,Z,mu,wlmin,wlmax,macroturbulence=2.0,c_norm=False):
+def compute_spectrum(T,logg,Z,mu,wlmin,wlmax,macroturbulence=0.0,mode='an',loud=False):
     """If the CLV effect needs to be taken into account, PHOENIX spectra cannot
         be used, and the SPECTRUM package will be used to calculate spectra.
         For this functionality to work, the user needs to have built the SPECTRUM
@@ -253,9 +253,12 @@ def compute_spectrum(T,logg,Z,mu,wlmin,wlmax,macroturbulence=2.0,c_norm=False):
             Limb angle(s) (cos(theta))
         macroturbulence: int,float
             Macroturbulent velocity (which broadens the lines) in km/s
-        c_norm: bool
-            Set to true if you want SPECTRUM to compute continuum-normalised
-            (unitless) spectra.
+        mode: str
+            a: Prompt user for custom statoms.dat
+            i: Isotope mode. For use with lukeall2.iso.lst linelist.
+            n: Silent running.
+            m/M: Specific intensities, normalised (m) or true (M).
+            f: Gives output in specific intensities. Implied if m or M is set.
         Returns
         -------
         wl,fx
@@ -282,17 +285,29 @@ def compute_spectrum(T,logg,Z,mu,wlmin,wlmax,macroturbulence=2.0,c_norm=False):
     test.file_exists(SPECTRUM,varname=spath+'in compute_spectrum()')#These four tests need to be moved into some dedicated test routine for SPECTRUM?
 
 
-    isotope = False #Hardcoded not to use isotope mode because itneeds the massive lukeall2.iso.lst that I dont want to upload to github.
-    mode = 'ainMf' #Mode of calling SPECTRUM.
-    #a: Prompt user for custom statoms.dat
-    #i: Isotope mode. For use with lukeall2.iso.lst linelist.
-    #n: Silent running.
-    #m/M: Specific intensities or normalized?
-    #f: Gives output in specific intensities? Don't know what it does, really. Needs investigating.
-    if c_norm == True:
-        mode = mode.lower()#Lower the case of the M.
-    if isotope == False:
-        mode = mode.replace('i','')
+    #Hardcoded not to use isotope mode because itneeds the massive lukeall2.iso.lst that I dont want to upload to github.
+    #mode = 'ainMf' #Mode of calling SPECTRUM.
+
+    if 'i' in mode:
+        isotope = True
+    else:
+        isotope = False
+    if (('m' in mode) or ('M' in mode)) == False:
+        mu = 0.0
+    if 'a' in mode == False:
+        print("WARNING: Compute_spectrum() mode does not include 'a'.")
+        print("This will break SPECTRUM as it expects the stdatom file to be")
+        print("in the root folder. 'a' points it to where it is supposed to be.")
+        print("Adding 'a' to mode variable.")
+        mode+='a'
+
+    # if c_norm == True:
+    #     mode = mode.lower()#Lower the case of the M.
+    # if isotope == False:
+    #     mode = mode.replace('i','')
+    # if disk_integrated == True:
+    #     mode = mode.replace('m','').replace('M','')
+    #     mu = 0.0
 
     #Standard tests on input.
     test.typetest(T,[int,float],varname='T in compute_spectrum')
@@ -323,6 +338,13 @@ def compute_spectrum(T,logg,Z,mu,wlmin,wlmax,macroturbulence=2.0,c_norm=False):
 
         opath = kurucz_root+'star.mod'#This will contain the temporary .mod file that is the model extracted from the Kurucz supermodel file.
         rpath = 'data/SPECTRUM.res'#This will contain the temporary response file used to < into the bash call of SPECTRUM.
+        if isotope == True:
+            lpath = 'lib/SPECTRUM/lukeall2.iso.lst'
+        else:
+            lpath = 'lib/SPECTRUM/merged_linelist.lst'#I made this linelist by manually mergin the other linelists. Will be part of our SPECTRUM fork.
+        test.file_exists(lpath,varname=lpath+' (linelist file) in compute_spectrum()')
+        sopath = 'data/SPECTRUM.spc'#Spectrum output path, temporary.
+
         try:
             res = subprocess.check_output([spath,mpath,opath, str(T),str(logg)])#This executes the command line as >>> selectmod supermodel.dat output.mod teff logg
             #So now we have made an atmosphere model file that SPECTRUM can use.
@@ -336,26 +358,40 @@ def compute_spectrum(T,logg,Z,mu,wlmin,wlmax,macroturbulence=2.0,c_norm=False):
             mu = [mu]
         fx = []#This will contain the flux axes, even if there is only one.
 
-        bashcmd = SPECTRUM+' '+mode+' < '+rpath+' > temp'#Write to temp to suppress output.
+        bashcmd = SPECTRUM+' '+mode+' < '+rpath
+        if loud == False:
+            bashcmd+=' > temp'#Write to temp to suppress output.
         i=0#Just a counter for the statusbar.
         print('------ Executing bash cmd:  '+bashcmd)
         for m in mu:#Loop over all mu angles, keeping the atmosphere model constant.
             statusbar(i,mu)
-            line1 = opath#Input .mod file.
-            line3 = 'lib/SPECTRUM/stdatom.dat'
-            line5 = 'data/SPECTRUM.spc'#The output file.
-            line6 = str(macroturbulence)#Macroturbulence, default 2kms.
-            line7 = str(m)
-            line8 = str(wlmin*10.0)+','+str(wlmax*10.0)#Convert to angstroms
-            line9 = '0.01'#Hardcoded to 0.01A, i.e. R = 500,000 at 500nm.
-            if isotope == True:#This is hardcoded to be off, at present.
-                line2 = 'lib/SPECTRUM/lukeall2.iso.lst'#The linelist.
-                line4 = 'lib/SPECTRUM/isotope.iso'#The isotope file.
-                lines = [line1,line2,line3,line4,line5,line6,line7,line8,line9]
-            else:
-                line2 = 'lib/SPECTRUM/merged_linelist.lst'#I made this linelist by hand. Will be part of our SPECTRUM fork.
-                lines = [line1,line2,line3,line5,line6,line7,line8,line9]#Load non-isotope linelist and ingore isotope file on line 4.
-            test.file_exists(line2,varname=line2+' (linelist file) in compute_spectrum()')
+            lines = []
+            lines.append(opath)
+            lines.append(lpath)
+            lines.append('lib/SPECTRUM/stdatom.dat')
+            if isotope == True:
+                lines.append('lib/SPECTRUM/isotope.iso')
+            lines.append(sopath)
+            lines.append(str(macroturbulence))
+            if ('m' in mode) or ('M' in mode):
+                lines.append(str(m))
+            lines.append(str(wlmin*10.0)+','+str(wlmax*10.0))#Convert to angstroms
+            lines.append('0.01')#Hardcoded to 0.01A, i.e. R = 500,000 at 500nm.
+            # line1 = opath#Input .mod file.
+            # line3 = 'lib/SPECTRUM/stdatom.dat'
+            # line5 = 'data/SPECTRUM.spc'#The output file.
+            # line6 = str(macroturbulence)#Macroturbulence, default 2kms.
+            # line7 = str(m)
+            # line8 = str(wlmin*10.0)+','+str(wlmax*10.0)#Convert to angstroms
+            # line9 = '0.01'
+            # if isotope == True:#This is hardcoded to be off, at present.
+            #     line2 = 'lib/SPECTRUM/lukeall2.iso.lst'#The linelist.
+            #     line4 = 'lib/SPECTRUM/isotope.iso'#The isotope file.
+            #     lines = [line1,line2,line3,line4,line5,line6,line7,line8,line9]
+            # else:
+            #     line2 = 'lib/SPECTRUM/merged_linelist.lst'
+            #     lines = [line1,line2,line3,line5,line6,line7,line8,line9]#Load non-isotope linelist and ingore isotope file on line 4.
+
             with open(rpath,'w') as f:
                 for line in lines:
                     f.write(line+'\n')#This works because the last line of the response
@@ -365,14 +401,14 @@ def compute_spectrum(T,logg,Z,mu,wlmin,wlmax,macroturbulence=2.0,c_norm=False):
             # with open('temp','w') as f:
             # process=subprocess.Popen(bashcmd.split(),stdout=subprocess.PIPE,shell=False)
             # stdout = process.communicate()
-            test.file_exists(line5,varname='SPECTRUM output ('+line5+')')
-            d=ascii.read(line5)
+            test.file_exists(sopath,varname='SPECTRUM output ('+sopath+')')
+            d=ascii.read(sopath)
 
             wl = d.columns[0].data#This is overwritten each time, but that doesn't matter because each time its the same.
-            fx.append(d.columns[1].data)
+            fx.append(d.columns[1].data*3.0)#IM HARDCODING A FACTOR 3 IN HERE TO MAKE THE FLUX UNIT MATCH THAT OF PHOENIX. COULD BE A FACTOR OF PI AS WELL..... 
             #Now we remove all the scratch files we made in this loop.
-            os.remove('temp')
-            os.remove(line5)
+            # os.remove('temp')
+            os.remove(sopath)
             os.remove(rpath)
             i+=1
         os.remove(opath)
