@@ -7,3 +7,5 @@ anim/
 *.gif
 *.png
 lib/SPECTRUM/*.o
+lib/SPECTRUM/*.dat
+temp
