@@ -24,29 +24,28 @@ import math
 
 
 
-if __name__ == '__main__':
 
+def StarRotator(wave_start,wave_end,velStar,stelinc,orbinc,drr,pob,grid_size=500,flag=''):
+
+    if flag == 'help' or flag == 'Help':
+        print("Welcome to StarRotator.")
+        print("***********************")
+        print("Star Rotator needs the following input:")
+        print("wave_start: Wavelength range start in nm in vacuum. type:float")
+        print("wave_end: Wavelength range end in nm in vacuum. type:float")
+        print("velStar: Equatiorial velocity of the star in m per s. type:float")
+        print("stelinc: Inclination of the star. type:float")
+        print("orbinc: Orbital inclination of the planet. type:float")
+        print("drr: Differential rotation rate in units of stellar radii. type:float")
+        print("pob: Projected obliquity of the star in degrees. type:float")
+        print("grid_size: Number of grid cells, default 500. type:int")
+        print("Good luck!")
+        sys.exit()
     #call parser, gets the input parameters from the user
     try:
-        parser = argparse.ArgumentParser(description='Input variables for StarRotator:')
-        parser.add_argument('wave_start', metavar='waveS', type=float,
-                            help='Wavelength range start in nm in vacuum. type:float')
-        parser.add_argument('wave_end', metavar='waveE', type=float,
-        help='Wavelength range end in nm in vacuum. type:float')
-        parser.add_argument('velStar', metavar='velS', type=float,
-        help='Equatiorial velocity of the star in m per s. type:float')
-        parser.add_argument('stelinc', metavar='stelinc', type=float,
-        help='Inclination of the star. type:float')
-        parser.add_argument('orbinc', metavar='orbinc', type=float,
-        help='Orbital inclination of the planet. type:float')
-        parser.add_argument('drr', metavar='drr', type=float,
-        help='Differential rotation rate in units of stellar radii. type:float')
-        parser.add_argument('pob', metavar='pob', type=float,
-        help='projected obliquity of the star in degrees. type:float')
-        parser.add_argument('grid_size', metavar='grid', type=int, default=500,
-        help='number of grid cells, default 500. type:int')
-        args = parser.parse_args()
-        test.test_parser(args)
+        test = 0
+        #placeholder
+        #add input testing
     except ValueError as err:
         print("Parser: ",err.args)
 
@@ -63,40 +62,40 @@ if __name__ == '__main__':
     mus = np.linspace(0.0,1.0,3)#Uncomment this to run in CLV mode with SPECTRUM.
 
     #Two arrays for the x and y axes
-    x = np.linspace(-1,1,num=2*args.grid_size) #in units of stellar radius
-    y = np.linspace(-1,1,num=2*args.grid_size) #in units of stellar radius
+    x = np.linspace(-1,1,num=2* grid_size) #in units of stellar radius
+    y = np.linspace(-1,1,num=2* grid_size) #in units of stellar radius
 
     #Calculate the velocity and flux grids
     print('--- Computing velocity/flux grids')
-    vel_grid = vgrid.calc_vel_stellar(x,y,args.stelinc,args.velStar,args.drr, args.pob)
+    vel_grid = vgrid.calc_vel_stellar(x,y, stelinc, velStar, drr,  pob)
     flux_grid = vgrid.calc_flux_stellar(x,y,u1,u2)
 
     if isinstance(mus,np.ndarray) != True:#SWITCH BETWEEN PHOENIX (mus=0) AND SPECTRUM
         print('--- Reading spectrum from PHOENIX')
         wl,fx = spectrum.read_spectrum(T,logg)
         print('--- Integrating disk')
-        if args.drr == 0:
+        if  drr == 0:
             print('------ Fast integration')
-            wlF,F = integrate.build_spectrum_fast(wl,fx,args.wave_start,args.wave_end,x,y,vel_grid,flux_grid)
+            wlF,F = integrate.build_spectrum_fast(wl,fx, wave_start, wave_end,x,y,vel_grid,flux_grid)
         else:
             print('------ Slow integration')
-            wlF,F = integrate.build_spectrum_slow(wl,fx,args.wave_start,args.wave_end,x,y,vel_grid,flux_grid)
+            wlF,F = integrate.build_spectrum_slow(wl,fx, wave_start, wave_end,x,y,vel_grid,flux_grid)
     else:#Meaning, if we have no mu's do:
         test.test_KURUCZ()
         print('--- Computing limb-resolved spectra with SPECTRUM')
         # print(T,logg,Z)
         # print(mus)
-        wl,fx_list = spectrum.compute_spectrum(T,logg,Z,mus,args.wave_start,args.wave_end,mode='anM')
+        wl,fx_list = spectrum.compute_spectrum(T,logg,Z,mus, wave_start, wave_end,mode='anM')
         # for fx in fx_list:
         #     plt.plot(wl,fx)
         # plt.show()
         print('--- Integrating limb-resolved disk')
-        wlF,F = integrate.build_spectrum_limb_resolved(wl,fx_list,mus,args.wave_start,args.wave_end,x,y,vel_grid)
+        wlF,F = integrate.build_spectrum_limb_resolved(wl,fx_list,mus, wave_start, wave_end,x,y,vel_grid)
         wl2,fx2 = spectrum.read_spectrum(T,logg)
-        wlF2,F2 = integrate.build_spectrum_fast(wl2,fx2,args.wave_start,args.wave_end,x,y,vel_grid,flux_grid)
+        wlF2,F2 = integrate.build_spectrum_fast(wl2,fx2, wave_start, wave_end,x,y,vel_grid,flux_grid)
 
-        wlp,Fp,flux,mask = integrate.build_local_spectrum_limb_resolved(-0.3,0.0,0.1,wl,fx_list,mus,args.wave_start,args.wave_end,x,y,vel_grid)
-        wlp2,Fp2,flux2,mask2 = integrate.build_local_spectrum_fast(-0.3,0.0,0.1,wl2,fx2,args.wave_start,args.wave_end,x,y,vel_grid,flux_grid)
+        wlp,Fp,flux,mask = integrate.build_local_spectrum_limb_resolved(-0.3,0.0,0.1,wl,fx_list,mus, wave_start, wave_end,x,y,vel_grid)
+        wlp2,Fp2,flux2,mask2 = integrate.build_local_spectrum_fast(-0.3,0.0,0.1,wl2,fx2, wave_start, wave_end,x,y,vel_grid,flux_grid)
         #This overplots non-rotating SPECTRUM and PHOENIX spectra, normalised.
         # plt.plot(wl,fx_list[-1]/max(fx_list[-1]),label='SPECTRUM')
         # plt.plot(wl2,fx2/5e15,label='PHOENIX')
@@ -132,8 +131,8 @@ if __name__ == '__main__':
 
     #The following puts a large circular spot with a T 1000K less than the star in the center.
     # wl2,fx2 = spectrum.read_spectrum(T-1000,logg)
-    # wlp,Fp,flux,mask = integrate.build_local_spectrum_fast(0,0,0.2,wl,fx,args.wave_start,args.wave_end,x,y,vel_grid,flux_grid)
-    # wls,Fs,fluxs,masks = integrate.build_local_spectrum_fast(0,0,0.2,wl2,fx2,args.wave_start,args.wave_end,x,y,vel_grid,flux_grid)
+    # wlp,Fp,flux,mask = integrate.build_local_spectrum_fast(0,0,0.2,wl,fx, wave_start, wave_end,x,y,vel_grid,flux_grid)
+    # wls,Fs,fluxs,masks = integrate.build_local_spectrum_fast(0,0,0.2,wl2,fx2, wave_start, wave_end,x,y,vel_grid,flux_grid)
     # Ft = F-Fp+Fs
     # plt.plot(wlF,F)
     # plt.plot(wlF,Ft)
@@ -166,7 +165,7 @@ if __name__ == '__main__':
     xp=xp1
     yp=yp1
     lightcurve = []#flux points will be appended onto this.
-    void1,void2,minflux,void3 = integrate.build_local_spectrum_fast(0,0,RpRs,wl,fx,args.wave_start,args.wave_end,x,y,vel_grid,flux_grid)
+    void1,void2,minflux,void3 = integrate.build_local_spectrum_fast(0,0,RpRs,wl,fx, wave_start, wave_end,x,y,vel_grid,flux_grid)
     for i in range(len(xp)):
         # if i == nsteps-1:
         #     RpRs = 0.1
@@ -175,7 +174,7 @@ if __name__ == '__main__':
         #     lightcurve = []
         #     RpRs = 0.16
         # i=150
-        wlp,Fp,flux,mask = integrate.build_local_spectrum_fast(xp[i],yp[i],RpRs,wl,fx,args.wave_start,args.wave_end,x,y,vel_grid,flux_grid)
+        wlp,Fp,flux,mask = integrate.build_local_spectrum_fast(xp[i],yp[i],RpRs,wl,fx, wave_start, wave_end,x,y,vel_grid,flux_grid)
 
         lightcurve.append(flux)
         fig,ax = plt.subplots(nrows=2, ncols=2,figsize=(8,8))
@@ -242,3 +241,7 @@ if __name__ == '__main__':
         integrate.statusbar(i,xp)
         plt.close()
         #convert -delay 6 anim/*.png HD209458b.gif
+
+
+if __name__ == '__main__':
+   StarRotator('help')
