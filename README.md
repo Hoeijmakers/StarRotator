@@ -17,7 +17,7 @@ Here comes a minimal Readme for getting main.py to run.
 11) 0.02
 12) Now spectrum should be running, while printing the output wavelength points to screen. You can see if the file called temp was created
 two folders up. This file contains the spectrum. 
-13) If this succeeded, you are now ready to run StarRotator. Navigate to the root folder and type: python3 main.py 586.0 592.0 110000.0 90.0 90.0 0.0 0.0 300       for a spectrum of the Na D lines, a fast-rotating star and a grid of (2x300)x(2x300) ie 600x600 grid.
+13) If this succeeded, you are now ready to run StarRotator. Navigate to the root folder and type: python3 main.py 586.0 592.0 110000.0 90.0 90.0 0.0 0.0 300       for a spectrum of the Na D lines, a fast-rotating star and a grid of (2x300)x(2x300) ie 600x600 pixels.
 
 
 
