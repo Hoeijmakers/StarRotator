@@ -25,7 +25,7 @@ import math
 
 
 
-def StarRotator(wave_start,wave_end,velStar,stelinc,orbinc,drr,pob,grid_size=500,flag=''):
+def StarRotator(wave_start,wave_end,velStar,stelinc,orbinc,drr,pob,T,logg,grid_size=500,flag=''):
 
     if flag == 'help' or flag == 'Help':
         print("Welcome to StarRotator.")
@@ -38,21 +38,21 @@ def StarRotator(wave_start,wave_end,velStar,stelinc,orbinc,drr,pob,grid_size=500
         print("orbinc: Orbital inclination of the planet. type:float")
         print("drr: Differential rotation rate in units of stellar radii. type:float")
         print("pob: Projected obliquity of the star in degrees. type:float")
+        print("T: Temperature of the star in K. type:float")
+        print("logg: Logarithmic gravity of the star in cgs. type:float") #4.5
         print("grid_size: Number of grid cells, default 500. type:int")
         print("Good luck!")
         sys.exit()
-    #call parser, gets the input parameters from the user
+    
     try:
-        test = 0
-        #placeholder
-        #add input testing
+        test.typetest(wave_start,float,varname='wave_start in input')
+        test.notnegativetest(wave_start,float,varname='wave_start in input')
+        test.nantest(wave_start,float,varname='wave_start in input')
+        #add all the other input parameters 
     except ValueError as err:
         print("Parser: ",err.args)
 
     # test.test_integrators()
-
-    T = 6000.0
-    logg = 4.5
     Z = 0.0
     # u1 = 0.387
     # u2 = 0.178
@@ -118,17 +118,6 @@ def StarRotator(wave_start,wave_end,velStar,stelinc,orbinc,drr,pob,grid_size=500
 
     sys.exit()
 
-
-
-
-
-
-
-
-
-
-
-
     #The following puts a large circular spot with a T 1000K less than the star in the center.
     # wl2,fx2 = spectrum.read_spectrum(T-1000,logg)
     # wlp,Fp,flux,mask = integrate.build_local_spectrum_fast(0,0,0.2,wl,fx, wave_start, wave_end,x,y,vel_grid,flux_grid)
@@ -138,13 +127,6 @@ def StarRotator(wave_start,wave_end,velStar,stelinc,orbinc,drr,pob,grid_size=500
     # plt.plot(wlF,Ft)
     # plt.show()
     # sys.exit()
-
-
-
-
-
-
-
 
 
     #The following creates a transiting planet. We will need to offload it to some
