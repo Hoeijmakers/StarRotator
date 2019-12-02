@@ -19,13 +19,12 @@ import pdb
 import time
 import matplotlib.pyplot as plt
 import math
+from matplotlib.patches import Circle
 #main body of code
 
 
 
-
-
-def StarRotator(wave_start,wave_end,velStar,stelinc,orbinc,drr,pob,T,logg,grid_size=500,flag=''):
+def StarRotator(wave_start,wave_end,velStar,stelinc,orbinc,drr,pob,T,Z,logg,grid_size=500,flag=''):
 
     if flag == 'help' or flag == 'Help':
         print("Welcome to StarRotator.")
@@ -39,23 +38,21 @@ def StarRotator(wave_start,wave_end,velStar,stelinc,orbinc,drr,pob,T,logg,grid_s
         print("drr: Differential rotation rate in units of stellar radii. type:float")
         print("pob: Projected obliquity of the star in degrees. type:float")
         print("T: Temperature of the star in K. type:float")
+        print("Z: Metallicity of the star (dex). type:float")
         print("logg: Logarithmic gravity of the star in cgs. type:float") #4.5
         print("grid_size: Number of grid cells, default 500. type:int")
         print("Good luck!")
         sys.exit()
-    
+
     try:
         test.typetest(wave_start,float,varname='wave_start in input')
         test.notnegativetest(wave_start,float,varname='wave_start in input')
         test.nantest(wave_start,float,varname='wave_start in input')
-        #add all the other input parameters 
+        #add all the other input parameters
     except ValueError as err:
         print("Parser: ",err.args)
 
     # test.test_integrators()
-    Z = 0.0
-    # u1 = 0.387
-    # u2 = 0.178
     u1 = 0.93
     u2 = -0.23#THESE ARE THE WINN2011 PAREMETERS, NOT KIPPING 2013.
     mus = 0#Normal operation without CLV.
@@ -83,12 +80,7 @@ def StarRotator(wave_start,wave_end,velStar,stelinc,orbinc,drr,pob,T,logg,grid_s
     else:#Meaning, if we have no mu's do:
         test.test_KURUCZ()
         print('--- Computing limb-resolved spectra with SPECTRUM')
-        # print(T,logg,Z)
-        # print(mus)
         wl,fx_list = spectrum.compute_spectrum(T,logg,Z,mus, wave_start, wave_end,mode='anM')
-        # for fx in fx_list:
-        #     plt.plot(wl,fx)
-        # plt.show()
         print('--- Integrating limb-resolved disk')
         wlF,F = integrate.build_spectrum_limb_resolved(wl,fx_list,mus, wave_start, wave_end,x,y,vel_grid)
         wl2,fx2 = spectrum.read_spectrum(T,logg)
@@ -105,7 +97,6 @@ def StarRotator(wave_start,wave_end,velStar,stelinc,orbinc,drr,pob,T,logg,grid_s
         # plt.legend()
         # plt.show()
 
-        # pdb.set_trace()
         plt.plot(wlF,F/max(F),color='skyblue',alpha=0.5)
         plt.plot(wlF,(F-Fp)/np.nanmax(F-Fp),color='skyblue',label='SPECTRUM')
         plt.plot(wlF2,F2/max(F2),color='red',alpha=0.5)
@@ -131,33 +122,16 @@ def StarRotator(wave_start,wave_end,velStar,stelinc,orbinc,drr,pob,T,logg,grid_s
 
     #The following creates a transiting planet. We will need to offload it to some
     #tutorial-kind of script, but I put it here for now.
-    from matplotlib.patches import Circle
 
     RpRs = 0.12247
     nsteps = 100
-    xp1 = np.linspace(-1.5,1.5,nsteps)
-    yp1 = np.linspace(-0.55,-0.45,nsteps)
-    # xp2 = np.linspace(-0.1,-0.5,int(nsteps*1.0)) #These lines are for adding additional transits.
-    # yp2 = np.linspace(2.5,-2.5,int(nsteps*1.0))
-    # xp3 = np.linspace(1.3,0.0,nsteps)
-    # yp3 = np.linspace(-0.5,1.3,nsteps)
+    xp = np.linspace(-1.5,1.5,nsteps)
+    yp = np.linspace(-0.55,-0.45,nsteps)
 
-    # xp = np.concatenate((xp1,xp2,xp3))
-    # yp = np.concatenate((yp1,yp2,yp3))
-    xp=xp1
-    yp=yp1
     lightcurve = []#flux points will be appended onto this.
     void1,void2,minflux,void3 = integrate.build_local_spectrum_fast(0,0,RpRs,wl,fx, wave_start, wave_end,x,y,vel_grid,flux_grid)
     for i in range(len(xp)):
-        # if i == nsteps-1:
-        #     RpRs = 0.1
-        #     lightcurve = []
-        # if i == 2*nsteps-1:
-        #     lightcurve = []
-        #     RpRs = 0.16
-        # i=150
         wlp,Fp,flux,mask = integrate.build_local_spectrum_fast(xp[i],yp[i],RpRs,wl,fx, wave_start, wave_end,x,y,vel_grid,flux_grid)
-
         lightcurve.append(flux)
         fig,ax = plt.subplots(nrows=2, ncols=2,figsize=(8,8))
         ax[0][0].pcolormesh(x,y,flux_grid*mask,vmin=0,vmax=1.0*np.nanmax(flux_grid),cmap='autumn')
