@@ -15,7 +15,7 @@ def calc_orbit_times(time_stamp, transitC, exposure_time, orb_p):
     #orbit_end = (time_stamp+exposure_time/(2.*24.*3600.)- transitC + 2400000.) % orb_p
 
     return  orbit_center# orbit_start, orbit_end,
-    
+
 def func_kepler(ecc_anom,mean_anom,ecc):
     """
     Find the eccentric anomaly using the mean anomaly and eccentricity
@@ -38,7 +38,7 @@ def calc_true_anom(ecc,phases,omega_bar):
         phases: type: np.array, phases, either given by the user or calculated from time stamps
         omega_bar: type: float, angle
     output:
-        
+
     """
     import numpy as np
     #Circular orbit
@@ -53,7 +53,7 @@ def calc_true_anom(ecc,phases,omega_bar):
         #    - angle counted from 0 at the perisastron, to the star/Earth LOS
         #    - >0 counterclockwise, possibly modulo 2pi
         true_anom_mt=(np.pi*0.5)-omega_bar
-        
+
         #True anomaly at the time of the transit
         #    - corresponds to 'dt_transit' (in years), time from periapsis to transit center
         #    - atan(X) is in -PI/2 ; PI/2
@@ -61,18 +61,18 @@ def calc_true_anom(ecc,phases,omega_bar):
         mean_anom_mt=ecc_anom_mt-ecc*np.sin(ecc_anom_mt)
         if (mean_anom_mt<0.):
             mean_anom_mt=mean_anom_mt+2.*np.pi
-        
+
         #Mean anomaly
         #  - time origin of t_mean at the periapsis (t_mean=0 <-> M=0 <-> E=0)
         #  - M(t_mean)=M(dt_transit)+M(t_simu)
         mean_anom=2.*np.pi*phases+mean_anom_mt
-        
+
         #Eccentric anomaly :
         #  - M = E - e sin(E)
         #    - >0 counterclockwise
         #  - angle, with origin at the ellipse center, between the major axis toward the periapsis and the line crossing the circle with radius 'a_Rs' at its intersection with the perpendicular to the major axis through the planet position
         ecc_anom=newton(func_kepler,mean_anom,args=(mean_anom,ecc,))
-        
+
         #True anomaly of the planet at current time
         true_anom=2.*np.arctan(np.sqrt((1.+ecc)/(1.-ecc))*np.tan(ecc_anom/2.))
     return true_anom,ecc_anom
@@ -89,23 +89,23 @@ def  calc_planet_pos(sma_Rs, ecc, omega, inclin, Rp_Rs, orb_p, transitC, flag, s
         Rp_Rs: type: float, ratio planet to star radii
         orb_p: type: float, orbital period in days
         transitC: type:float, transit center - 2400000.
-        flag: type: string, can either be "times" for input as a real observation time array, or "phase" for an array of phases
+        flag: type: string, can either be "times" for input as a real observation time array, or "phases" for an array of phases
         step_grid: type: np.array, if flag=="times", grid of times in jdb, if flag=="phases" grid of phases
         exposure_times: type: np.array, all exposure times, only needed if flag=="times", default 0.
-        
+
     output: x_pl, y_pl, z_pl: type: np.arrays of floats, containing the position of the planet in units of stellar radii
 
     """
     import numpy as np
     from sys import exit
-    
-    
+
+
     inclin_bar = inclin*np.pi/180.
     omega_bar = omega*np.pi/180.
     obs_n = len(step_grid) #number of steps
-    
+
     positions= np.empty([3,obs_n], dtype=float)
-    
+
     if flag == "phases":
         phase = step_grid
     elif flag=="times":
@@ -123,7 +123,7 @@ def  calc_planet_pos(sma_Rs, ecc, omega, inclin, Rp_Rs, orb_p, transitC, flag, s
 
     #calc anomalies
     true_anom,ecc_anom = calc_true_anom(ecc,phase,omega_bar)
-    
+
     #circular orbit
     if np.isclose(ecc,0.,1e-4):
         x_pl = sma_Rs*np.sin(np.asarray(true_anom))

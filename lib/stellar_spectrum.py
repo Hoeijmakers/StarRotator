@@ -283,6 +283,7 @@ def compute_spectrum(T,logg,Z,mu,wlmin,wlmax,macroturbulence=0.0,mode='an',loud=
     from lib.integrate import statusbar
     import lib.operations as ops
     from os import path
+    import sys
     kurucz_root = 'data/KURUCZ/'#THIS IS THE SECOND TIME THIS IS DEFINED. SHOULD MATCH THE DEFINITION IN test_KURUCZ()!
     spath = './lib/SPECTRUM/selectmod'#This points to the supermod function.
     SPECTRUM = './lib/SPECTRUM/spectrum'#This points to spectrum.
@@ -433,3 +434,4 @@ def compute_spectrum(T,logg,Z,mu,wlmin,wlmax,macroturbulence=0.0,mode='an',loud=
         print(logg_a)
         print('Fe/H:')
         print(list(Z_a))
+        sys.exit()

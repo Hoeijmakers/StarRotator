@@ -20,43 +20,82 @@ import time
 import matplotlib.pyplot as plt
 import math
 from matplotlib.patches import Circle
+import lib.planet_pos as ppos
 #main body of code
 
 
+def StarRotator(wave_start,wave_end,grid_size,star_path='demo_star.txt',planet_path='demo_planet.txt',obs_path='demo_observations.txt'):
+#def StarRotator(wave_start,wave_end,velStar,stelinc,orbinc,drr,pob,T,Z,logg,grid_size=500,u1 = 0,u2=0):
+    planetparams = open(planet_path,'r').read().splitlines()
+    starparams = open(star_path,'r').read().splitlines()
+    obsparams = open(obs_path,'r').read().splitlines()
+    print(planetparams)
+    print(starparams)
+    print(obsparams)
 
-def StarRotator(wave_start,wave_end,velStar,stelinc,orbinc,drr,pob,T,Z,logg,grid_size=500,flag=''):
+    velStar = float(starparams[0].split()[0])
+    stelinc = float(starparams[1].split()[0])
+    drr = float(starparams[2].split()[0])
+    T = float(starparams[3].split()[0])
+    Z = float(starparams[4].split()[0])
+    logg = float(starparams[5].split()[0])
+    u1 = float(starparams[6].split()[0])
+    u2 = float(starparams[7].split()[0])
+    mus = float(starparams[8].split()[0])
 
-    if flag == 'help' or flag == 'Help':
-        print("Welcome to StarRotator.")
-        print("***********************")
-        print("Star Rotator needs the following input:")
-        print("wave_start: Wavelength range start in nm in vacuum. type:float")
-        print("wave_end: Wavelength range end in nm in vacuum. type:float")
-        print("velStar: Equatiorial velocity of the star in m per s. type:float")
-        print("stelinc: Inclination of the star. type:float")
-        print("orbinc: Orbital inclination of the planet. type:float")
-        print("drr: Differential rotation rate in units of stellar radii. type:float")
-        print("pob: Projected obliquity of the star in degrees. type:float")
-        print("T: Temperature of the star in K. type:float")
-        print("Z: Metallicity of the star (dex). type:float")
-        print("logg: Logarithmic gravity of the star in cgs. type:float") #4.5
-        print("grid_size: Number of grid cells, default 500. type:int")
-        print("Good luck!")
-        sys.exit()
+    sma_Rs = float(planetparams[0].split()[0])
+    ecc = float(planetparams[1].split()[0])
+    omega = float(planetparams[2].split()[0])
+    orbinc = float(planetparams[3].split()[0])
+    pob = float(planetparams[4].split()[0])
+    Rp_Rs = float(planetparams[5].split()[0])
+    orb_p = float(planetparams[6].split()[0])
+    transitC = float(planetparams[7].split()[0])
+    mode = planetparams[8].split()[0]#This is a string.
+
+    times = [] #These are in JD-24000000.0 or in orbital phase.
+    exptimes = []
+    for i in obsparams:
+        times.append(float(i.split()[0]))
+    times = np.array(times)
+    if mode == 'times':
+        for i in obsparams:
+            exptimes.append(float(i.split()[1]))
+        exptimes = np.array(exptimes)
+
+    """
+        Welcome to StarRotator.
+        ***********************
+        Star Rotator needs the following input:
+        wave_start: Wavelength range start in nm in vacuum. type:float
+        wave_end: Wavelength range end in nm in vacuum. type:float
+        velStar: Equatiorial velocity of the star in m per s. type:float
+        stelinc: Inclination of the star. type:float
+        orbinc: Orbital inclination of the planet. type:float
+        drr: Differential rotation rate in units of stellar radii. type:float
+        pob: Projected obliquity of the star in degrees. type:float
+        T: Temperature of the star in K. type:float
+        Z: Metallicity of the star (dex). type:float
+        logg: Logarithmic gravity of the star in cgs. type:float
+        grid_size: Number of grid cells, default 500. type:int
+        Good luck!
+    """
 
     try:
         test.typetest(wave_start,float,varname='wave_start in input')
-        test.notnegativetest(wave_start,float,varname='wave_start in input')
-        test.nantest(wave_start,float,varname='wave_start in input')
+        test.notnegativetest(wave_start,varname='wave_start in input')
+        test.nantest(wave_start,varname='wave_start in input')
         #add all the other input parameters
     except ValueError as err:
         print("Parser: ",err.args)
 
     # test.test_integrators()
-    u1 = 0.93
-    u2 = -0.23#THESE ARE THE WINN2011 PAREMETERS, NOT KIPPING 2013.
-    mus = 0#Normal operation without CLV.
-    mus = np.linspace(0.0,1.0,3)#Uncomment this to run in CLV mode with SPECTRUM.
+    # u1 = 0.93
+    # u2 = -0.23#THESE ARE THE WINN2011 PAREMETERS, NOT KIPPING 2013.
+    # mus = 0#Normal operation without CLV.
+
+    if mus != 0:
+        mus = np.linspace(0.0,1.0,mus)#Uncomment this to run in CLV mode with SPECTRUM.
 
     #Two arrays for the x and y axes
     x = np.linspace(-1,1,num=2* grid_size) #in units of stellar radius
@@ -83,31 +122,52 @@ def StarRotator(wave_start,wave_end,velStar,stelinc,orbinc,drr,pob,T,Z,logg,grid
         wl,fx_list = spectrum.compute_spectrum(T,logg,Z,mus, wave_start, wave_end,mode='anM')
         print('--- Integrating limb-resolved disk')
         wlF,F = integrate.build_spectrum_limb_resolved(wl,fx_list,mus, wave_start, wave_end,x,y,vel_grid)
-        wl2,fx2 = spectrum.read_spectrum(T,logg)
-        wlF2,F2 = integrate.build_spectrum_fast(wl2,fx2, wave_start, wave_end,x,y,vel_grid,flux_grid)
 
-        wlp,Fp,flux,mask = integrate.build_local_spectrum_limb_resolved(-0.3,0.0,0.1,wl,fx_list,mus, wave_start, wave_end,x,y,vel_grid)
-        wlp2,Fp2,flux2,mask2 = integrate.build_local_spectrum_fast(-0.3,0.0,0.1,wl2,fx2, wave_start, wave_end,x,y,vel_grid,flux_grid)
-        #This overplots non-rotating SPECTRUM and PHOENIX spectra, normalised.
-        # plt.plot(wl,fx_list[-1]/max(fx_list[-1]),label='SPECTRUM')
-        # plt.plot(wl2,fx2/5e15,label='PHOENIX')
+
+
+
+    xp,yp,zp = ppos.calc_planet_pos(sma_Rs, ecc, omega, orbinc, Rp_Rs, orb_p, transitC, mode, times, exptimes)
+    plt.plot(xp,yp,'.')
+    plt.xlim(-0.3,0.3)
+    plt.ylim(-0.3,0.3)
+    plt.show()
+    sys.exit()
+    for i,t in range(len(xp)):
+        wlp,Fp,flux,mask = integrate.build_local_spectrum_fast(xp,yp,RpRs,wl,fx, wave_start, wave_end,x,y,vel_grid,flux_grid)
+
+
+
+
+
+        #This is for plotting random comparisons.
+        # wl2,fx2 = spectrum.read_spectrum(T,logg)
+        # wlF2,F2 = integrate.build_spectrum_fast(wl2,fx2, wave_start, wave_end,x,y,vel_grid,flux_grid)
+        # wlp,Fp,flux,mask = integrate.build_local_spectrum_limb_resolved(-0.3,0.0,0.1,wl,fx_list,mus, wave_start, wave_end,x,y,vel_grid)
+        # wlp2,Fp2,flux2,mask2 = integrate.build_local_spectrum_fast(-0.3,0.0,0.1,wl2,fx2, wave_start, wave_end,x,y,vel_grid,flux_grid)
+        ##This overplots non-rotating SPECTRUM and PHOENIX spectra, normalised.
+        ## plt.plot(wl,fx_list[-1]/max(fx_list[-1]),label='SPECTRUM')
+        ## plt.plot(wl2,fx2/5e15,label='PHOENIX')
+        ## plt.xlabel('Wavelength (nm)')
+        ## plt.ylabel('Max-normalised flux')
+        ## plt.title('T = %s K, log(g) = %s' % (T,logg))
+        ## plt.legend()
+        ## plt.show()
+
+        # plt.plot(wlF,F/max(F),color='skyblue',alpha=0.5)
+        # plt.plot(wlF,(F-Fp)/np.nanmax(F-Fp),color='skyblue',label='SPECTRUM')
+        # plt.plot(wlF2,F2/max(F2),color='red',alpha=0.5)
+        # plt.plot(wlF2,(F2-Fp2)/np.nanmax(F2-Fp2),color='red',label='PHOENIX')
+        # plt.legend()
         # plt.xlabel('Wavelength (nm)')
         # plt.ylabel('Max-normalised flux')
-        # plt.title('T = %s K, log(g) = %s' % (T,logg))
-        # plt.legend()
+        # plt.title('T = %s K, log(g) = %s, vsini = 110km/s' % (T,logg))
         # plt.show()
 
-        plt.plot(wlF,F/max(F),color='skyblue',alpha=0.5)
-        plt.plot(wlF,(F-Fp)/np.nanmax(F-Fp),color='skyblue',label='SPECTRUM')
-        plt.plot(wlF2,F2/max(F2),color='red',alpha=0.5)
-        plt.plot(wlF2,(F2-Fp2)/np.nanmax(F2-Fp2),color='red',label='PHOENIX')
-        plt.legend()
-        plt.xlabel('Wavelength (nm)')
-        plt.ylabel('Max-normalised flux')
-        plt.title('T = %s K, log(g) = %s, vsini = 110km/s' % (T,logg))
-        plt.show()
-
     sys.exit()
+
+
+
+    # void1,void2,minflux,void3 = integrate.build_local_spectrum_fast(0,0,RpRs,wl,fx, wave_start, wave_end,x,y,vel_grid,flux_grid)
 
     #The following puts a large circular spot with a T 1000K less than the star in the center.
     # wl2,fx2 = spectrum.read_spectrum(T-1000,logg)
@@ -120,9 +180,29 @@ def StarRotator(wave_start,wave_end,velStar,stelinc,orbinc,drr,pob,T,Z,logg,grid
     # sys.exit()
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     #The following creates a transiting planet. We will need to offload it to some
     #tutorial-kind of script, but I put it here for now.
-
     RpRs = 0.12247
     nsteps = 100
     xp = np.linspace(-1.5,1.5,nsteps)
@@ -197,7 +277,3 @@ def StarRotator(wave_start,wave_end,velStar,stelinc,orbinc,drr,pob,T,Z,logg,grid
         integrate.statusbar(i,xp)
         plt.close()
         #convert -delay 6 anim/*.png HD209458b.gif
-
-
-if __name__ == '__main__':
-   StarRotator('help')
