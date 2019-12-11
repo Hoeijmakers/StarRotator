@@ -2,9 +2,9 @@
 
 
 
-Here comes a minimal Readme for getting main.py to run.
+This is a minimal guide for for getting StarRotator to run.
 
-### Necessary steps to run StarRotator with CLV (i.e. $\mu$-resolved photospheric spectra) enabled
+#### Necessary steps to run StarRotator with CLV (i.e. <img src="https://latex.codecogs.com/gif.latex?\mu" /> -resolved photospheric spectra) enabled
 
 In order to run StarRotator with specific intensity-model spectra provided by the SPECTRUM code, perform the following steps:
 1) Clone the repo / pull it to your machine. This will include the files to run SPECTRUM as well. If you are happy running StarRotator without SPECTRUM, you can skip ahead past step 13.
