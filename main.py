@@ -57,7 +57,7 @@ def StarRotator(wave_start,wave_end,grid_size,star_path='demo_star.txt',planet_p
     ecc = float(planetparams[1].split()[0])
     omega = float(planetparams[2].split()[0])
     orbinc = float(planetparams[3].split()[0])
-    pob = float(planetparams[4].split()[0])
+    pob = float(planetparams[4].split()[0])#Obliquity.
     Rp_Rs = float(planetparams[5].split()[0])
     orb_p = float(planetparams[6].split()[0])
     transitC = float(planetparams[7].split()[0])
@@ -68,12 +68,11 @@ def StarRotator(wave_start,wave_end,grid_size,star_path='demo_star.txt',planet_p
     for i in obsparams:
         times.append(float(i.split()[0]))
     times = np.array(times)
+    Nexp = len(times)#Number of exposures.
     if mode == 'times':
         for i in obsparams:
             exptimes.append(float(i.split()[1]))
         exptimes = np.array(exptimes)
-
-
 
     try:
         test.typetest(wave_start,float,varname='wave_start in input')
@@ -121,18 +120,18 @@ def StarRotator(wave_start,wave_end,grid_size,star_path='demo_star.txt',planet_p
         wlF,F = integrate.build_spectrum_limb_resolved(wl,fx_list,mus, wave_start, wave_end,x,y,vel_grid)
 
 
-
-
     xp,yp,zp = ppos.calc_planet_pos(sma_Rs, ecc, omega, orbinc, Rp_Rs, orb_p, transitC, mode, times, exptimes)
-    plt.plot(xp,yp,'.')
-    plt.xlim(-0.3,0.3)
-    plt.ylim(-0.3,0.3)
-    plt.show()
-    sys.exit()
-    for i in range(len(xp)):
-        wlp,Fp,flux,mask = integrate.build_local_spectrum_fast(xp[i],yp[i],RpRs,wl,fx, wave_start, wave_end,x,y,vel_grid,flux_grid)
 
+    F_out = np.zeros((Nexp,len(F)))
+    flux_out = []
+    mask_out = []
+    for i in range(Nexp):
+        wlp,Fp,flux,mask = integrate.build_local_spectrum_fast(xp[i],yp[i],Rp_Rs,wl,fx,wave_start,wave_end,x,y,vel_grid,flux_grid)
+        F_out[i,:]=F-Fp
+        flux_out.append(flux)
+        mask_out.append(mask)
 
+    return(wlF,F,F_out,flux_out,mask_out,times,Rp_Rs)
 
 
 
@@ -160,7 +159,6 @@ def StarRotator(wave_start,wave_end,grid_size,star_path='demo_star.txt',planet_p
         # plt.title('T = %s K, log(g) = %s, vsini = 110km/s' % (T,logg))
         # plt.show()
 
-    sys.exit()
 
 
 
@@ -175,102 +173,3 @@ def StarRotator(wave_start,wave_end,grid_size,star_path='demo_star.txt',planet_p
     # plt.plot(wlF,Ft)
     # plt.show()
     # sys.exit()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    #The following creates a transiting planet. We will need to offload it to some
-    #tutorial-kind of script, but I put it here for now.
-    RpRs = 0.12247
-    nsteps = 100
-    xp = np.linspace(-1.5,1.5,nsteps)
-    yp = np.linspace(-0.55,-0.45,nsteps)
-
-    lightcurve = []#flux points will be appended onto this.
-    void1,void2,minflux,void3 = integrate.build_local_spectrum_fast(0,0,RpRs,wl,fx, wave_start, wave_end,x,y,vel_grid,flux_grid)
-    for i in range(len(xp)):
-        wlp,Fp,flux,mask = integrate.build_local_spectrum_fast(xp[i],yp[i],RpRs,wl,fx, wave_start, wave_end,x,y,vel_grid,flux_grid)
-        lightcurve.append(flux)
-        fig,ax = plt.subplots(nrows=2, ncols=2,figsize=(8,8))
-        ax[0][0].pcolormesh(x,y,flux_grid*mask,vmin=0,vmax=1.0*np.nanmax(flux_grid),cmap='autumn')
-        ax[1][0].pcolormesh(x,y,vel_grid*mask,cmap='bwr')
-        ax[0][0].axes.set_aspect('equal')
-        ax[1][0].axes.set_aspect('equal')
-        planet1 = Circle((xp[i],yp[i]),RpRs, facecolor='black', edgecolor='black', lw=1)
-        planet2 = Circle((xp[i],yp[i]),RpRs, facecolor='black', edgecolor='black', lw=1)
-        ax[0][0].add_patch(planet1)
-        ax[1][0].add_patch(planet2)
-
-
-        ax[0][1].plot(lightcurve,'.',color='black')
-        ax[0][1].set_xlim((0,nsteps))
-        ax[0][1].set_ylim((minflux-0.1*RpRs**2.0),1.0+0.1*RpRs**2)
-        ax[1][1].plot(wlF,F/np.nanmax(F),color='black',alpha = 0.5)
-        ymin = np.nanmin(F/np.nanmax(F))
-        ymax = np.nanmax(F/np.nanmax(F))
-        linedepth = ymax - ymin
-        ax[1][1].plot(wlF,(F-Fp)/np.nanmax(F-Fp),color='black')
-        ax[1][1].set_xlim((588.5,590.2))
-        yl = (ymin-0.1*linedepth,ymax+0.3*linedepth)
-        ax[1][1].set_ylim(yl)
-        ax2 = ax[1][1].twinx()
-        ax2.plot(wlF,(F-Fp)*np.nanmax(F)/F/np.nanmax(F-Fp),color='skyblue')
-        sf = 20.0
-        ax2.set_ylim((1.0-(1-yl[0])/sf,1.0+(yl[1]-1)/sf))
-        ax2.set_ylabel('Ratio F_in/F_out',fontsize = 7)
-        ax2.tick_params(axis='both', which='major', labelsize=6)
-        ax2.tick_params(axis='both', which='minor', labelsize=5)
-
-        ax[0][0].set_ylabel('Y (Rs)',fontsize=7)
-        ax[0][0].tick_params(axis='both', which='major', labelsize=6)
-        ax[0][0].tick_params(axis='both', which='minor', labelsize=5)
-
-        ax[1][0].set_ylabel('Y (Rs)',fontsize=7)
-        ax[1][0].set_xlabel('X (Rs)',fontsize=7)
-        ax[1][0].tick_params(axis='both', which='major', labelsize=6)
-        ax[1][0].tick_params(axis='both', which='minor', labelsize=5)
-
-
-        ax[0][1].set_ylabel('Normalised flux',fontsize=7)
-        ax[0][1].set_xlabel('Timestep',fontsize='small')
-        ax[0][1].tick_params(axis='both', which='major', labelsize=6)
-        ax[0][1].tick_params(axis='both', which='minor', labelsize=5)
-
-        ax[1][1].set_ylabel('Normalised flux',fontsize=7)
-        ax[1][1].set_xlabel('Wavelength (nm)',fontsize=7)
-        ax[1][1].tick_params(axis='both', which='major', labelsize=6)
-        ax[1][1].tick_params(axis='both', which='minor', labelsize=5)
-        # plt.show()
-        # sys.exit()
-        if len(str(i)) == 1:
-            out = '000'+str(i)
-        if len(str(i)) == 2:
-            out = '00'+str(i)
-        if len(str(i)) == 3:
-            out = '0'+str(i)
-        if len(str(i)) == 4:
-            out = str(i)
-
-        fig.savefig('anim/'+out+'.png', dpi=fig.dpi)
-        integrate.statusbar(i,xp)
-        plt.close()
-        #convert -delay 6 anim/*.png HD209458b.gif
