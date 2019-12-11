@@ -131,7 +131,7 @@ def StarRotator(wave_start,wave_end,grid_size,star_path='demo_star.txt',planet_p
         flux_out.append(flux)
         mask_out.append(mask)
 
-    return(wlF,F,F_out,flux_out,mask_out,times,Rp_Rs)
+    return(wlF,F,F_out,flux_out,mask_out,times,Rp_Rs,xp,yp,zp,x,y,vel_grid,flux_grid)#This is mad return statement. This whole function should be a class instead.
 
 
 
