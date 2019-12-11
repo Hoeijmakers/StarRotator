@@ -33,6 +33,7 @@ def input_tests_global(wl,fx,wlmin,wlmax,x,y,vel_grid,flux_grid,fname=''):
     """This wraps the input tests for all the integrator functions, as these are all the same."""
     import lib.test as test
     import numpy as np
+    import lib.operations as ops
     #wl and fx should be numpy arrays with the same length.
     test.typetest(wl,np.ndarray,varname='wl in '+fname)
     test.typetest(fx,np.ndarray,varname='fx in '+fname)
@@ -54,6 +55,14 @@ def input_tests_global(wl,fx,wlmin,wlmax,x,y,vel_grid,flux_grid,fname=''):
     test.dimtest(flux_grid,[len(y),len(x)],varname='y in '+fname)
     test.typetest(vel_grid,np.ndarray,varname='vel_grid in '+fname)
     test.typetest(flux_grid,np.ndarray,varname='flux_grid in '+fname)
+
+    dvm = np.nanmax(np.abs(vel_grid))
+    if wlmin/ops.doppler(dvm) <= np.nanmin(wl):
+        raise Exception("Value error in "+fname+": wlmin (%s) is smaller than min(wl) (%s) after accounting for the maximum velocity shift (%s)" % (wlmin/ops.doppler(dvm),min(wl),dvm))
+    if wlmax*ops.doppler(dvm) >= np.nanmax(wl):
+        raise Exception("Value error in "+fname+": wlmax (%s) is greater than max(wl) (%s) after accounting for the maximum velocity shift (%s)" % (wlmax*ops.doppler(dvm),max(wl),dvm))
+
+
 
     #fname should be a string.
     test.typetest(fname,str,varname='fname in input_tests_global')
@@ -117,7 +126,6 @@ def build_local_spectrum_fast(xp,yp,RpRs,wl,fx,wlmin,wlmax,x,y,vel_grid,flux_gri
     input_tests_local(xp,yp,RpRs)
     input_tests_global(wl,fx,wlmin,wlmax,x,y,vel_grid,flux_grid,fname='build_local_spectrum_fast')
 
-
     #We start by creating a mask that selects just the area of the star that is
     #covered by the planet, as well as its inverse which we like to return for
     #plotting purposes.
@@ -133,6 +141,7 @@ def build_local_spectrum_fast(xp,yp,RpRs,wl,fx,wlmin,wlmax,x,y,vel_grid,flux_gri
     mask = flux_grid*(d*0.0+1.0)#Set that to 1.0 and multiply with flux grid. Nansum coming!
     mask_i = flux_grid*(di*0.0+1.0)#Inverse of mask.
     wlc,fxc,wlc_wide,fxc_wide = ops.clip_spectrum(wl,fx,wlmin,wlmax,pad=2.0*np.nanmax(np.abs(vel_grid)))
+
 
     F = 0#output
     flux = np.nansum(mask,axis = 0)#This is the sum of the flux grid.
@@ -274,11 +283,11 @@ def build_spectrum_fast(wl,fx,wlmin,wlmax,x,y,vel_grid,flux_grid):
     import numpy as np
     import lib.operations as ops
     import warnings
+    import pdb
     #Standard tests on input:
     input_tests_global(wl,fx,wlmin,wlmax,x,y,vel_grid,flux_grid,fname='build_spectrum_fast')
 
     wlc,fxc,wlc_wide,fxc_wide = ops.clip_spectrum(wl,fx,wlmin,wlmax,pad=2.0*np.nanmax(np.abs(vel_grid)))
-
     F = 0#output
     flux = np.nansum(flux_grid,axis = 0)#This is the sum of the flux grid.
     with warnings.catch_warnings():

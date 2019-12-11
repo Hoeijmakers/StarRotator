@@ -26,12 +26,22 @@ import lib.planet_pos as ppos
 
 def StarRotator(wave_start,wave_end,grid_size,star_path='demo_star.txt',planet_path='demo_planet.txt',obs_path='demo_observations.txt'):
 #def StarRotator(wave_start,wave_end,velStar,stelinc,orbinc,drr,pob,T,Z,logg,grid_size=500,u1 = 0,u2=0):
+    """
+        Welcome to StarRotator.
+        ***********************
+        Star Rotator needs the following input:
+        wave_start: Wavelength range start in nm in vacuum. type:float
+        wave_end: Wavelength range end in nm in vacuum. type:float
+        grid_size: Number of grid cells, default 500. type:int
+        star_path, planet_path and obs_path point to textfiles that contain
+        the parameters of the star, the system and the time-series of the observations
+        (either in phase or in time.)
+        Good luck!
+    """
+
     planetparams = open(planet_path,'r').read().splitlines()
     starparams = open(star_path,'r').read().splitlines()
     obsparams = open(obs_path,'r').read().splitlines()
-    print(planetparams)
-    print(starparams)
-    print(obsparams)
 
     velStar = float(starparams[0].split()[0])
     stelinc = float(starparams[1].split()[0])
@@ -63,28 +73,15 @@ def StarRotator(wave_start,wave_end,grid_size,star_path='demo_star.txt',planet_p
             exptimes.append(float(i.split()[1]))
         exptimes = np.array(exptimes)
 
-    """
-        Welcome to StarRotator.
-        ***********************
-        Star Rotator needs the following input:
-        wave_start: Wavelength range start in nm in vacuum. type:float
-        wave_end: Wavelength range end in nm in vacuum. type:float
-        velStar: Equatiorial velocity of the star in m per s. type:float
-        stelinc: Inclination of the star. type:float
-        orbinc: Orbital inclination of the planet. type:float
-        drr: Differential rotation rate in units of stellar radii. type:float
-        pob: Projected obliquity of the star in degrees. type:float
-        T: Temperature of the star in K. type:float
-        Z: Metallicity of the star (dex). type:float
-        logg: Logarithmic gravity of the star in cgs. type:float
-        grid_size: Number of grid cells, default 500. type:int
-        Good luck!
-    """
+
 
     try:
         test.typetest(wave_start,float,varname='wave_start in input')
-        test.notnegativetest(wave_start,varname='wave_start in input')
         test.nantest(wave_start,varname='wave_start in input')
+        test.notnegativetest(wave_start,varname='wave_start in input')
+        test.notnegativetest(velStar,varname='velStar in input')
+        test.notnegativetest(stelinc,varname='stelinc in input')
+
         #add all the other input parameters
     except ValueError as err:
         print("Parser: ",err.args)
@@ -112,10 +109,10 @@ def StarRotator(wave_start,wave_end,grid_size,star_path='demo_star.txt',planet_p
         print('--- Integrating disk')
         if  drr == 0:
             print('------ Fast integration')
-            wlF,F = integrate.build_spectrum_fast(wl,fx, wave_start, wave_end,x,y,vel_grid,flux_grid)
+            wlF,F = integrate.build_spectrum_fast(wl,fx,wave_start,wave_end,x,y,vel_grid,flux_grid)
         else:
             print('------ Slow integration')
-            wlF,F = integrate.build_spectrum_slow(wl,fx, wave_start, wave_end,x,y,vel_grid,flux_grid)
+            wlF,F = integrate.build_spectrum_slow(wl,fx,wave_start,wave_end,x,y,vel_grid,flux_grid)
     else:#Meaning, if we have no mu's do:
         test.test_KURUCZ()
         print('--- Computing limb-resolved spectra with SPECTRUM')
@@ -132,8 +129,8 @@ def StarRotator(wave_start,wave_end,grid_size,star_path='demo_star.txt',planet_p
     plt.ylim(-0.3,0.3)
     plt.show()
     sys.exit()
-    for i,t in range(len(xp)):
-        wlp,Fp,flux,mask = integrate.build_local_spectrum_fast(xp,yp,RpRs,wl,fx, wave_start, wave_end,x,y,vel_grid,flux_grid)
+    for i in range(len(xp)):
+        wlp,Fp,flux,mask = integrate.build_local_spectrum_fast(xp[i],yp[i],RpRs,wl,fx, wave_start, wave_end,x,y,vel_grid,flux_grid)
 
 
 

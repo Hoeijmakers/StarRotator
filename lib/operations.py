@@ -125,9 +125,6 @@ def clip_spectrum(wl,fx,wlmin,wlmax,pad=0):
     test.nantest(pad,varname='pad in clip_spectrum')
     if wlmin >= wlmax:
         raise ValueError('wlmin in clip_spectrum should be smaller than wlmax.')
-
-
-
     wlc = wl[(wl >= wlmin) & (wl <= wlmax)]#This is the wavelength grid onto which we will interpolate the final result.
     fxc = fx[(wl >= wlmin) & (wl <= wlmax)]
 
@@ -143,8 +140,11 @@ def clip_spectrum(wl,fx,wlmin,wlmax,pad=0):
 def crop_spectrum(wl,fx,pad):
     """This crops a spectrum wl,fx to wlmin and wlmax.
     If pad !=0, it should be set to a positive velocity
-    by which the output spectrum will be padded around wlmin,wlmax,
-    which is returned as well as the narrower cropped spectrum.
+    by which the output spectrum will be padded within wlmin,wlmax, to allow
+    for velocity shifts. The difference with clip_spectrum above is that this
+    routine pads towards the inside (only returning the narrow spectrum), while
+    clip_spectrum pads towards the outside, returning both the cropped and the
+    padded cropped spectra.
 
         Parameters
         ----------
@@ -175,10 +175,6 @@ def crop_spectrum(wl,fx,pad):
     test.nantest(pad,varname=                 'pad in crop_spectrum')
     if wlmin >= wlmax:
         raise ValueError('wlmin in crop_spectrum should be smaller than wlmax.')
-
-
-
-
     wlmin_wide = wlmin*doppler(pad)#Crop towards the inside
     wlmax_wide = wlmax/doppler(pad)#Crop towards the inside
     wlc_narrow = wl[(wl >= wlmin_wide) & (wl <= wlmax_wide)]
