@@ -29,20 +29,105 @@ class StarRotator(object):
         """
             Welcome to StarRotator.
             ***********************
-            Star Rotator needs the following input:
-            wave_start: Wavelength range start in nm in vacuum. type:float
-            wave_end: Wavelength range end in nm in vacuum. type:float
-            grid_size: Number of grid cells, default 500. type:int
-            star_path, planet_path and obs_path point to textfiles that contain
-            the parameters of the star, the system and the time-series of the observations
-            (either in phase or in time.)
-            Good luck!
+            The StarRotator object contains the main functionality of StarRotator.
+            Upon initialization, the exoplanet system input is read from file, and the
+            model is computed. The parameters needed to initialise are listed below:
 
+            Parameters
+            ----------
+            wave_start : float
+                Start of modelled wavelength range in nm in vacuum.
+            wave_end : float
+                Ending Wavelength range in nm in vacuum.
+            grid_size: int
+                Half-width of number of grid cells. Set to values greater than 200
+                to limit numerical errors, or less if you are trying things out and just
+                want speed.
+            star_path : str
+                Path to parameter file defining the star. This file should contain the following
+                values on separate lines, and the default values are as follows:
+                    50000.0     v_eq
+                    90.0        stellar i
+                    0.0         Differential rotation parameter (alpha)
+                    5000.0      Stellar effective temperature (K)
+                    0.0         Fe/H
+                    4.5         logg
+                    0.93        Limb-darkening coefficient u1
+                    -0.23       Limb-darkening coefficient u2
+                    0           Number of mu angles to consider. For values higher than zero, StarRotator switches to SPECTRUM rather than PHOENIX.
+            planet_path: str
+                Path to the parameter file defining the planet and its orbit. This file should contain
+                the following values on separate lines, and the default values are as follows:
+                    3.153       a/Rs
+                    0.0         e
+                    0.0         omega
+                    86.79       Orbital inclination
+                    85.0        Projected obliquity
+                    0.08228     Rp/Rs
+                    1.4811235   Orbital period
+                    57095.68572 Transit center time - 2400000.
+                    phases      mode, providing the interpretation of the timestamps of the observations:
+
+            obs_path: str
+                Path to the parameter file defining the timestamps of the observations.
+                If mode (see previous) is set to 'phases', this file is assumed to contain
+                a list of orbital phases. Otherwise it should be set to 'times', in which
+                case the file should contain the times of the observations, in
+                JD - 2400000. These times are assumed to mean the *start* times of
+                each observation in the sequence. In addition, a second column should
+                be provided giving the exposure time in seconds. This allows StarRotator
+                to shift to the mid-times of the exposures. Note that for longer exposure times,
+                the output of StarRotator will be less accurate because the signal of multiple
+                exposures are convolved together. This effect is greater for aligned orbits.
+
+                By default, the following phases are provided:
+                    -0.06
+                    -0.055
+                    -0.05
+                    -0.045
+                    -0.04
+                    -0.035
+                    -0.03
+                    -0.025
+                    -0.02
+                    -0.015
+                    -0.01
+                    -0.005
+                    0.0
+                    0.005
+                    0.01
+                    0.015
+                    0.02
+                    0.025
+                    0.03
+                    0.035
+                    0.04
+                    0.045
+                    0.05
+                    0.055
+                    0.06
+
+            Class methods
+            -------------
             After initializing the class like a=StarRotator(588.0,592.0,200.0),
-            the simulated spectra can be accessed as:
-            a.wl (wavelength array)
-            a.spectra (matrix of spectra)
-            a.lightcurve (list of fluxes)
+            the following methods are available to manipulate the simulation after
+            it has been calculated the first time, or to plot the simulation output.
+            star.read_system() Reads in (new) exoplanet system files (see above).
+            star.compute_spectrum() recomputes the simulation.
+            star.plot_residuals() Produces a 2D plot of the residuals.
+            star.animate() Produces an animation of the transiting system. One frame
+            corresponding to each phase provided.
+
+            Output attributes
+            -----------------
+            After initializing the class like star = StarRotator(588.0,592.0,200.0),
+            the primary simulation output can be accessed as follows:
+            star.wl (wavelength array)
+            star.spectra (matrix of spectra, 2D np.array)
+            star.lightcurve (list of fluxes)
+            star.residual (residual after dividing out of transit spectra, 2D np.array)
+
+
         """
         self.wave_start=wave_start
         self.wave_end=wave_end
@@ -56,12 +141,14 @@ class StarRotator(object):
         """Reads in the stellar, planet and observation parameters from file; performing
         tests on the input and lifting the read variables to the class object.
 
-        Input:
-            star_path: str
+        Parameters
+        ----------
+            star_path : str
+                Path to parameter file defining the star.
             planet_path: str
+                Path to the parameter file defining the planet and its orbit.
             obs_path: str
-        Returns:
-            None
+                Path to the parameter file defining the timestamps of the observations.
         """
         planetparams = open(planet_path,'r').read().splitlines()
         starparams = open(star_path,'r').read().splitlines()
@@ -109,7 +196,13 @@ class StarRotator(object):
 
 
     def compute_spectrum(self):
-        """This is where the main computation takes place. Output is passed to self."""
+        """This is where the main computation takes place. The simulation output
+        and other variables are raised to class-wide attributes.
+
+        Parameters
+        ----------
+            None
+        """
         #Two arrays for the x and y axes
         self.x = np.linspace(-1,1,num=2*self.grid_size) #in units of stellar radius
         self.y = np.linspace(-1,1,num=2*self.grid_size) #in units of stellar radius
@@ -153,24 +246,57 @@ class StarRotator(object):
         self.lightcurve = flux_out
         self.masks = mask_out
 
-        def residuals(self):
-            """Compute and return the residuals of the time_series of spectra.
-            This may be the primary output of StarRotator."""
-            self.residual = self.spectra*0.0
-            for i in range(self.Nexp):
-                self.residual[i,:]=self.spectra[i]/self.stellar_spectrum
-            return(self.residual)
+    def residuals(self):
+        """Compute and return the residuals of the time_series of spectra.
+        This may be the primary output of StarRotator.
 
-        def plot_residuals(self):
-            """Compute and plot the residuals."""
-            import matplotlib.pyplot as plt
-            res = self.residuals()
-            plt.pcolormesh(self.wl,self.times,res)
-            plt.xlabel('Wavelength (nm)')
-            plt.ylabel('Phase')
-            plt.show()
+        Parameters
+        ----------
+            None
+
+        Returns
+        -------
+            residual : np.array
+                2D matrix corresponding in dimensions to the length of the
+                time-series times the number of wavelength points, containing
+                the residuals of the spectra after dividing out the out-of-
+                transit flux.
+        """
+        self.residual = self.spectra*0.0
+        for i in range(self.Nexp):
+            self.residual[i,:]=self.spectra[i]/self.stellar_spectrum
+        return(self.residual)
+
+    def plot_residuals(self):
+        """Compute and plot the residuals.
+
+        Parameters
+        ----------
+            None
+        Returns
+        -------
+            None
+        """
+        import matplotlib.pyplot as plt
+        res = self.residuals()
+        plt.pcolormesh(self.wl,self.times,res)
+        plt.xlabel('Wavelength (nm)')
+        plt.ylabel('Phase')
+        plt.show()
 
     def animate(self):
+        """Plots an animation of the transit event, the stellar flux and velocity
+        fields, and the resulting transit and line-shape variations. The animation
+        is located in the subfolder `anim`. Anything located in this folder prior
+        to running this function will be removed.
+
+        Parameters
+        ----------
+            None
+        Returns
+        -------
+            None
+        """
         import matplotlib.pyplot as plt
         import lib.integrate as integrate
         import numpy as np
