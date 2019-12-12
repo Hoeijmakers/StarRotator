@@ -365,7 +365,16 @@ class StarRotator(object):
             integrate.statusbar(i,self.Nexp)
             plt.close()
         print('')
-        os.system('convert -delay 6 anim/*.png animation.gif')
+
+        status = os.system('convert -delay 6 anim/*.png animation.gif')
+        if status != 0:
+            print('The conversion of the animation frames into a gif has')
+            print('failed; probably because the Imagemagick convert command')
+            print('was not found. The animation frames have been created in')
+            print('the anim/ folder. If you want to convert these into a .gif,')
+            print('please do it manually, or install Imagemagick, see')
+            print('https://imagemagick.org')
+
 
         #This is for plotting random comparisons.
         # wl2,fx2 = spectrum.read_spectrum(T,logg)
