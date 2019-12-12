@@ -6,10 +6,10 @@ This is a minimal guide for for getting StarRotator to run.
 
 #### Minimal steps needed to run StarRotator:
 
-In order to run StarRotator w, perform the following steps:
+In order to run StarRotator, perform the following steps:
 1) Clone the repo / pull it to your machine. This will include the files to run SPECTRUM as well. If you are happy running StarRotator without SPECTRUM (i.e. without specific intensity-model spectra provided by the SPECTRUM code), you can skip ahead to step 14.
-2) If not, navigate a terminal to the lib/SPECTRUM folder
-3) Type `make all` to compile SPECTRUM. I should compile with a few warnings.
+2) If not, navigate a terminal to the lib/SPECTRUM folder.
+3) Type `make all` to compile SPECTRUM. It should compile with a few warnings.
 4) Type `./spectrum`
 5) Spectrum will open and prompt you for answers. Answer the following:
 6) `vega.mod`
