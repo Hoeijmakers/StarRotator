@@ -78,6 +78,11 @@ def get_spectrum(T,logg,Z,a):
     #These are the output filenames, they will also be returned so that the wrapper
     #of this function can take them in.
     wavename = 'data/PHOENIX/WAVE.fits'
+
+    if os.path.isdir('data/PHOENIX/') == False:
+        os.makedirs('data/PHOENIX/')
+
+
     specname = 'data/PHOENIX/lte'+t_string+g_string+z_string+a_string+'.PHOENIX-ACES-AGSS-COND-2011-HiRes.fits'
 
     #If it doesn't already exists, we download them, otherwise, we just pass them on:
