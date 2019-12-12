@@ -303,8 +303,8 @@ class StarRotator(object):
         from matplotlib.patches import Circle
         import shutil
         import os
-        shutil.rmtree('anim/')#First delete the contents of the anim folder.
         os.mkdir('anim/')
+        shutil.rmtree('anim/')#First delete the contents of the anim folder.
         minflux = min(self.lightcurve)
         F=self.stellar_spectrum
         for i in range(self.Nexp):
