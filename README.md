@@ -1,10 +1,8 @@
 # StarRotator
 
+StarRotator is a package that simulates a rotation-broadened stellar spectrum during an exoplanet transit event. The simulation is done via numerical integration of the stellar disk, with model photosphere spectra from either PHOENIX or SPECTRUM.
 
-
-This is a minimal guide for for getting StarRotator to run.
-
-#### Minimal steps needed to run StarRotator:
+#### This is a minimal guide for for getting StarRotator to run.
 
 In order to run StarRotator, perform the following steps:
 1) Clone the repo / pull it to your machine. This will include the files to run SPECTRUM as well. If you are happy running StarRotator without SPECTRUM (i.e. without specific intensity-model spectra provided by the SPECTRUM code), you can skip ahead to step 14.
@@ -24,7 +22,7 @@ In order to run StarRotator, perform the following steps:
 
 StarRotator will run out of the box using a not-so-fictional exoplanet system defined in prepackaged configuration files (the demo .txt files included in the root folder). To begin, open python in the root folder and hit `from StarRotator import StarRotator`.
 
-14) Now StarRotator can be called as `KELT9 = StarRotator(586.0,592.0,400.0)` for a model spectrum of the Na-D lines of KELT-9, a fast-rotating 10,000K A-star orbited by KELT-9b, computed on a grid of (2x400)x(2x400) ie 600x600 pixels, and no CLV.
+14) Now StarRotator can be called as `KELT9 = StarRotator(586.0,592.0,400.0)` for a model spectrum of the Na-D lines of KELT-9, a fast-rotating 10,000K A-star orbited by KELT-9b, computed on a grid of (2x400)x(2x400) i.e. 800x800 square pixels, and no CLV.
 15) Access the simulation output using attributes defined on the `KELT9` object: The wavelength axis of the model is accessed as `wl = KELT9.wl`, the out-of-transit stellar spectrum as `F_out = KELT9.stellar_spectrum`, the time-series of the modelled spectrum as `spectra = KELT9.spectra` and the residuals obtained by dividing the out-of-transit spectrum out of the time-series: `residuals = KELT9.residuals()`.
 16) The StarRotator object contains methods to plot the simulation output. You can instantly plot the residuals of the time series like `KELT9.plot_residuals()`, and an animation of the entire time-series as `KELT9.animate()`, the result of which could look like the animation below:
 
