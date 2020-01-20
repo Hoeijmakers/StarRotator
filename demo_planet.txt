@@ -2,7 +2,7 @@
 0.0         e
 0.0       omega
 86.79         Inclination
-85.0          Obliquity
+-84.8          Obliquity
 0.08228      Rp/Rs
 1.4811235    Period
 57095.68572  Tc
