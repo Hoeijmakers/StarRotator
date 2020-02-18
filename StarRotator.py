@@ -213,7 +213,7 @@ class StarRotator(object):
 
         if isinstance(self.mus,np.ndarray) != True:#SWITCH BETWEEN PHOENIX (mus=0) AND SPECTRUM
             print('--- Reading spectrum from PHOENIX')
-            print('-----T=%sK, log(g)=%s, Z=%s',% (self.T,self.logg,self.Z))
+            print('-----T=%sK, log(g)=%s, Z=%s.' % (self.T,self.logg,self.Z))
             wl,fx = spectrum.read_spectrum(self.T,self.logg,metallicity=self.Z)
             print('--- Integrating disk')
             if  self.drr == 0:
@@ -225,13 +225,13 @@ class StarRotator(object):
         else:#Meaning, if we have no mu's do:
             test.test_KURUCZ()
             print('--- Computing limb-resolved spectra with SPECTRUM')
-            print('-----T=%sK, log(g)=%s, Z=%s',% (self.T,self.logg,self.Z))
+            print('-----T=%sK, log(g)=%s, Z=%s.'% (self.T,self.logg,self.Z))
             wl,fx_list = spectrum.compute_spectrum(self.T,self.logg,self.Z,self.mus,self.wave_start,self.wave_end,mode='anM')
             print('--- Integrating limb-resolved disk')
             wlF,F = integrate.build_spectrum_limb_resolved(wl,fx_list,self.mus, self.wave_start,self.wave_end,self.x,self.y,self.vel_grid)
 
 
-        self.xp,self.yp,self.zp = ppos.calc_planet_pos(self.sma_Rs, self.ecc, self.omega, self.orbinc, self.Rp_Rs, self.orb_p, self.transitC, self.mode, self.times, self.exptimes)
+        self.xp,self.yp,self.zp = ppos.calc_planet_pos(self.sma_Rs, self.ecc, self.omega, self.orbinc, self.pob, self.Rp_Rs, self.orb_p, self.transitC, self.mode, self.times, self.exptimes)
 
         F_out = np.zeros((self.Nexp,len(F)))
         flux_out = []

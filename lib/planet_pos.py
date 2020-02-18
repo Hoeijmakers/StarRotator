@@ -77,7 +77,7 @@ def calc_true_anom(ecc,phases,omega_bar):
         true_anom=2.*np.arctan(np.sqrt((1.+ecc)/(1.-ecc))*np.tan(ecc_anom/2.))
     return true_anom,ecc_anom
 
-def  calc_planet_pos(sma_Rs, ecc, omega, inclin, Rp_Rs, orb_p, transitC, flag, step_grid, exposure_times=0.):
+def  calc_planet_pos(sma_Rs, ecc, omega, inclin, l_spinorbit, Rp_Rs, orb_p, transitC, flag, step_grid, exposure_times=0.):
     """
     Takes the stellar and planet parameters as input and calulates the path of the planet
     in front of the cartesian stellar coordiante system
@@ -86,6 +86,7 @@ def  calc_planet_pos(sma_Rs, ecc, omega, inclin, Rp_Rs, orb_p, transitC, flag, s
         ecc: type: float, eccentricity
         omega: type: float, Angle between the ascending node and the periastron, in the orbital plane (>0 counterclockwise)
         inclin: type: float, Inclination from the line of sight toward the normal to the orbital plane
+        l_spinorbit: Orbit obliquity in degrees.
         Rp_Rs: type: float, ratio planet to star radii
         orb_p: type: float, orbital period in days
         transitC: type:float, transit center - 2400000.
@@ -141,4 +142,4 @@ def  calc_planet_pos(sma_Rs, ecc, omega, inclin, Rp_Rs, orb_p, transitC, flag, s
         x_pl = Y1_p
         y_pl = -X1_p*np.cos(inclin_bar)
         z_pl = X1_p*np.sin(inclin_bar)
-    return x_pl, y_pl, z_pl
+    return x_pl*np.cos(np.radians(l_spinorbit))-y_pl*np.sin(np.radians(l_spinorbit)),x_pl*np.sin(np.radians(l_spinorbit))+y_pl*np.cos(np.radians(l_spinorbit)), z_pl#CONVERT x_p and y_p to perpendicular x,y wrt stellar spin axis, see equation 4,5 of Cegla+ 2016.
