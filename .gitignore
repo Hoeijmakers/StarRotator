@@ -6,6 +6,11 @@ data/
 anim/
 *.gif
 *.png
+*.fits
+M2_obs.txt
+M2_planet.txt
+M2_star.txt
+__pycache__/
 lib/SPECTRUM/*.o
 lib/SPECTRUM/*.dat
 temp
