@@ -21,6 +21,7 @@ import matplotlib.pyplot as plt
 import math
 from matplotlib.patches import Circle
 import lib.planet_pos as ppos
+import copy
 #main body of code
 
 
@@ -244,7 +245,8 @@ class StarRotator(object):
         #This defines the output.
         self.wl = wlF
         self.stellar_spectrum = F
-        self.spectra = F_out
+        self.spectra = copy.deepcopy(F_out)
+        self.spectra_smooth = copy.deepcopy(F_out)
         self.lightcurve = flux_out
         self.masks = mask_out
 
@@ -266,7 +268,7 @@ class StarRotator(object):
         """
         self.residual = self.spectra*0.0
         for i in range(self.Nexp):
-            self.residual[i,:]=self.spectra[i]/self.stellar_spectrum
+            self.residual[i,:]=self.spectra[i]-self.stellar_spectrum
         return(self.residual)
 
     def plot_residuals(self):
@@ -285,6 +287,26 @@ class StarRotator(object):
         plt.xlabel('Wavelength (nm)')
         plt.ylabel('Phase')
         plt.show()
+
+
+    def spectral_resolution(self,R):
+        import lib.operations as ops
+        import astropy.constants as const
+        import copy
+        import scipy.ndimage.filters as SNF
+        dv = const.c.value / R / 1000.0 #in km/s
+
+        for i in range(len(self.spectra)):
+            self.spectra_smooth[i] = ops.blur_spec(self.wl,copy.deepcopy(self.spectra[i]),dv)
+            # self.spectra_smooth[i] = ops.smooth(copy.deepcopy(self.spectra[i]),40.0)
+            # self.spectra_smooth[i] = SNF.gaussian_filter(copy.deepcopy(self.spectra[i]),20.0,truncate=6.0)
+
+            # self.spectra_smooth[i] = ops.smooth(copy.deepcopy(self.spectra[i]),40.0)
+        self.spectra_save = copy.deepcopy(self.spectra)
+        self.spectra = copy.deepcopy(self.spectra_smooth)
+
+    def undo_spectral_resolution(self):
+        self.spectra = copy.deepcopy(self.spectra_save)
 
     def animate(self):
         """Plots an animation of the transit event, the stellar flux and velocity

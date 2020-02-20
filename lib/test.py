@@ -32,6 +32,34 @@ def test_ld():
     if w1 != 1 or w2 !=0 or w3 != 0:
         print('ERROR: limb darkening does not pass.')
 
+def test_smoothing():
+    from StarRotator import StarRotator
+    import matplotlib.pyplot as plt
+    import numpy as np
+    KELT9 = StarRotator(586.0,592.0,200.0)
+    F_unsmooth_1 = KELT9.spectra[0]
+    Res_1 = KELT9.residuals()
+    KELT9.spectral_resolution(20000.0)
+    F_smooth = KELT9.spectra[0]
+    Res_2 = KELT9.residuals()
+
+
+
+    # plt.plot(KELT9.wl,F_unsmooth_1)
+    # plt.plot(KELT9.wl,F_smooth)
+    # plt.show()
+
+    fig = plt.figure(figsize=(12,6))
+    plt.plot(KELT9.wl,Res_1[10])
+    plt.plot(KELT9.wl,Res_2[10])
+    plt.xlim((588.8,590.2))
+    plt.ylabel('In/out Residual')
+    plt.xlabel('Wavelength (nm)')
+    plt.title('With a brute-force for-loop')
+    plt.show()
+
+
+
 def investigate_SPECTRUM():
     """
 

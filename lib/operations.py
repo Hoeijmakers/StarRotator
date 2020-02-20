@@ -275,3 +275,166 @@ def limb_darkening(z,a1,a2):
     a0 = 1-a1-a2
     I = a0+a1*np.cos(psi)+a2*np.cos(psi)**2
     return(I)
+
+def findgen(n,int=False):
+    """This is basically IDL's findgen function.
+    a = findgen(5) will return an array with 5 elements from 0 to 4:
+    [0,1,2,3,4]
+    """
+    import numpy as np
+    if int:
+        return np.linspace(0,n-1,n).astype(int)
+    else:
+        return np.linspace(0,n-1,n)
+
+
+
+def convolve(array,kernel,edge_degree=1):
+    """It's unbelievable, but I could not find the python equivalent of IDL's
+    /edge_truncate keyword, which truncates the kernel at the edge of the convolution.
+    Therefore, unfortunately, I need to code a convolution operation myself.
+    Stand by to be slowed down by an order of magnitude #thankspython.
+
+    Nope! Because I can just use np.convolve for most of the array, just not the edge...
+
+    So the strategy is to extrapolate the edge of the array using a polynomial fit
+    to the edge elements. I fit over a range that is twice the length of the kernel.
+
+    Example: y_blurred = convolve(x,y,edge_degree = 2)
+    For a convolution where the edge is extrapolated with a second degree polynomial.
+    """
+    import numpy as np
+    import lib.test as test
+    test.typetest(edge_degree,int,'edge_degree in convolve')
+    test.typetest(array,np.ndarray,'array in convolve')
+    test.typetest(kernel,np.ndarray,'kernel in convolve')
+
+    if len(kernel) >= len(array)/2:
+        raise Exception("Error in convolution: Kernel length is larger than half of the array. Can't extrapolate over that length. And you probably don't want to be doing a convolution like that, anyway.")
+
+    if len(kernel) % 2 != 1:
+        raise Exception('Error in convolution: Kernel needs to have an odd number of elements.')
+
+    #Perform polynomial fits at the edges.
+    x=findgen(len(array))
+    fit_left=np.polyfit(x[0:len(kernel)*2],array[0:len(kernel)*2],edge_degree)
+    fit_right=np.polyfit(x[-2*len(kernel)-1:-1],array[-2*len(kernel)-1:-1],edge_degree)
+
+    #Pad both the x-grid (onto which the polynomial is defined)
+    #and the data array.
+    pad=findgen( (len(kernel)-1)/2)
+    left_pad=pad-(len(kernel)-1)/2
+    right_pad=np.max(x)+pad+1
+    left_array_pad=np.polyval(fit_left,left_pad)
+    right_array_pad=np.polyval(fit_right,right_pad)
+
+    #Perform the padding.
+    x_padded = np.append(left_pad , x)
+    x_padded = np.append(x_padded , right_pad) #Pad the array with the missing elements of the kernel at the edge.
+    array_padded = np.append(left_array_pad,array)
+    array_padded = np.append(array_padded,right_array_pad)
+
+    #Reverse the kernel because np.convol does that automatically and I don't want that.
+    #(Imagine doing a derivative with a kernel [-1,0,1] and it gets reversed...)
+    kr = kernel[::-1]
+    #The valid keyword effectively undoes the padding, leaving only those values for which the kernel was entirely in the padded array.
+    #This thus again has length equal to len(array).
+    return np.convolve(array_padded,kr,'valid')
+
+
+def gaussian(x,A,mu,sig,cont=0.0):
+    import numpy as np
+    """This produces a gaussian function on the grid x with amplitude A, mean mu
+    and standard deviation sig. Will need to expand it with a version that has
+    a polynomial continuum in the same way that IDL does it."""
+    return A * np.exp(-0.5*(x - mu)/sig*(x - mu)/sig)+cont
+
+def blur_spec(wl,spec,dv,truncsize = 20.0):
+    """This function takes a spectrum, and blurs it using either a
+    Gaussian kernel or a box kernel, which have a FWHM width of dv km/s everywhere.
+    Meaning that the width changes dynamically on a constant d-lambda grid.
+    Because the kernel needs to be recomputed on each element of the wavelength axis
+    individually, this operation is much slower than convolution with
+    a constant kernel, in which a simple shifting of the array, rather than a recomputation
+    of the kernel is sufficient."""
+
+    # print('I MAY NOT WANT TO USE BLUR-SPEC BECAUSE IT IS SLOW, AT LEAST IN BOX MODE.')
+    # print('AND I HAVE NOT THOROUGHLY BENCHMARKED IT.')
+    import numpy as np
+    import pdb
+    from matplotlib import pyplot as plt
+    import time
+    import astropy.constants as const
+    import numpy as np
+    import lib.test as test
+    # Do not perform tests because this thing is in a double forloop.
+    # test.typetest(dv,float,varname='dv in doppler(dv)')
+    c = const.c.value#Comes out in m/s.
+    test.typetest(dv,float,varname='dv in blur_spec')
+    test.typetest(wl,np.ndarray,varname='w in blur_specl')
+    test.typetest(spec,np.ndarray,varname='spec in blur_spec')
+    test.typetest(truncsize,float,varname='truncsize in blur_spec')
+
+    #truncsize=8.0#The gaussian is truncated at 8 sigma.
+
+    sig_dv = dv / 2*np.sqrt(2.0*np.log(2)) #Transform FWHM to Gaussian sigma. In km/s.
+
+    d_kernel=np.array([-1,0,1])/2.0
+    deriv = convolve(wl,d_kernel)
+    #l*dv/c=dl
+    dwl=wl*dv/const.c.value*1000.0
+    sig_wl=wl*sig_dv/const.c.value*1000.0#in nm
+    sig_px=sig_wl/deriv
+    trunc_dist=np.round(sig_px*truncsize).astype(int)
+
+    spec_blurred=spec*0.0
+    # pdb.set_trace()
+    for i in range(0,len(wl)):
+        #Im going to select wl in a bin so that I dont need to evaluate a gaussian over millions of points that are all zero
+        binstart=max([0,i-trunc_dist[i]])
+        binend=i+trunc_dist[i]
+        k = gaussian(wl[binstart:binend],1.0,wl[i],sig_wl[i])
+        k_n=k/np.sum(k)
+        spec_blurred[i]=np.sum(k_n*spec[binstart:binend])
+        #To speed up, need to select wl and then append with zeroes. <= what does that mean? Jens 03 mar 18
+    return(spec_blurred)
+
+
+def smooth(fx,w,mode='gaussian',edge_degree=1):
+    """This function takes a spectrum, and blurs it using either a
+    Gaussian kernel or a box kernel, which have a FWHM width of w px everywhere.
+    Meaning that the width changes dynamically on a constant d-lambda grid.
+    """
+
+    import numpy as np
+    import lib.test as test
+    import pdb
+
+    test.typetest(w,float,'w')
+    test.typetest(fx,np.ndarray,'fx')
+    test.typetest(mode,str,'mode')
+    test.typetest(edge_degree,int,'edge_degree')
+
+    truncsize=8.0#The gaussian is truncated at 8 sigma.
+    shape=np.shape(fx)
+
+    sig_w = w / 2*np.sqrt(2.0*np.log(2)) #Transform FWHM to Gaussian sigma. In km/s.
+    trunc_dist=np.round(sig_w*truncsize).astype(int)
+
+    #First define the kernel.
+    kw=int(np.round(truncsize*sig_w*2.0))
+    if kw % 2.0 != 1.0:#This is to make sure that the kernel has an odd number of
+    #elements, and that it is symmetric around zero.
+        kw+=1
+
+    kx=findgen(kw)
+    kx-=np.mean(kx)#This must be centered around zero. Doing a hardcoded check:
+    if (-1.0)*kx[-1] != kx[0]:
+        print(kx)
+        raise Exception("ERROR in box_smooth: Kernel could not be made symmetric somehow. Attempted kernel grid is printed above. Kernel width is %s pixels." % kw)
+
+    if mode == 'gaussian':
+        k=gaussian(kx,1.0,0.0,sig_w)
+
+    k/=np.sum(k)
+    return(convolve(fx,k,edge_degree))
