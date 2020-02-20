@@ -39,9 +39,10 @@ def test_smoothing():
     KELT9 = StarRotator(586.0,592.0,200.0)
     F_unsmooth_1 = KELT9.spectra[0]
     Res_1 = KELT9.residuals()
-    KELT9.spectral_resolution(20000.0)
-    F_smooth = KELT9.spectra[0]
-    Res_2 = KELT9.residuals()
+    KELT9.spectral_resolution(100000.0)
+    # F_smooth = KELT9.spectra[0]
+    # Res_2 = KELT9.residuals()
+    Res_2 = KELT9.residual
 
 
 

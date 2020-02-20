@@ -267,8 +267,9 @@ class StarRotator(object):
                 transit flux.
         """
         self.residual = self.spectra*0.0
+        self.residual_smooth = self.spectra*0.0
         for i in range(self.Nexp):
-            self.residual[i,:]=self.spectra[i]-self.stellar_spectrum
+            self.residual[i,:]=self.spectra[i]/self.stellar_spectrum
         return(self.residual)
 
     def plot_residuals(self):
@@ -297,16 +298,18 @@ class StarRotator(object):
         dv = const.c.value / R / 1000.0 #in km/s
 
         for i in range(len(self.spectra)):
-            self.spectra_smooth[i] = ops.blur_spec(self.wl,copy.deepcopy(self.spectra[i]),dv)
-            # self.spectra_smooth[i] = ops.smooth(copy.deepcopy(self.spectra[i]),40.0)
+            self.residual_smooth[i] = ops.blur_spec(self.wl,copy.deepcopy(self.residual[i]),dv)
+            # self.spectra_smooth[i] = ops.blur_spec(self.wl,copy.deepcopy(self.spectra[i]),dv)
             # self.spectra_smooth[i] = SNF.gaussian_filter(copy.deepcopy(self.spectra[i]),20.0,truncate=6.0)
-
             # self.spectra_smooth[i] = ops.smooth(copy.deepcopy(self.spectra[i]),40.0)
-        self.spectra_save = copy.deepcopy(self.spectra)
-        self.spectra = copy.deepcopy(self.spectra_smooth)
+        self.residual_save = copy.deepcopy(self.residual)
+        self.residual = copy.deepcopy(self.residual_smooth)
+        # self.spectra_save = copy.deepcopy(self.spectra)
+        # self.spectra = copy.deepcopy(self.spectra_smooth)
 
     def undo_spectral_resolution(self):
-        self.spectra = copy.deepcopy(self.spectra_save)
+        # self.spectra = copy.deepcopy(self.spectra_save)
+        self.residual = copy.deepcopy(self.residual_save)
 
     def animate(self):
         """Plots an animation of the transit event, the stellar flux and velocity
