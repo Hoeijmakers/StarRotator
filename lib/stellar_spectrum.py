@@ -178,6 +178,7 @@ def read_spectrum(T,logg,metallicity=0.0,alpha=0.0):
         print('a/M:')
         print(alpha_a)
         print('Alpha element enhancement != 0 only available for -3.0<[Fe/H]<0.0')
+        sys.exit()
 
 def download_kurucz(outpath):
     from contextlib import closing
