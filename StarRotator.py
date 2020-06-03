@@ -295,21 +295,27 @@ class StarRotator(object):
         import astropy.constants as const
         import copy
         import scipy.ndimage.filters as SNF
+        import scipy.interpolate as interp
+        from lib.integrate import statusbar as statusbar
         dv = const.c.value / R / 1000.0 #in km/s
-
+        # wl_high = np.linspace(np.min(self.wl),np.max(self.wl),num=len(self.wl)*30.0)
+        print('---Blurring')
         for i in range(len(self.spectra)):
-            self.residual_smooth[i] = ops.blur_spec(self.wl,copy.deepcopy(self.residual[i]),dv)
-            # self.spectra_smooth[i] = ops.blur_spec(self.wl,copy.deepcopy(self.spectra[i]),dv)
+            statusbar(i,len(self.spectra))
+            # spec_i = interp.interp1d(self.wl,self.spectra[i])
+            # self.residual_smooth[i] = ops.blur_spec(self.wl,copy.deepcopy(self.residual[i]),dv)
+            self.spectra_smooth[i] = ops.blur_spec(self.wl,copy.deepcopy(self.spectra[i]),dv)
             # self.spectra_smooth[i] = SNF.gaussian_filter(copy.deepcopy(self.spectra[i]),20.0,truncate=6.0)
             # self.spectra_smooth[i] = ops.smooth(copy.deepcopy(self.spectra[i]),40.0)
-        self.residual_save = copy.deepcopy(self.residual)
-        self.residual = copy.deepcopy(self.residual_smooth)
-        # self.spectra_save = copy.deepcopy(self.spectra)
-        # self.spectra = copy.deepcopy(self.spectra_smooth)
+            # self.spectra_smooth[i] = interp.interp1d(wl_high,ops.blur_spec(wl_high,spec_i(wl_high),dv))(self.wl)
+        # self.residual_save = copy.deepcopy(self.residual)
+        # self.residual = copy.deepcopy(self.residual_smooth)
+        self.spectra_save = copy.deepcopy(self.spectra)
+        self.spectra = copy.deepcopy(self.spectra_smooth)
 
     def undo_spectral_resolution(self):
-        # self.spectra = copy.deepcopy(self.spectra_save)
-        self.residual = copy.deepcopy(self.residual_save)
+        self.spectra = copy.deepcopy(self.spectra_save)
+        # self.residual = copy.deepcopy(self.residual_save)
 
     def animate(self):
         """Plots an animation of the transit event, the stellar flux and velocity
@@ -360,9 +366,9 @@ class StarRotator(object):
             ax[1][1].set_ylim(yl)
             ax2 = ax[1][1].twinx()
             ax2.plot(self.wl,(self.spectra[i])*np.nanmax(F)/F/np.nanmax(self.spectra[i]),color='skyblue')
-            sf = 20.0
+            sf = 30.0
             ax2.set_ylim((1.0-(1-yl[0])/sf,1.0+(yl[1]-1)/sf))
-            ax2.set_ylabel('Ratio F_in/F_out',fontsize = 7)
+            ax2.set_ylabel('Ratio in transit / out of transit',fontsize = 7)
             ax2.tick_params(axis='both', which='major', labelsize=6)
             ax2.tick_params(axis='both', which='minor', labelsize=5)
             ax[0][0].set_ylabel('Y (Rs)',fontsize=7)
@@ -373,7 +379,7 @@ class StarRotator(object):
             ax[1][0].tick_params(axis='both', which='major', labelsize=6)
             ax[1][0].tick_params(axis='both', which='minor', labelsize=5)
             ax[0][1].set_ylabel('Normalised flux',fontsize=7)
-            ax[0][1].set_xlabel('Timestep',fontsize='small')
+            ax[0][1].set_xlabel('Orbital Phase',fontsize='small')
             ax[0][1].tick_params(axis='both', which='major', labelsize=6)
             ax[0][1].tick_params(axis='both', which='minor', labelsize=5)
             ax[1][1].set_ylabel('Normalised flux',fontsize=7)
@@ -391,9 +397,9 @@ class StarRotator(object):
             fig.savefig('anim/'+out+'.png', dpi=fig.dpi)
             integrate.statusbar(i,self.Nexp)
             plt.close()
-        print('',end="\r")
+        print('--- Saving to animation.gif',end="\r")
 
-        status = os.system('convert -delay 6 anim/*.png animation.gif')
+        status = os.system('convert -delay 8 anim/*.png animation.gif')
         if status != 0:
             print('The conversion of the animation frames into a gif has')
             print('failed; probably because the Imagemagick convert command')

@@ -4,7 +4,7 @@ lib/.DS_Store
 data/
 .DS_Store
 anim/
-*.gif
+animation.gif
 *.png
 *.fits
 M2_obs.txt
