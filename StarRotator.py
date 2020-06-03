@@ -240,6 +240,11 @@ class StarRotator(object):
             wlF,F = integrate.build_spectrum_limb_resolved(wl,fx_list,self.mus, self.wave_start,self.wave_end,self.x,self.y,self.vel_grid)
 
 
+<<<<<<< HEAD
+=======
+        print(wlF)
+        print(len(wlF),len(F))
+>>>>>>> bc71f5956fba334ad6b0cc5d2508d1935e0ea4d2
 
         self.xp,self.yp,self.zp = ppos.calc_planet_pos(self.sma_Rs, self.ecc, self.omega, self.orbinc, self.pob, self.Rp_Rs, self.orb_p, self.transitC, self.mode, self.times, self.exptimes)
 
