@@ -199,6 +199,7 @@ def vactoair(wlnm):
             The wavelengths.
     """
     import lib.test as test
+    import numpy
     #First run standard tests on the input
     test.typetest(wlnm,[int,float,numpy.ndarray],varname='wlnm in vactoair')
     test.notnegativetest(wlnm,varname='wlnm in vactoair')
@@ -388,6 +389,7 @@ def blur_spec(wl,spec,dv,truncsize = 20.0):
     trunc_dist=np.round(sig_px*truncsize).astype(int)
 
     spec_blurred=spec*0.0
+    summm = []
     # pdb.set_trace()
     for i in range(0,len(wl)):
         #Im going to select wl in a bin so that I dont need to evaluate a gaussian over millions of points that are all zero
@@ -395,8 +397,19 @@ def blur_spec(wl,spec,dv,truncsize = 20.0):
         binend=i+trunc_dist[i]
         k = gaussian(wl[binstart:binend],1.0,wl[i],sig_wl[i])
         k_n=k/np.sum(k)
-        spec_blurred[i]=np.sum(k_n*spec[binstart:binend])
+        summm.append(np.sum(k))
+        # try:
+        # print(len(k_n),len(spec[binstart:binend]),len(wl[binstart:binend]))
+        try:
+            spec_blurred[i]=np.sum(k_n*spec[binstart:binend])
+        except:
+            print(len(wl),len(spec))
+            pdb.set_trace()
+        # except:
+            # pdb.set_trace()
         #To speed up, need to select wl and then append with zeroes. <= what does that mean? Jens 03 mar 18
+    plt.plot(wl,summm)
+    plt.show()
     return(spec_blurred)
 
 

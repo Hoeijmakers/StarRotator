@@ -373,8 +373,7 @@ def build_spectrum_limb_resolved(wl,fx_list,mu_list,wlmin,wlmax,x,y,vel_grid):
     test.typetest(mu_list,np.ndarray,varname='mu_list in build_spectrum_limb_resolved')
     test.dimtest(mu_list,[len(fx_list)],varname='mu_list in build_spectrum_limb_resolved')
     input_tests_global(wlc_wide,fx_list[0],wlmin,wlmax,x,y,vel_grid,vel_grid,fname='build_spectrum_limb_resolved')
-    wlc,fxc = ops.crop_spectrum(wl,fx_list[0],2.0*np.nanmax(np.abs(vel_grid)))#I do this for only one spectrum because I only care about wlc
-
+    wlc,fxc = ops.crop_spectrum(wl,fx_list[0],1.0*np.nanmax(np.abs(vel_grid)))#I do this for only one spectrum because I only care about wlc
     F = 0#output
     # start = time.time()
     for i in range(len(x)):
@@ -441,6 +440,8 @@ def build_local_spectrum_limb_resolved(xp,yp,RpRs,wl,fx_list,mu_list,wlmin,wlmax
     import lib.operations as ops
     import lib.test as test
     import warnings
+    import sys
+    import pdb
     wlc_wide = wl
     #Standard tests on input:
     input_tests_local(xp,yp,RpRs)
@@ -466,16 +467,18 @@ def build_local_spectrum_limb_resolved(xp,yp,RpRs,wl,fx_list,mu_list,wlmin,wlmax
 #ACTUALLY, NOW I AM USING VEL GRID INS TEAD OF FLUX GRID. THAT MEANS THAT THE
 #FLUX IS NO LONGER CALCULATED PROPERLY. NO LIGHTCURVE!
     # wlc,fxc,wlc_wide,fxc_wide = ops.clip_spectrum(wl,fx,wlmin,wlmax,pad=2.0*np.nanmax(np.abs(vel_grid)))
-    wlc,fxc = ops.crop_spectrum(wl,fx_list[0],2.0*np.nanmax(np.abs(vel_grid)))#I do this for only one spectrum because I only care about wlc
+    wlc,fxc = ops.crop_spectrum(wl,fx_list[0],1.0*np.nanmax(np.abs(vel_grid)))#I do this for only one spectrum because I only care about wlc
 
 
     F = 0#output
     # start = time.time()
+
+    # pdb.set_trace()
     for i in range(len(x)):
         for j in range(len(y)):
             if np.isnan(mask[j,i]) == False:
                 mu = 1 - np.sqrt(x[i]**2 + y[j]**2)
-                diff = abs(mu_list - mu)
+                diff = np.abs(mu_list - mu)
                 index = np.argmin(diff)
                 if mu_list[index] > 0:
                     fxc_wide = fx_list[index]
