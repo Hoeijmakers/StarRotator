@@ -193,7 +193,7 @@ class StarRotator(object):
             print("Parser: ",err.args)
 
         if self.mus != 0:
-            self.mus = np.linspace(0.0,1.0,mus)#Uncomment this to run in CLV mode with SPECTRUM.
+            self.mus = np.linspace(0.0,1.0,self.mus)#Uncomment this to run in CLV mode with SPECTRUM.
 
 
     def compute_spectrum(self):
@@ -204,6 +204,7 @@ class StarRotator(object):
         ----------
             None
         """
+        import math
         #Two arrays for the x and y axes
         self.x = np.linspace(-1,1,num=2*self.grid_size) #in units of stellar radius
         self.y = np.linspace(-1,1,num=2*self.grid_size) #in units of stellar radius
@@ -227,10 +228,20 @@ class StarRotator(object):
             test.test_KURUCZ()
             print('--- Computing limb-resolved spectra with SPECTRUM')
             print('-----T=%sK, log(g)=%s, Z=%s.'% (self.T,self.logg,self.Z))
-            wl,fx_list = spectrum.compute_spectrum(self.T,self.logg,self.Z,self.mus,self.wave_start,self.wave_end,mode='anM')
+
+            # print(self.wave_start,math.floor(ops.vactoair(self.wave_start)*10.0)/10.0)
+            # print(self.wave_end,math.ceil(ops.vactoair(self.wave_end)*10.0)/10.0)
+            # sys.exit()
+            maxvel = math.ceil(np.nanmax(np.abs(self.vel_grid)))
+            wl,fx_list = spectrum.compute_spectrum(self.T,self.logg,self.Z,self.mus,math.floor(ops.vactoair(self.wave_start*ops.doppler((-1.0)*maxvel))*10.0)/10.0,math.ceil(ops.vactoair(self.wave_end*ops.doppler(maxvel))*10.0)/10.0,mode='anM')
             print('--- Integrating limb-resolved disk')
+            # print(wl,self.wave_start)
+            # sys.exit()
             wlF,F = integrate.build_spectrum_limb_resolved(wl,fx_list,self.mus, self.wave_start,self.wave_end,self.x,self.y,self.vel_grid)
 
+
+        print(wlF)
+        print(len(wlF),len(F))
 
         self.xp,self.yp,self.zp = ppos.calc_planet_pos(self.sma_Rs, self.ecc, self.omega, self.orbinc, self.pob, self.Rp_Rs, self.orb_p, self.transitC, self.mode, self.times, self.exptimes)
 
@@ -238,7 +249,10 @@ class StarRotator(object):
         flux_out = []
         mask_out = []
         for i in range(self.Nexp):
-            wlp,Fp,flux,mask = integrate.build_local_spectrum_fast(self.xp[i],self.yp[i],self.Rp_Rs,wl,fx,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid,self.flux_grid)
+            if isinstance(self.mus,np.ndarray) == True:
+                wlp,Fp,flux,mask = integrate.build_local_spectrum_limb_resolved(self.xp[i],self.yp[i],self.Rp_Rs,wl,fx_list,self.mus,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid)
+            else:
+                wlp,Fp,flux,mask = integrate.build_local_spectrum_fast(self.xp[i],self.yp[i],self.Rp_Rs,wl,fx,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid,self.flux_grid)
             F_out[i,:]=F-Fp
             flux_out.append(flux)
             mask_out.append(mask)
@@ -397,7 +411,8 @@ class StarRotator(object):
             fig.savefig('anim/'+out+'.png', dpi=fig.dpi)
             integrate.statusbar(i,self.Nexp)
             plt.close()
-        print('--- Saving to animation.gif',end="\r")
+        print('',end="\r")
+        print('--- Saving to animation.gif')
 
         status = os.system('convert -delay 8 anim/*.png animation.gif')
         if status != 0:
