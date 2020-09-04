@@ -297,7 +297,7 @@ def build_spectrum_fast(wl,fx,wlmin,wlmax,x,y,vel_grid,flux_grid):
     for i in range(len(x)):
         if np.isnan(v[i]) == False:
             F+=ops.shift(wlc,wlc_wide,fxc_wide,v[i])*flux[i]
-    # statusbar(i,len(x))
+        statusbar(i,len(x))
     return(wlc,F)
 
 
