@@ -35,14 +35,38 @@ def test_ld():
 def test_smoothing():
     from StarRotator import StarRotator
     import matplotlib.pyplot as plt
+    import scipy.interpolate as interp
     import numpy as np
-    KELT9 = StarRotator(586.0,592.0,200.0)
+    from lib.integrate import statusbar as statusbar
+    import sys
+    import copy
+    KELT9 = StarRotator(586.0,592.0,100.0)
+    N = len(KELT9.spectra)
     F_unsmooth_1 = KELT9.spectra[0]
+
+
+    wl_low = copy.deepcopy(KELT9.wl)
+    wl_high = np.linspace(np.min(KELT9.wl),np.max(KELT9.wl),num=len(KELT9.wl)*30.0)
+    fx_high = np.zeros((N,len(wl_high)))
+
+
+
+    for i in range(N):
+        fx_high[i]=interp.interp1d(KELT9.wl,KELT9.spectra[i])(wl_high)
+        statusbar(i,N)
+
+
     Res_1 = KELT9.residuals()
-    KELT9.spectral_resolution(100000.0)
+    KELT9.spectral_resolution(20000.0)
+    Res_2 = KELT9.residuals()
+    KELT9.wl = copy.deepcopy(wl_high)
+    KELT9.spectra = copy.deepcopy(fx_high)
+    KELT9.stellar_spectrum = fx_high[0]
+    KELT9.spectra_smooth = copy.deepcopy(fx_high)
+    KELT9.spectral_resolution(20000.0)
     # F_smooth = KELT9.spectra[0]
     # Res_2 = KELT9.residuals()
-    Res_2 = KELT9.residual
+    Res_3 = KELT9.residuals()
 
 
 
@@ -51,12 +75,14 @@ def test_smoothing():
     # plt.show()
 
     fig = plt.figure(figsize=(12,6))
-    plt.plot(KELT9.wl,Res_1[10])
-    plt.plot(KELT9.wl,Res_2[10])
+    plt.plot(wl_low,Res_1[10],label='No blurring')
+    plt.plot(wl_low,Res_2[10],label='Blurring, normal sampling')
+    plt.plot(wl_high,Res_3[10],'--',label='Blurring, 30x oversampling')
     plt.xlim((588.8,590.2))
     plt.ylabel('In/out Residual')
     plt.xlabel('Wavelength (nm)')
-    plt.title('With a brute-force for-loop')
+    plt.title('With oversampling')
+    plt.legend()
     plt.show()
 
 

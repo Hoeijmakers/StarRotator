@@ -153,6 +153,7 @@ def build_local_spectrum_fast(xp,yp,RpRs,wl,fx,wlmin,wlmax,x,y,vel_grid,flux_gri
     for i in range(len(x)):
         if np.isnan(v[i]) == False:
             F+=ops.shift(wlc,wlc_wide,fxc_wide,v[i])*flux[i]
+
     return(wlc,F,np.nansum(mask_i),(di*0.0)+1.0)
 
 

@@ -1,5 +1,225 @@
 #This file contains a collection of functions that operate on spectra.
 
+def convolve(array,kernel,edge_degree=1,fit_width=2):
+    """It's unbelievable, but I could not find the python equivalent of IDL's
+    /edge_truncate keyword, which truncates the kernel at the edge of the convolution.
+    Therefore, unfortunately, I need to code a convolution operation myself.
+    Stand by to be slowed down by an order of magnitude #thankspython.
+
+    Nope! Because I can just use np.convolve for most of the array, just not the edge...
+
+    So the strategy is to extrapolate the edge of the array using a polynomial fit
+    to the edge elements. By default, I fit over a range that is twice the length of the kernel; but
+    this value can be modified using the fit_width parameter.
+
+    Parameters
+    ----------
+    array : list, np.ndarray
+        The horizontal axis.
+
+    kernel : list, np.ndarray
+        The convolution kernel. It is required to have a length that is less than 25% of the size of the array.
+
+    edge_degree : int
+        The polynomial degree by which the array is extrapolated in order to
+
+    fit_width : int
+        The length of the area at the edges of array used to fit the polynomial, in units of the length of the kernel.
+        Increase this number for small kernels or noisy arrays.
+    Returns
+    -------
+    array_convolved : np.array
+        The input array convolved with the kernel
+
+    Example
+    -------
+    >>> import numpy as np
+    >>> a=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]
+    >>> b=[-0.5,0,0.5]
+    >>> c=convolve(a,b,edge_degree=1)
+    """
+
+    import numpy as np
+    import pdb
+
+
+    array = np.array(array)
+    kernel= np.array(kernel)
+
+    if len(kernel) >= len(array)/4.0:
+        raise Exception(f"Error in ops.convolve(): Kernel length is larger than a quarter of the array ({len(kernel)}, {len(array)}). Can't extrapolate over that length. And you probably don't want to be doing a convolution like that, anyway.")
+
+    if len(kernel) % 2 != 1:
+        raise Exception('Error in ops.convolve(): Kernel needs to have an odd number of elements.')
+
+    #Perform polynomial fits at the edges.
+    x=findgen(len(array))
+    fit_left=np.polyfit(x[0:len(kernel)*2],array[0:len(kernel)*2],edge_degree)
+    fit_right=np.polyfit(x[-2*len(kernel)-1:-1],array[-2*len(kernel)-1:-1],edge_degree)
+
+    #Pad both the x-grid (onto which the polynomial is defined)
+    #and the data array.
+    pad=findgen((len(kernel)-1)/2)
+    left_pad=pad-(len(kernel)-1)/2
+    right_pad=np.max(x)+pad+1
+    left_array_pad=np.polyval(fit_left,left_pad)
+    right_array_pad=np.polyval(fit_right,right_pad)
+
+    #Perform the padding.
+    x_padded = np.append(left_pad , x)
+    x_padded = np.append(x_padded , right_pad) #Pad the array with the missing elements of the kernel at the edge.
+    array_padded = np.append(left_array_pad,array)
+    array_padded = np.append(array_padded,right_array_pad)
+
+    #Reverse the kernel because np.convol does that automatically and I don't want that.
+    #(Imagine doing a derivative with a kernel [-1,0,1] and it gets reversed...)
+    kr = kernel[::-1]
+    #The valid keyword effectively undoes the padding, leaving only those values for which the kernel was entirely in the padded array.
+    #This thus again has length equal to len(array).
+    return np.convolve(array_padded,kr,'valid')
+
+
+def smooth(fx,w,edge_degree=1):
+    """
+    This function takes a spectrum, and blurs it using either a
+    Gaussian kernel or a box kernel, which have a FWHM width of w px everywhere.
+    Meaning that the width changes dynamically on a constant d-lambda grid.
+    Set the mode to gaussian or box. Because in box, care is taken to correctly
+    interpolate the edges, it is about twice slower than the Gaussian.
+    This interpolation is done manually in the fun.box function.
+    """
+
+    import numpy as np
+
+    from matplotlib import pyplot as plt
+    truncsize=4.0#The gaussian is truncated at 8 sigma.
+    shape=np.shape(fx)
+
+    sig_w = w / 2*np.sqrt(2.0*np.log(2)) #Transform FWHM to Gaussian sigma. In km/s.
+    trunc_dist=np.round(sig_w*truncsize).astype(int)
+
+    #First define the kernel.
+    kw=int(np.round(truncsize*sig_w*2.0))
+    if kw % 2.0 != 1.0:#This is to make sure that the kernel has an odd number of
+    #elements, and that it is symmetric around zero.
+        kw+=1
+
+    kx=findgen(kw)
+    kx-=np.mean(kx)#This must be centered around zero. Doing a hardcoded check:
+    if (-1.0)*kx[-1] != kx[0]:
+        print(kx)
+        raise Exception("ERROR in box_smooth: Kernel could not be made symmetric somehow. Attempted kernel grid is printed above. Kernel width is %s pixels." % kw)
+
+    k=gaussian(kx,1.0,0.0,sig_w)
+
+    k/=np.sum(k)
+
+    return(convolve(fx,k,edge_degree))
+
+
+def derivative(x):
+    """
+    This computes the simple numerical derivative of x by convolving with kernel [-1,0,1].
+
+    Parameters
+    ----------
+    x : list, np.ndarray
+        The array from which the derivative is required.
+
+    Returns
+    -------
+    derivative : np.array
+        The numerical derivative of x.
+
+    Example
+    -------
+    >>> import numpy as np
+    >>> x=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]
+    >>> dx=derivative(x)
+    """
+    import numpy as np
+    x=np.array(x)
+    d_kernel=np.array([-1,0,1])/2.0
+    return(convolve(x,d_kernel,fit_width=3))
+
+
+
+
+def constant_velocity_wl_grid(wl,fx,oversampling=1.0):
+    """This function will define a constant-velocity grid that is (optionally)
+    sampled a number of times finer than the SMALLEST velocity difference that is
+    currently in the grid.
+
+    Example: wl_cv,fx_cv = constant_velocity_wl_grid(wl,fx,oversampling=1.5).
+
+    This function is hardcoded to raise an exception if wl or fx contain NaNs,
+    because interp1d does not handle NaNs.
+
+
+    Parameters
+    ----------
+    wl : list, np.ndarray
+        The wavelength array to be resampled.
+
+    fx : list, np.ndarray
+        The flux array to be resampled.
+
+    oversampling : float
+        The factor by which the wavelength array is *minimally* oversampled.
+
+
+    Returns
+    -------
+    wl : np.array
+        The new wavelength grid.
+
+    fx : np.array
+        The interpolated flux values.
+
+    a : float
+        The velocity step in km/s.
+
+
+    """
+    import astropy.constants as consts
+    import numpy as np
+    from scipy import interpolate
+    import pdb
+    import matplotlib.pyplot as plt
+
+
+    oversampling=float(oversampling)
+    wl=np.array(wl)
+    fx=np.array(fx)
+
+    c=consts.c.to('km/s').value
+
+    dl=derivative(wl)
+    dv=dl/wl*c
+    a=np.min(dv)/oversampling
+
+    wl_new=0.0
+    #The following while loop will define the new pixel grid.
+    #It starts trying 100,000 points, and if that's not enough to cover the entire
+    #range from min(wl) to max(wl), it will add 100,000 more; until it's enough.
+    n=len(wl)
+    while np.max(wl_new) < np.max(wl):
+        x=findgen(n)
+        wl_new=np.exp(a/c * x)*np.min(wl)
+        n+=len(wl)
+    wl_new[0]=np.min(wl)#Artificially set to zero to avoid making a small round
+    #off error in that exponent.
+
+    #Then at the end we crop the part that goes too far:
+    wl_new_cropped=wl_new[(wl_new <= np.max(wl))]
+    x_cropped=x[(wl_new <= np.max(wl))]
+    i_fx = interpolate.interp1d(wl,fx)
+    fx_new_cropped =i_fx(wl_new_cropped)
+    return(wl_new_cropped,fx_new_cropped,a)
+
+
+
+
 
 def doppler(dv):
     """This computes the relativistic doppler parameter.
@@ -290,58 +510,6 @@ def findgen(n,int=False):
 
 
 
-def convolve(array,kernel,edge_degree=1):
-    """It's unbelievable, but I could not find the python equivalent of IDL's
-    /edge_truncate keyword, which truncates the kernel at the edge of the convolution.
-    Therefore, unfortunately, I need to code a convolution operation myself.
-    Stand by to be slowed down by an order of magnitude #thankspython.
-
-    Nope! Because I can just use np.convolve for most of the array, just not the edge...
-
-    So the strategy is to extrapolate the edge of the array using a polynomial fit
-    to the edge elements. I fit over a range that is twice the length of the kernel.
-
-    Example: y_blurred = convolve(x,y,edge_degree = 2)
-    For a convolution where the edge is extrapolated with a second degree polynomial.
-    """
-    import numpy as np
-    import lib.test as test
-    test.typetest(edge_degree,int,'edge_degree in convolve')
-    test.typetest(array,np.ndarray,'array in convolve')
-    test.typetest(kernel,np.ndarray,'kernel in convolve')
-
-    if len(kernel) >= len(array)/2:
-        raise Exception("Error in convolution: Kernel length is larger than half of the array. Can't extrapolate over that length. And you probably don't want to be doing a convolution like that, anyway.")
-
-    if len(kernel) % 2 != 1:
-        raise Exception('Error in convolution: Kernel needs to have an odd number of elements.')
-
-    #Perform polynomial fits at the edges.
-    x=findgen(len(array))
-    fit_left=np.polyfit(x[0:len(kernel)*2],array[0:len(kernel)*2],edge_degree)
-    fit_right=np.polyfit(x[-2*len(kernel)-1:-1],array[-2*len(kernel)-1:-1],edge_degree)
-
-    #Pad both the x-grid (onto which the polynomial is defined)
-    #and the data array.
-    pad=findgen( (len(kernel)-1)/2)
-    left_pad=pad-(len(kernel)-1)/2
-    right_pad=np.max(x)+pad+1
-    left_array_pad=np.polyval(fit_left,left_pad)
-    right_array_pad=np.polyval(fit_right,right_pad)
-
-    #Perform the padding.
-    x_padded = np.append(left_pad , x)
-    x_padded = np.append(x_padded , right_pad) #Pad the array with the missing elements of the kernel at the edge.
-    array_padded = np.append(left_array_pad,array)
-    array_padded = np.append(array_padded,right_array_pad)
-
-    #Reverse the kernel because np.convol does that automatically and I don't want that.
-    #(Imagine doing a derivative with a kernel [-1,0,1] and it gets reversed...)
-    kr = kernel[::-1]
-    #The valid keyword effectively undoes the padding, leaving only those values for which the kernel was entirely in the padded array.
-    #This thus again has length equal to len(array).
-    return np.convolve(array_padded,kr,'valid')
-
 
 def gaussian(x,A,mu,sig,cont=0.0):
     import numpy as np
@@ -408,8 +576,8 @@ def blur_spec(wl,spec,dv,truncsize = 20.0):
         # except:
             # pdb.set_trace()
         #To speed up, need to select wl and then append with zeroes. <= what does that mean? Jens 03 mar 18
-    plt.plot(wl,summm)
-    plt.show()
+    # plt.plot(wl,summm)
+    # plt.show()
     return(spec_blurred)
 
 

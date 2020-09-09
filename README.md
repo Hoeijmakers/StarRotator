@@ -24,7 +24,7 @@ StarRotator will run out of the box using a not-so-fictional exoplanet system de
 
 14) To begin, open python in the root folder and hit `from StarRotator import StarRotator`.
 15) Now StarRotator can be called as `KELT9 = StarRotator(586.0,592.0,400.0)` for a model spectrum of the Na-D lines of KELT-9, a fast-rotating 10,000K A-star orbited by KELT-9b, computed on a grid of (2x400)x(2x400) i.e. 800x800 square pixels, and no CLV.
-16) Access the simulation output using attributes defined on the `KELT9` object: The wavelength axis of the model is accessed as `wl = KELT9.wl`, the out-of-transit stellar spectrum as `F_out = KELT9.stellar_spectrum`, the time-series of the modelled spectrum as `spectra = KELT9.spectra` and the residuals obtained by dividing the out-of-transit spectrum out of the time-series: `residuals = KELT9.residuals()`.
+16) Access the simulation output using attributes defined on the `KELT9` object: The wavelength axis of the model is accessed as `wl = KELT9.wl`, the out-of-transit stellar spectrum as `F_out = KELT9.stellar_spectrum`, the time-series of the modelled spectrum as `spectra = KELT9.spectra` and the residuals as obtained by dividing the out-of-transit spectrum out of the time-series: `residuals = KELT9.residual`. These can be blurred to a spectral resolution defined in KELT9.R (defined by default as 115,000 in the `demo_star.txt` parameter file), using `KELT9.convolve_spectral_resolution()`.
 17) The StarRotator object contains methods to plot the simulation output. You can instantly plot the residuals of the time series like `KELT9.plot_residuals()`, and an animation of the entire time-series as `KELT9.animate()`, the result of which could look like the animation below:
 
 ![](demo.gif)

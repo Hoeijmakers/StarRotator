@@ -130,9 +130,9 @@ class StarRotator(object):
 
 
         """
-        self.wave_start=wave_start
-        self.wave_end=wave_end
-        self.grid_size=grid_size
+        self.wave_start=float(wave_start)
+        self.wave_end=float(wave_end)
+        self.grid_size=int(grid_size)
         self.read_system(star_path=star_path,planet_path=planet_path,obs_path=obs_path)
         self.compute_spectrum()
 
@@ -163,6 +163,7 @@ class StarRotator(object):
         self.u1 = float(starparams[6].split()[0])
         self.u2 = float(starparams[7].split()[0])
         self.mus = float(starparams[8].split()[0])
+        self.R = float(starparams[9].split()[0])
         self.sma_Rs = float(planetparams[0].split()[0])
         self.ecc = float(planetparams[1].split()[0])
         self.omega = float(planetparams[2].split()[0])
@@ -251,6 +252,8 @@ class StarRotator(object):
                 wlp,Fp,flux,mask = integrate.build_local_spectrum_limb_resolved(self.xp[i],self.yp[i],self.Rp_Rs,wl,fx_list,self.mus,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid)
             else:
                 wlp,Fp,flux,mask = integrate.build_local_spectrum_fast(self.xp[i],self.yp[i],self.Rp_Rs,wl,fx,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid,self.flux_grid)
+            integrate.statusbar(i,self.Nexp)
+
             F_out[i,:]=F-Fp
             flux_out.append(flux)
             mask_out.append(mask)
@@ -258,11 +261,11 @@ class StarRotator(object):
         self.wl = wlF
         self.stellar_spectrum = F
         self.spectra = copy.deepcopy(F_out)
-        self.spectra_smooth = copy.deepcopy(F_out)
         self.lightcurve = flux_out
         self.masks = mask_out
+        self.compute_residuals()
 
-    def residuals(self):
+    def compute_residuals(self):
         """Compute and return the residuals of the time_series of spectra.
         This may be the primary output of StarRotator.
 
@@ -278,11 +281,14 @@ class StarRotator(object):
                 the residuals of the spectra after dividing out the out-of-
                 transit flux.
         """
+        import pdb
         self.residual = self.spectra*0.0
-        self.residual_smooth = self.spectra*0.0
+        # self.residual_smooth = self.spectra*0.0
         for i in range(self.Nexp):
             self.residual[i,:]=self.spectra[i]/self.stellar_spectrum
-        return(self.residual)
+        # pdb.set_trace()
+        # self.apply_spectral_resolution(self.R)
+
 
     def plot_residuals(self):
         """Compute and plot the residuals.
@@ -295,38 +301,45 @@ class StarRotator(object):
             None
         """
         import matplotlib.pyplot as plt
-        res = self.residuals()
-        plt.pcolormesh(self.wl,self.times,res)
+        # res = self.residuals()
+        plt.pcolormesh(self.wl,self.times,self.residual)
         plt.xlabel('Wavelength (nm)')
         plt.ylabel('Phase')
         plt.show()
 
 
-    def spectral_resolution(self,R):
+    def convolve_spectral_resolution(self):
         import lib.operations as ops
         import astropy.constants as const
         import copy
         import scipy.ndimage.filters as SNF
         import scipy.interpolate as interp
         from lib.integrate import statusbar as statusbar
-        dv = const.c.value / R / 1000.0 #in km/s
+        dv = const.c.value / self.R / 1000.0 #in km/s
         # wl_high = np.linspace(np.min(self.wl),np.max(self.wl),num=len(self.wl)*30.0)
         print('---Blurring')
+
         for i in range(len(self.spectra)):
             statusbar(i,len(self.spectra))
             # spec_i = interp.interp1d(self.wl,self.spectra[i])
             # self.residual_smooth[i] = ops.blur_spec(self.wl,copy.deepcopy(self.residual[i]),dv)
-            self.spectra_smooth[i] = ops.blur_spec(self.wl,copy.deepcopy(self.spectra[i]),dv)
+            # self.spectra_smooth[i] = ops.blur_spec(self.wl,copy.deepcopy(self.spectra[i]),dv)
             # self.spectra_smooth[i] = SNF.gaussian_filter(copy.deepcopy(self.spectra[i]),20.0,truncate=6.0)
             # self.spectra_smooth[i] = ops.smooth(copy.deepcopy(self.spectra[i]),40.0)
             # self.spectra_smooth[i] = interp.interp1d(wl_high,ops.blur_spec(wl_high,spec_i(wl_high),dv))(self.wl)
+
+            res = self.residual[i]
+            wl_constant_v,res_constant_v,a = ops.constant_velocity_wl_grid(self.wl,res,3.0)
+            res_smooth = ops.smooth(res_constant_v,dv/a)
+            self.residual[i] = interp.interp1d(wl_constant_v,res_smooth,fill_value='extrapolate',bounds_error=False)(self.wl)
+            # self.residual[i] = ops.blur_spec(self.wl,copy.deepcopy(self.residual[i]),dv)
         # self.residual_save = copy.deepcopy(self.residual)
         # self.residual = copy.deepcopy(self.residual_smooth)
-        self.spectra_save = copy.deepcopy(self.spectra)
-        self.spectra = copy.deepcopy(self.spectra_smooth)
+        # self.spectra_save = copy.deepcopy(self.spectra)
+        # self.spectra = copy.deepcopy(self.spectra_smooth)
 
-    def undo_spectral_resolution(self):
-        self.spectra = copy.deepcopy(self.spectra_save)
+    # def undo_spectral_resolution(self):
+    #     self.spectra = copy.deepcopy(self.spectra_save)
         # self.residual = copy.deepcopy(self.residual_save)
 
     def animate(self):
