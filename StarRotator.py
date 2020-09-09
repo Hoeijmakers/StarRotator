@@ -244,14 +244,18 @@ class StarRotator(object):
 
         self.xp,self.yp,self.zp = ppos.calc_planet_pos(self.sma_Rs, self.ecc, self.omega, self.orbinc, self.pob, self.Rp_Rs, self.orb_p, self.transitC, self.mode, self.times, self.exptimes)
 
+
+        # for i in range(len(self.xp)):
+        #     print(self.xp[i],self.yp[i],self.zp[i])
+        # pdb.set_trace()
         F_out = np.zeros((self.Nexp,len(F)))
         flux_out = []
         mask_out = []
         for i in range(self.Nexp):
             if isinstance(self.mus,np.ndarray) == True:
-                wlp,Fp,flux,mask = integrate.build_local_spectrum_limb_resolved(self.xp[i],self.yp[i],self.Rp_Rs,wl,fx_list,self.mus,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid)
+                wlp,Fp,flux,mask = integrate.build_local_spectrum_limb_resolved(self.xp[i],self.yp[i],self.zp[i],self.Rp_Rs,wl,fx_list,self.mus,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid)
             else:
-                wlp,Fp,flux,mask = integrate.build_local_spectrum_fast(self.xp[i],self.yp[i],self.Rp_Rs,wl,fx,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid,self.flux_grid)
+                wlp,Fp,flux,mask = integrate.build_local_spectrum_fast(self.xp[i],self.yp[i],self.zp[i],self.Rp_Rs,wl,fx,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid,self.flux_grid)
             integrate.statusbar(i,self.Nexp)
 
             F_out[i,:]=F-Fp
@@ -374,10 +378,11 @@ class StarRotator(object):
             ax[1][0].pcolormesh(self.x,self.y,self.vel_grid*mask,cmap='bwr')
             ax[0][0].axes.set_aspect('equal')
             ax[1][0].axes.set_aspect('equal')
-            planet1 = Circle((self.xp[i],self.yp[i]),self.Rp_Rs, facecolor='black', edgecolor='black', lw=1)
-            planet2 = Circle((self.xp[i],self.yp[i]),self.Rp_Rs, facecolor='black', edgecolor='black', lw=1)
-            ax[0][0].add_patch(planet1)
-            ax[1][0].add_patch(planet2)
+            if self.zp[i] > 0.0:
+                planet1 = Circle((self.xp[i],self.yp[i]),self.Rp_Rs, facecolor='black', edgecolor='black', lw=1)
+                planet2 = Circle((self.xp[i],self.yp[i]),self.Rp_Rs, facecolor='black', edgecolor='black', lw=1)
+                ax[0][0].add_patch(planet1)
+                ax[1][0].add_patch(planet2)
             ax[0][1].plot(self.times[0:i],self.lightcurve[0:i],'.',color='black')
             ax[0][1].set_xlim((min(self.times),max(self.times)))
             ax[0][1].set_ylim((minflux-0.1*self.Rp_Rs**2.0),1.0+0.1*self.Rp_Rs**2)

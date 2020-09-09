@@ -67,7 +67,7 @@ def input_tests_global(wl,fx,wlmin,wlmax,x,y,vel_grid,flux_grid,fname=''):
     #fname should be a string.
     test.typetest(fname,str,varname='fname in input_tests_global')
 
-def build_local_spectrum_fast(xp,yp,RpRs,wl,fx,wlmin,wlmax,x,y,vel_grid,flux_grid):
+def build_local_spectrum_fast(xp,yp,zp,RpRs,wl,fx,wlmin,wlmax,x,y,vel_grid,flux_grid):
     """This is the fast and easy way of building the missing local spectrum that
     is blocked by the planet, assuming that the projected spin axis is vertical
     and differential rotation is zero, i.e. that all rows contain the same velocity.
@@ -134,10 +134,14 @@ def build_local_spectrum_fast(xp,yp,RpRs,wl,fx,wlmin,wlmax,x,y,vel_grid,flux_gri
     d = np.sqrt(x_full**2 + y_full**2)
     di = d*1.0
     d[d > RpRs] = np.nan#Mask out everything but the location of the planet.
+
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
         if np.nanmin(d) <= RpRs:
             di[d <= RpRs] = np.nan#out the location of the planet. Inverse of d.
+    if zp < 0.0:
+        d*=np.nan#Force the planet to not be in front of the disk if the z-coordinate is such that it is behind the star.
+        di[np.isnan(di)]=1.0#started as 1.0, set back to 1.0
     mask = flux_grid*(d*0.0+1.0)#Set that to 1.0 and multiply with flux grid. Nansum coming!
     mask_i = flux_grid*(di*0.0+1.0)#Inverse of mask.
     wlc,fxc,wlc_wide,fxc_wide = ops.clip_spectrum(wl,fx,wlmin,wlmax,pad=2.0*np.nanmax(np.abs(vel_grid)))
@@ -157,9 +161,10 @@ def build_local_spectrum_fast(xp,yp,RpRs,wl,fx,wlmin,wlmax,x,y,vel_grid,flux_gri
     return(wlc,F,np.nansum(mask_i),(di*0.0)+1.0)
 
 
-def build_local_spectrum_slow(xp,yp,RpRs,wl,fx,wlmin,wlmax,x,y,vel_grid,flux_grid):
+def build_local_spectrum_slow(xp,yp,zp,RpRs,wl,fx,wlmin,wlmax,x,y,vel_grid,flux_grid):
     """This is the brute-force (slow) way of building the missing local spectrum that
-    is blocked by the planet, applicable to any velocity/flux grid.
+    is blocked by the planet, applicable to any velocity/flux grid. This is used when differential
+    rotation is a thing.
 
         Parameters
         ----------
@@ -220,12 +225,16 @@ def build_local_spectrum_slow(xp,yp,RpRs,wl,fx,wlmin,wlmax,x,y,vel_grid,flux_gri
     x_full = np.tile(x,(len(y),1))-xp
     y_full = np.tile(y,(len(x),1)).T-yp
     d = np.sqrt(x_full**2 + y_full**2)
+    if zp < 0: d+=np.inf
     di = d*1.0
     d[d > RpRs] = np.nan#Mask out everything but the location of the planet.
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
         if np.nanmin(d) <= RpRs:
             di[d <= RpRs] = np.nan#out the location of the planet. Inverse of d.
+    if zp < 0.0:
+        d*=np.nan#Force the planet to not be in front of the disk if the z-coordinate is such that it is behind the star.
+        di[np.isnan(di)]=1.0#started as 1.0, set back to 1.0
     mask = flux_grid*(d*0.0+1.0)#Set that to 1.0 and multiply with flux grid. Nansum coming!
     mask_i = flux_grid*(di*0.0+1.0)#Inverse of mask.
 
@@ -392,8 +401,12 @@ def build_spectrum_limb_resolved(wl,fx_list,mu_list,wlmin,wlmax,x,y,vel_grid):
     return(wlc,F)
 
 
-def build_local_spectrum_limb_resolved(xp,yp,RpRs,wl,fx_list,mu_list,wlmin,wlmax,x,y,vel_grid):
-    """WRITE THIS
+def build_local_spectrum_limb_resolved(xp,yp,zp,RpRs,wl,fx_list,mu_list,wlmin,wlmax,x,y,vel_grid):
+    """This is used when SPECTRUM was called to provide spectra wth mu angles, in which
+    case the flux map doesn't exist and the computation is different from the
+    disk-averaged PHOENIX spectra.
+
+    WRITE THIS MORE
 
         Parameters
         ----------
@@ -456,12 +469,16 @@ def build_local_spectrum_limb_resolved(xp,yp,RpRs,wl,fx_list,mu_list,wlmin,wlmax
     x_full = np.tile(x,(len(y),1))-xp
     y_full = np.tile(y,(len(x),1)).T-yp
     d = np.sqrt(x_full**2 + y_full**2)
+    if zp < 0: d+=np.inf
     di = d*1.0
     d[d > RpRs] = np.nan#Mask out everything but the location of the planet.
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
         if np.nanmin(d) <= RpRs:
             di[d <= RpRs] = np.nan#out the location of the planet. Inverse of d.
+    if zp < 0.0:
+        d*=np.nan#Force the planet to not be in front of the disk if the z-coordinate is such that it is behind the star.
+        di[np.isnan(di)]=1.0#started as 1.0, set back to 1.0
     mask = (0.0*vel_grid+1.0)*(d*0.0+1.0)#Set that to 1.0 and multiply with flux grid. Nansum coming!
     mask_i = (0.0*vel_grid+1.0)*(di*0.0+1.0)#Inverse of mask.
 #MOVE ALL OF THIS INTO A WRAPPER? I THINK THIS IS NOW COPYPASTED 3 TIMES?
