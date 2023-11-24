@@ -217,6 +217,8 @@ class StarRotator(object):
             print('--- Reading spectrum from PHOENIX')
             print('-----T=%sK, log(g)=%s, Z=%s.' % (self.T,self.logg,self.Z))
             wl,fx = spectrum.read_spectrum(self.T,self.logg,metallicity=self.Z)
+            self.wl_in = wl*1.0
+            self.fx_in = fx*1.0
             print('--- Integrating disk')
             if  self.drr == 0:
                 print('------ Fast integration')
