@@ -4,11 +4,10 @@
 #
 #
 #####################
-#Call like: python3 main.py 586.0 592.0 110000.0 90.0 90.0 0.0 0.0 500
+
 #import statements
 import sys
 import numpy as np
-import argparse
 import lib.test as test
 import lib.vgrid as vgrid
 import lib.plotting as pl
