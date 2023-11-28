@@ -174,6 +174,8 @@ class StarRotator(object):
         self.transitC = float(planetparams[7].split()[0])
         self.mode = planetparams[8].split()[0]#This is a string.
         times = [] #These are in JD-24000000.0 or in orbital phase.
+
+        self.residual = None
         self.exptimes = []
         for i in obsparams:
             times.append(float(i.split()[0]))
@@ -238,18 +240,12 @@ class StarRotator(object):
             maxvel = math.ceil(np.nanmax(np.abs(self.vel_grid)))
             wl,fx_list = spectrum.compute_spectrum(self.T,self.logg,self.Z,self.mus,math.floor(ops.vactoair(self.wave_start*ops.doppler((-1.0)*maxvel))*10.0)/10.0,math.ceil(ops.vactoair(self.wave_end*ops.doppler(maxvel))*10.0)/10.0,mode='anM')
             print('--- Integrating limb-resolved disk')
-            # print(wl,self.wave_start)
-            # sys.exit()
+
             wlF,F = integrate.build_spectrum_limb_resolved(wl,fx_list,self.mus, self.wave_start,self.wave_end,self.x,self.y,self.vel_grid)
-
-
 
         self.xp,self.yp,self.zp = ppos.calc_planet_pos(self.sma_Rs, self.ecc, self.omega, self.orbinc, self.pob, self.Rp_Rs, self.orb_p, self.transitC, self.mode, self.times, self.exptimes)
 
 
-        # for i in range(len(self.xp)):
-        #     print(self.xp[i],self.yp[i],self.zp[i])
-        # pdb.set_trace()
         F_out = np.zeros((self.Nexp,len(F)))
         flux_out = []
         mask_out = []
@@ -273,7 +269,7 @@ class StarRotator(object):
 
     def compute_residuals(self):
         """Compute and return the residuals of the time_series of spectra.
-        This may be the primary output of StarRotator.
+        This may be considered to be the primary scientific output of StarRotator.
 
         Parameters
         ----------
@@ -289,15 +285,13 @@ class StarRotator(object):
         """
         import pdb
         self.residual = self.spectra*0.0
-        # self.residual_smooth = self.spectra*0.0
         for i in range(self.Nexp):
             self.residual[i,:]=self.spectra[i]/self.stellar_spectrum
-        # pdb.set_trace()
-        # self.apply_spectral_resolution(self.R)
+        return(self.residual)
 
 
     def plot_residuals(self):
-        """Compute and plot the residuals.
+        """Plot the residuals if available.
 
         Parameters
         ----------
@@ -307,14 +301,26 @@ class StarRotator(object):
             None
         """
         import matplotlib.pyplot as plt
-        # res = self.residuals()
-        plt.pcolormesh(self.wl,self.times,self.residual)
-        plt.xlabel('Wavelength (nm)')
-        plt.ylabel('Phase')
-        plt.show()
+        if self.residual is not None:
+            plt.pcolormesh(self.wl,self.times,self.residual)
+            plt.xlabel('Wavelength (nm)')
+            plt.ylabel('Phase')
+            plt.show()
 
 
     def convolve_spectral_resolution(self):
+        """Convolves the residual to conform to a spectral resolving power.
+        An approximation is made is that the convolution of the ratio of the in/out of transit
+        spectra is the same as the ratio of the convolutions of the in/out transit spectra. This
+        is done because taking the ratio of the convolution leads to numerical errors.
+
+        Parameters
+        ----------
+            None
+        Returns
+        -------
+            None
+        """
         import lib.operations as ops
         import astropy.constants as const
         import copy
@@ -322,37 +328,25 @@ class StarRotator(object):
         import scipy.interpolate as interp
         from lib.integrate import statusbar as statusbar
         dv = const.c.value / self.R / 1000.0 #in km/s
-        # wl_high = np.linspace(np.min(self.wl),np.max(self.wl),num=len(self.wl)*30.0)
         print('---Blurring')
 
-        for i in range(len(self.spectra)):
-            statusbar(i,len(self.spectra))
-            # spec_i = interp.interp1d(self.wl,self.spectra[i])
-            # self.residual_smooth[i] = ops.blur_spec(self.wl,copy.deepcopy(self.residual[i]),dv)
-            # self.spectra_smooth[i] = ops.blur_spec(self.wl,copy.deepcopy(self.spectra[i]),dv)
-            # self.spectra_smooth[i] = SNF.gaussian_filter(copy.deepcopy(self.spectra[i]),20.0,truncate=6.0)
-            # self.spectra_smooth[i] = ops.smooth(copy.deepcopy(self.spectra[i]),40.0)
-            # self.spectra_smooth[i] = interp.interp1d(wl_high,ops.blur_spec(wl_high,spec_i(wl_high),dv))(self.wl)
+        if self.residual is not None:
+            for i in range(len(self.spectra)):
+                statusbar(i,len(self.spectra))
+                res = self.residual[i]
+                wl_constant_v,res_constant_v,a = ops.constant_velocity_wl_grid(self.wl,res,3.0)
+                res_smooth = ops.smooth(res_constant_v,dv/a)
+                self.residual[i] = interp.interp1d(wl_constant_v,res_smooth,
+                fill_value='extrapolate',bounds_error=False)(self.wl)
 
-            res = self.residual[i]
-            wl_constant_v,res_constant_v,a = ops.constant_velocity_wl_grid(self.wl,res,3.0)
-            res_smooth = ops.smooth(res_constant_v,dv/a)
-            self.residual[i] = interp.interp1d(wl_constant_v,res_smooth,fill_value='extrapolate',bounds_error=False)(self.wl)
-            # self.residual[i] = ops.blur_spec(self.wl,copy.deepcopy(self.residual[i]),dv)
-        # self.residual_save = copy.deepcopy(self.residual)
-        # self.residual = copy.deepcopy(self.residual_smooth)
-        # self.spectra_save = copy.deepcopy(self.spectra)
-        # self.spectra = copy.deepcopy(self.spectra_smooth)
-
-    # def undo_spectral_resolution(self):
-    #     self.spectra = copy.deepcopy(self.spectra_save)
-        # self.residual = copy.deepcopy(self.residual_save)
 
     def animate(self):
         """Plots an animation of the transit event, the stellar flux and velocity
         fields, and the resulting transit and line-shape variations. The animation
         is located in the subfolder `anim`. Anything located in this folder prior
-        to running this function will be removed.
+        to running this function will be removed. The creation of the animation gif file
+        requires that the imagemagick package is installed on your system. If it is not, an error
+        will be raised. The PNG files will have been saved in the anim directory nonetheless.
 
         Parameters
         ----------
@@ -376,13 +370,16 @@ class StarRotator(object):
         for i in range(self.Nexp):
             mask = self.masks[i]
             fig,ax = plt.subplots(nrows=2, ncols=2,figsize=(8,8))
-            ax[0][0].pcolormesh(self.x,self.y,self.flux_grid*mask,vmin=0,vmax=1.0*np.nanmax(self.flux_grid),cmap='autumn')
+            ax[0][0].pcolormesh(self.x,self.y,self.flux_grid*mask,vmin=0,
+            vmax=1.0*np.nanmax(self.flux_grid),cmap='autumn')
             ax[1][0].pcolormesh(self.x,self.y,self.vel_grid*mask,cmap='bwr')
             ax[0][0].axes.set_aspect('equal')
             ax[1][0].axes.set_aspect('equal')
             if self.zp[i] > 0.0:
-                planet1 = Circle((self.xp[i],self.yp[i]),self.Rp_Rs, facecolor='black', edgecolor='black', lw=1)
-                planet2 = Circle((self.xp[i],self.yp[i]),self.Rp_Rs, facecolor='black', edgecolor='black', lw=1)
+                planet1 = Circle((self.xp[i],self.yp[i]),self.Rp_Rs, facecolor='black',
+                edgecolor='black', lw=1)
+                planet2 = Circle((self.xp[i],self.yp[i]),self.Rp_Rs, facecolor='black',
+                edgecolor='black', lw=1)
                 ax[0][0].add_patch(planet1)
                 ax[1][0].add_patch(planet2)
             ax[0][1].plot(self.times[0:i],self.lightcurve[0:i],'.',color='black')
@@ -397,7 +394,8 @@ class StarRotator(object):
             yl = (ymin-0.1*linedepth,ymax+0.3*linedepth)
             ax[1][1].set_ylim(yl)
             ax2 = ax[1][1].twinx()
-            ax2.plot(self.wl,(self.spectra[i])*np.nanmax(F)/F/np.nanmax(self.spectra[i]),color='skyblue')
+            ax2.plot(self.wl,(self.spectra[i])*np.nanmax(F)/F/np.nanmax(self.spectra[i]),
+            color='skyblue')
             sf = 30.0
             ax2.set_ylim((1.0-(1-yl[0])/sf,1.0+(yl[1]-1)/sf))
             ax2.set_ylabel('Ratio in transit / out of transit',fontsize = 7)
@@ -434,37 +432,12 @@ class StarRotator(object):
 
         status = os.system('convert -delay 8 anim/*.png animation.gif')
         if status != 0:
-            print('The conversion of the animation frames into a gif has')
-            print('failed; probably because the Imagemagick convert command')
-            print('was not found. The animation frames have been created in')
-            print('the anim/ folder. If you want to convert these into a .gif,')
-            print('please do it manually, or install Imagemagick, see')
-            print('https://imagemagick.org')
+            raise Exception('The conversion of the animation frames into a gif has failed; '
+            'probably because the Imagemagick convert command was not found. The animation frames '
+            'have been created in the anim/ folder. If you want to convert these into a .gif '
+            'please do it in some alternative way, or install Imagemagick, see '
+            'https://imagemagick.org')
 
-
-        #This is for plotting random comparisons.
-        # wl2,fx2 = spectrum.read_spectrum(T,logg)
-        # wlF2,F2 = integrate.build_spectrum_fast(wl2,fx2, wave_start, wave_end,x,y,vel_grid,flux_grid)
-        # wlp,Fp,flux,mask = integrate.build_local_spectrum_limb_resolved(-0.3,0.0,0.1,wl,fx_list,mus, wave_start, wave_end,x,y,vel_grid)
-        # wlp2,Fp2,flux2,mask2 = integrate.build_local_spectrum_fast(-0.3,0.0,0.1,wl2,fx2, wave_start, wave_end,x,y,vel_grid,flux_grid)
-        ##This overplots non-rotating SPECTRUM and PHOENIX spectra, normalised.
-        ## plt.plot(wl,fx_list[-1]/max(fx_list[-1]),label='SPECTRUM')
-        ## plt.plot(wl2,fx2/5e15,label='PHOENIX')
-        ## plt.xlabel('Wavelength (nm)')
-        ## plt.ylabel('Max-normalised flux')
-        ## plt.title('T = %s K, log(g) = %s' % (T,logg))
-        ## plt.legend()
-        ## plt.show()
-
-        # plt.plot(wlF,F/max(F),color='skyblue',alpha=0.5)
-        # plt.plot(wlF,(F-Fp)/np.nanmax(F-Fp),color='skyblue',label='SPECTRUM')
-        # plt.plot(wlF2,F2/max(F2),color='red',alpha=0.5)
-        # plt.plot(wlF2,(F2-Fp2)/np.nanmax(F2-Fp2),color='red',label='PHOENIX')
-        # plt.legend()
-        # plt.xlabel('Wavelength (nm)')
-        # plt.ylabel('Max-normalised flux')
-        # plt.title('T = %s K, log(g) = %s, vsini = 110km/s' % (T,logg))
-        # plt.show()
 
 
 
