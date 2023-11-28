@@ -25,7 +25,8 @@ import copy
 
 
 class StarRotator(object):
-    def __init__(self,wave_start,wave_end,grid_size,star_path='demo_star.txt',planet_path='demo_planet.txt',obs_path='demo_observations.txt'):
+    def __init__(self,wave_start,wave_end,grid_size,star_path='input/demo_star.txt',
+    planet_path='input/demo_planet.txt',obs_path='input/demo_observations.txt'):
         """
             Welcome to StarRotator.
             ***********************
