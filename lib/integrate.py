@@ -362,7 +362,7 @@ def build_spectrum_slow(wl,fx,wlmin,wlmax,x,y,vel_grid,flux_grid):
 
 
 
-def build_spectrum_limb_resolved(wl,fx_list,mu_list,wlmin,wlmax,x,y,vel_grid):
+def build_spectrum_limb_resolved(wl,fx_list,mu_list,wlmin,wlmax,x,y,vel_grid,flux_grid):
     """WRITE THIS.
         Parameters
         ----------
@@ -389,19 +389,19 @@ def build_spectrum_limb_resolved(wl,fx_list,mu_list,wlmin,wlmax,x,y,vel_grid):
     for i in range(len(x)):
         for j in range(len(y)):
             if np.isnan(vel_grid[j,i]) == False:
-                mu = 1 - np.sqrt(x[i]**2 + y[j]**2)
-                diff = abs(mu_list - mu)
+                mu = 1 - np.sqrt(x[i]**2 + y[j]**2) # mu angle corresponding to the pixel
+                diff = abs(mu_list - mu) # chooses nearest mu
                 index = np.argmin(diff)
                 if mu_list[index] > 0:
                     fxc_wide = fx_list[index]
                     # print(i,j,x[i],y[j],mu,mu_list[index])
-                    F+=ops.shift(wlc,wlc_wide,fxc_wide,vel_grid[j,i])#*flux_grid[j,i]
+                    F+=ops.shift(wlc,wlc_wide,fxc_wide,vel_grid[j,i])*flux_grid[j,i]
         statusbar(i,len(x))
     # print(time.time()-start)
     return(wlc,F)
 
 
-def build_local_spectrum_limb_resolved(xp,yp,zp,RpRs,wl,fx_list,mu_list,wlmin,wlmax,x,y,vel_grid):
+def build_local_spectrum_limb_resolved(xp,yp,zp,RpRs,wl,fx_list,mu_list,wlmin,wlmax,x,y,vel_grid,flux_grid):
     """This is used when SPECTRUM was called to provide spectra wth mu angles, in which
     case the flux map doesn't exist and the computation is different from the
     disk-averaged PHOENIX spectra.
@@ -479,8 +479,8 @@ def build_local_spectrum_limb_resolved(xp,yp,zp,RpRs,wl,fx_list,mu_list,wlmin,wl
     if zp < 0.0:
         d*=np.nan#Force the planet to not be in front of the disk if the z-coordinate is such that it is behind the star.
         di[np.isnan(di)]=1.0#started as 1.0, set back to 1.0
-    mask = (0.0*vel_grid+1.0)*(d*0.0+1.0)#Set that to 1.0 and multiply with flux grid. Nansum coming!
-    mask_i = (0.0*vel_grid+1.0)*(di*0.0+1.0)#Inverse of mask.
+    mask = flux_grid*(0.0*vel_grid+1.0)*(d*0.0+1.0)#Set that to 1.0 and multiply with flux grid. Nansum coming!
+    mask_i = flux_grid*(0.0*vel_grid+1.0)*(di*0.0+1.0)#Inverse of mask.
 #MOVE ALL OF THIS INTO A WRAPPER? I THINK THIS IS NOW COPYPASTED 3 TIMES?
 #ACTUALLY, NOW I AM USING VEL GRID INS TEAD OF FLUX GRID. THAT MEANS THAT THE
 #FLUX IS NO LONGER CALCULATED PROPERLY. NO LIGHTCURVE!
@@ -501,7 +501,7 @@ def build_local_spectrum_limb_resolved(xp,yp,zp,RpRs,wl,fx_list,mu_list,wlmin,wl
                 if mu_list[index] > 0:
                     fxc_wide = fx_list[index]
                     # print(i,j,x[i],y[j],mu,mu_list[index])
-                    F+=ops.shift(wlc,wlc_wide,fxc_wide,vel_grid[j,i])#*flux_grid[j,i]
+                    F+=ops.shift(wlc,wlc_wide,fxc_wide,vel_grid[j,i])*flux_grid[j,i]
     # print(time.time()-start)
     return(wlc,F,np.nansum(mask_i),(di*0.0)+1.0)
 
