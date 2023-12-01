@@ -1,5 +1,4 @@
 #This file contains a collection of functions that operate on spectra.
-
 def convolve(array,kernel,edge_degree=1,fit_width=2):
     """It's unbelievable, but I could not find the python equivalent of IDL's
     /edge_truncate keyword, which truncates the kernel at the edge of the convolution.
@@ -40,8 +39,6 @@ def convolve(array,kernel,edge_degree=1,fit_width=2):
     """
 
     import numpy as np
-    import pdb
-
 
     array = np.array(array)
     kernel= np.array(kernel)
@@ -59,7 +56,7 @@ def convolve(array,kernel,edge_degree=1,fit_width=2):
 
     #Pad both the x-grid (onto which the polynomial is defined)
     #and the data array.
-    pad=findgen((len(kernel)-1)/2)
+    pad=findgen(int((len(kernel)-1)/2))
     left_pad=pad-(len(kernel)-1)/2
     right_pad=np.max(x)+pad+1
     left_array_pad=np.polyval(fit_left,left_pad)
@@ -184,8 +181,6 @@ def constant_velocity_wl_grid(wl,fx,oversampling=1.0):
     import astropy.constants as consts
     import numpy as np
     from scipy import interpolate
-    import pdb
-    import matplotlib.pyplot as plt
 
 
     oversampling=float(oversampling)
@@ -193,6 +188,7 @@ def constant_velocity_wl_grid(wl,fx,oversampling=1.0):
     fx=np.array(fx)
 
     c=consts.c.to('km/s').value
+
 
     dl=derivative(wl)
     dv=dl/wl*c
@@ -266,7 +262,6 @@ def shift(wl,wl_wide,fx,dv):
     from scipy.interpolate import interp1d
     import astropy.constants as const
     import numpy as np
-    import pdb
 
     #Do not run tests on the input here because this thing is in a double forloop somewhere.
     wl_shifted =  wl_wide*doppler(dv)#Relativistic Doppler effect.
@@ -511,6 +506,7 @@ def findgen(n,int=False):
 
 
 
+
 def gaussian(x,A,mu,sig,cont=0.0):
     import numpy as np
     """This produces a gaussian function on the grid x with amplitude A, mean mu
@@ -530,9 +526,9 @@ def blur_spec(wl,spec,dv,truncsize = 20.0):
     # print('I MAY NOT WANT TO USE BLUR-SPEC BECAUSE IT IS SLOW, AT LEAST IN BOX MODE.')
     # print('AND I HAVE NOT THOROUGHLY BENCHMARKED IT.')
     import numpy as np
-    import pdb
     from matplotlib import pyplot as plt
     import time
+    import pdb
     import astropy.constants as const
     import numpy as np
     import lib.test as test
@@ -586,10 +582,8 @@ def smooth(fx,w,mode='gaussian',edge_degree=1):
     Gaussian kernel or a box kernel, which have a FWHM width of w px everywhere.
     Meaning that the width changes dynamically on a constant d-lambda grid.
     """
-
     import numpy as np
     import lib.test as test
-    import pdb
 
     test.typetest(w,float,'w')
     test.typetest(fx,np.ndarray,'fx')
