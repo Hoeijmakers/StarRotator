@@ -1,5 +1,5 @@
 ######################
-#authors: Jens Hoeijmakers and Julia Seidel
+#authors: Jens Hoeijmakers, Julia Seidel, Madeline Lam, Bibiana Prinoth
 #Description: Calculates the stellar spectrum
 #
 #
