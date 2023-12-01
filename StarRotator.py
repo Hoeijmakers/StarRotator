@@ -26,7 +26,7 @@ import copy
 
 class StarRotator(object):
     def __init__(self,wave_start,wave_end,grid_size,star_path='input/demo_star.txt',
-    planet_path='input/demo_planet.txt',obs_path='input/demo_observations.txt'):
+    planet_path='input/demo_planet.txt',obs_path='input/demo_observations.txt', linelist_path=''):
         """
             Welcome to StarRotator.
             ***********************
@@ -107,6 +107,8 @@ class StarRotator(object):
                     0.05
                     0.055
                     0.06
+            linelist_path: str
+                Path to the VALD linelist used for generating a spectrum using pySME.
 
             Class methods
             -------------
@@ -134,6 +136,7 @@ class StarRotator(object):
         self.wave_end=float(wave_end)
         self.grid_size=int(grid_size)
         self.read_system(star_path=star_path,planet_path=planet_path,obs_path=obs_path)
+        self.linelist_path = linelist_path
         self.compute_spectrum()
 
         # return(self.wlF,F_out)#This is mad return statement. This whole function should be a class instead.
@@ -162,8 +165,11 @@ class StarRotator(object):
         self.logg = float(starparams[5].split()[0])
         self.u1 = float(starparams[6].split()[0])
         self.u2 = float(starparams[7].split()[0])
-        self.mus = float(starparams[8].split()[0])
+        self.mus = int(starparams[8].split()[0])
         self.R = float(starparams[9].split()[0])
+        self.model = str(starparams[10].split()[0])
+        self.grid_model = str(starparams[11].split()[0])
+        self.abund = starparams[12:]
         self.sma_Rs = float(planetparams[0].split()[0])
         self.ecc = float(planetparams[1].split()[0])
         self.omega = float(planetparams[2].split()[0])
@@ -196,7 +202,7 @@ class StarRotator(object):
             print("Parser: ",err.args)
 
         if self.mus != 0:
-            self.mus = np.linspace(0.0,1.0,self.mus)#Uncomment this to run in CLV mode with SPECTRUM.
+            self.mus = np.linspace(0.1,1.0,self.mus)#Uncomment this to run in CLV mode with SPECTRUM.
 
 
     def compute_spectrum(self):
@@ -215,13 +221,20 @@ class StarRotator(object):
         print('--- Computing velocity/flux grids')
         self.vel_grid = vgrid.calc_vel_stellar(self.x,self.y, self.stelinc, self.velStar, self.drr,  self.pob)
         self.flux_grid = vgrid.calc_flux_stellar(self.x,self.y,self.u1,self.u2)
-
         if isinstance(self.mus,np.ndarray) != True:#SWITCH BETWEEN PHOENIX (mus=0) AND SPECTRUM
-            print('--- Reading spectrum from PHOENIX')
-            print('-----T=%sK, log(g)=%s, Z=%s.' % (self.T,self.logg,self.Z))
-            wl,fx = spectrum.read_spectrum(self.T,self.logg,metallicity=self.Z)
-            self.wl_in = wl*1.0
-            self.fx_in = fx*1.0
+            if self.model == 'PHOENIX':
+                print('--- Reading spectrum from PHOENIX')
+                print('-----T=%sK, log(g)=%s, Z=%s.' % (self.T,self.logg,self.Z))
+                wl,fx = spectrum.read_spectrum(self.T,self.logg,metallicity=self.Z)
+                self.wl_in = wl*1.0
+                self.fx_in = fx*1.0
+            elif self.model == 'pySME': 
+                print('--- Creating spectrum from pySME')
+                print('-----T=%sK, log(g)=%s, Z=%s.' % (self.T,self.logg,self.Z))
+                wl, fx= spectrum.get_spectrum_pysme(self.wave_start, self.wave_end, self.T, self.logg, self.Z, self.linelist_path, grid = self.grid_model)
+            else:
+                print('ERROR: Invalid model spectrum chosen. Input either PHOENIX or pySME')
+                sys.exit()
             print('--- Integrating disk')
             if  self.drr == 0:
                 print('------ Fast integration')
@@ -230,38 +243,55 @@ class StarRotator(object):
                 print('------ Slow integration')
                 wlF,F = integrate.build_spectrum_slow(wl,fx,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid,self.flux_grid)
         else:#Meaning, if we have no mu's do:
-            test.test_KURUCZ()
-            print('--- Computing limb-resolved spectra with SPECTRUM')
-            print('-----T=%sK, log(g)=%s, Z=%s.'% (self.T,self.logg,self.Z))
+            if self.model == 'SPECTRUM':
+                test.test_KURUCZ()
+                print('--- Computing limb-resolved spectra with SPECTRUM')
+                print('-----T=%sK, log(g)=%s, Z=%s.'% (self.T,self.logg,self.Z))
+                # print(self.wave_start,math.floor(ops.vactoair(self.wave_start)*10.0)/10.0)
+                # print(self.wave_end,math.ceil(ops.vactoair(self.wave_end)*10.0)/10.0)
+                # sys.exit()
+                maxvel = math.ceil(np.nanmax(np.abs(self.vel_grid)))
+                wl,fx_list = spectrum.compute_spectrum(self.T,self.logg,self.Z,self.mus,math.floor(ops.vactoair(self.wave_start*ops.doppler((-1.0)*maxvel))*10.0)/10.0,math.ceil(ops.vactoair(self.wave_end*ops.doppler(maxvel))*10.0)/10.0,mode='anM')
+                print('--- Integrating limb-resolved disk')
+                wlF,F = integrate.build_spectrum_fast(wl,fx,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid,self.flux_grid)
 
-            # print(self.wave_start,math.floor(ops.vactoair(self.wave_start)*10.0)/10.0)
-            # print(self.wave_end,math.ceil(ops.vactoair(self.wave_end)*10.0)/10.0)
-            # sys.exit()
-            maxvel = math.ceil(np.nanmax(np.abs(self.vel_grid)))
-            wl,fx_list = spectrum.compute_spectrum(self.T,self.logg,self.Z,self.mus,math.floor(ops.vactoair(self.wave_start*ops.doppler((-1.0)*maxvel))*10.0)/10.0,math.ceil(ops.vactoair(self.wave_end*ops.doppler(maxvel))*10.0)/10.0,mode='anM')
-            print('--- Integrating limb-resolved disk')
+            elif self.model == 'pySME':
+                print('--- Computing limb-resolved spectra with pySME')
+                print('-----T=%sK, log(g)=%s, Z=%s.'% (self.T,self.logg,self.Z))
+                wl, fx_list = spectrum.get_spectrum_pysme(self.wave_start, self.wave_end, self.T, self.logg, self.Z, self.linelist_path, self.mus, self.abund, grid=self.grid_model)
+                print('--- Integrating limb-resolved disk')
+                wlF,F = integrate.build_spectrum_limb_resolved(wl,fx_list,self.mus, self.wave_start,self.wave_end,self.x,self.y,self.vel_grid, self.flux_grid)
 
-            wlF,F = integrate.build_spectrum_limb_resolved(wl,fx_list,self.mus, self.wave_start,self.wave_end,self.x,self.y,self.vel_grid)
+            else:
+                print('ERROR: Invalid model spectrum chosen. Input either SPECTRUM or pySME')
+                sys.exit()
+
 
         self.xp,self.yp,self.zp = ppos.calc_planet_pos(self.sma_Rs, self.ecc, self.omega, self.orbinc, self.pob, self.Rp_Rs, self.orb_p, self.transitC, self.mode, self.times, self.exptimes)
 
 
+
         F_out = np.zeros((self.Nexp,len(F)))
+        F_planet = np.zeros((self.Nexp,len(F)))
         flux_out = []
         mask_out = []
+        print('--- Building local spectrum')
         for i in range(self.Nexp):
             if isinstance(self.mus,np.ndarray) == True:
-                wlp,Fp,flux,mask = integrate.build_local_spectrum_limb_resolved(self.xp[i],self.yp[i],self.zp[i],self.Rp_Rs,wl,fx_list,self.mus,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid)
+                wlp,Fp,flux,mask = integrate.build_local_spectrum_limb_resolved(self.xp[i],self.yp[i],self.zp[i],self.Rp_Rs,wl,fx_list,self.mus,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid, self.flux_grid)
+
             else:
                 wlp,Fp,flux,mask = integrate.build_local_spectrum_fast(self.xp[i],self.yp[i],self.zp[i],self.Rp_Rs,wl,fx,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid,self.flux_grid)
             integrate.statusbar(i,self.Nexp)
 
             F_out[i,:]=F-Fp
+            F_planet[i,:] = Fp
             flux_out.append(flux)
             mask_out.append(mask)
         #This defines the output.
         self.wl = wlF
         self.stellar_spectrum = F
+        self.Fp = copy.deepcopy(F_planet)
         self.spectra = copy.deepcopy(F_out)
         self.lightcurve = flux_out
         self.masks = mask_out
@@ -287,7 +317,8 @@ class StarRotator(object):
         self.residual = self.spectra*0.0
         for i in range(self.Nexp):
             self.residual[i,:]=self.spectra[i]/self.stellar_spectrum
-        return(self.residual)
+        # pdb.set_trace()
+        # self.apply_spectral_resolution(self.R)
 
 
     def plot_residuals(self):
@@ -382,6 +413,8 @@ class StarRotator(object):
                 edgecolor='black', lw=1)
                 ax[0][0].add_patch(planet1)
                 ax[1][0].add_patch(planet2)
+            ax[0][0].set_ylim((min(self.y),max(self.y)))
+            ax[1][0].set_ylim((min(self.y),max(self.y)))
             ax[0][1].plot(self.times[0:i],self.lightcurve[0:i],'.',color='black')
             ax[0][1].set_xlim((min(self.times),max(self.times)))
             ax[0][1].set_ylim((minflux-0.1*self.Rp_Rs**2.0),1.0+0.1*self.Rp_Rs**2)

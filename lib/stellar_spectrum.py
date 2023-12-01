@@ -97,6 +97,7 @@ def get_spectrum(T,logg,Z,a):
                 shutil.copyfileobj(r, f)
     return(wavename,specname)
 
+
 def read_spectrum(T,logg,metallicity=0.0,alpha=0.0):
     """Wrapper for the function get_spectrum() above, that checks that the input
         T, log(g), metallicity and alpha are in accordance with what is provided by
@@ -441,3 +442,94 @@ def compute_spectrum(T,logg,Z,mu,wlmin,wlmax,macroturbulence=0.0,mode='an',loud=
         print('Fe/H:')
         print(list(Z_a))
         sys.exit()
+
+
+def get_spectrum_pysme(wave_start, wave_end, T, logg, Z, linelist = '', mu=[], abund = {}, grid = ''):
+    """Constructing a spectrum from pySME. pySME uses the MARCS 2014 grid by
+    default. It is also possible to use another grid by specifying with the parameter grid.
+    Individual elemental abundances can also be specified and updated. If an array of
+    mu angles is specified, the spectrum for each mu angle is calculated and
+    stored in a list.
+
+        Parameters
+        ----------
+        wave_start : float
+            Start of modelled wavelength range in nm in air
+        wave_end :  float
+            Ending wavelength range in nm in air
+        T : int, float
+            The model effective temperature of the star in Kelvin.
+        logg : int, float
+            The model log(g) value. The surface gravity of the star in log(cgs).
+        Z : int, float
+            The model metallicity of the star in log_10 relative to the indiviual
+            abundances. 
+        linelist : str
+            Path to VALD linelist used to generate spectrum
+        mu : np.array()
+            Array of mu angles to calculate the spectrum over. If an array is
+            specified, a list of fluxes for each mu angle is returned.
+        abund : str
+            Specific elemental abudances in dict form, eg. '{'X': 6.4}'. Default
+            abundances are solar.
+        grid : str
+            Name of model atmosphere to be used. The default used by pySME is MARCS
+            2014, which spans a temperature range of 2500 - 8000 K, logg between -0.5
+            - 5.5 and metallicity -5 - 1. The other option is the ATLAS12 model, which
+            can be used by specifying "atlas12.sav". This spans a temperature of 
+            3500 - 50 000 K and logg between 0 - 5.
+
+        Returns
+        -------
+        wl,f : np.array(),np.array()
+            The wavelength (nm) and flux (erg/s/cm^2/cm) axes of the requested
+            spectrum.
+        """
+    from pysme.sme import SME_Structure as SME_Struct
+    from pysme.abund import Abund
+    from pysme.synthesize import synthesize_spectrum
+    from pysme.solve import solve
+    from pysme.linelist.vald import ValdFile
+    import numpy as np
+    import ast
+
+    sme = SME_Struct()
+    sme.abund = Abund.solar()
+    sme.teff, sme.logg, sme.monh = T, logg, Z
+    sme.vsini = 0
+    
+    # Change from default grid
+    if grid:
+        sme.atmo.method = 'grid'
+        sme.atmo.source = grid
+
+    # Convert from nm to Angstrom
+    wave_start *= 10
+    wave_end *= 10
+
+    # Account for velocity shift in wavelengths for StarRotator
+    wave_start -= 5
+    wave_end += 5
+
+    if abund:
+        for i in range(len(abund)):
+            sme.abund.update_pattern(updates=ast.literal_eval(abund[i]))
+    
+    sme.wran = [[wave_start, wave_end]]
+    vald = ValdFile(linelist)
+    sme.linelist = vald
+    
+    if len(mu) > 0:
+        fx = []
+        for m in mu:#Loop over all mu angles
+            sme.mu = m
+            sme = synthesize_spectrum(sme)
+            
+            w, f = *sme.wave/10, *sme.synth
+            wl = w
+            fx.append(f.copy())
+        return wl, fx
+        
+    else:
+        sme = synthesize_spectrum(sme)
+        return *sme.wave/10, *sme.synth
