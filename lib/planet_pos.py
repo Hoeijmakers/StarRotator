@@ -98,7 +98,6 @@ def  calc_planet_pos(sma_Rs, ecc, omega, inclin, l_spinorbit, Rp_Rs, orb_p, tran
 
     """
     import numpy as np
-    from sys import exit
 
 
     inclin_bar = inclin*np.pi/180.
@@ -113,13 +112,13 @@ def  calc_planet_pos(sma_Rs, ecc, omega, inclin, l_spinorbit, Rp_Rs, orb_p, tran
         phase = np.zeros(obs_n,float)
         for i in range(obs_n):
             mid_time = calc_orbit_times(step_grid[i], transitC, exposure_times[i], orb_p)
-            if mid_time<OrbPeriod/2.:
+            if mid_time<orb_p/2.:
                 phase[i] = mid_time/orb_p
             else:
                 phase[i] = (mid_time-orb_p)/orb_p
     else:
-        print("Wrong flag option in calc_planet_pos. Possible values are 'phases' or 'times'.")
-        exit()
+        raise Exception("Wrong flag option in calc_planet_pos. "
+        "Possible values are 'phases' or 'times'.")
 
 
     #calc anomalies
@@ -142,4 +141,6 @@ def  calc_planet_pos(sma_Rs, ecc, omega, inclin, l_spinorbit, Rp_Rs, orb_p, tran
         x_pl = Y1_p
         y_pl = -X1_p*np.cos(inclin_bar)
         z_pl = X1_p*np.sin(inclin_bar)
-    return x_pl*np.cos(np.radians(l_spinorbit))-y_pl*np.sin(np.radians(l_spinorbit)),x_pl*np.sin(np.radians(l_spinorbit))+y_pl*np.cos(np.radians(l_spinorbit)), z_pl#CONVERT x_p and y_p to perpendicular x,y wrt stellar spin axis, see equation 4,5 of Cegla+ 2016.
+    return(x_pl*np.cos(np.radians(l_spinorbit))-y_pl*np.sin(np.radians(l_spinorbit)),
+    x_pl*np.sin(np.radians(l_spinorbit))+y_pl*np.cos(np.radians(l_spinorbit)), z_pl)
+    #CONVERT x_p and y_p to perpendicular x,y wrt stellar spin axis, see equation 4,5 of Cegla+ 2016.
