@@ -8,3 +8,4 @@
 -0.23 u2
 0 Number of mu angles
 115000 Spectral resolution
+PHOENIX Model type
