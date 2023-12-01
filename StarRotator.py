@@ -26,7 +26,8 @@ import copy
 
 class StarRotator(object):
     def __init__(self,wave_start,wave_end,grid_size,star_path='input/demo_star.txt',
-    planet_path='input/demo_planet.txt',obs_path='input/demo_observations.txt', linelist_path=''):
+    planet_path='input/demo_planet.txt',obs_path='input/demo_observations.txt', linelist_path='',
+    input={}):
         """
             Welcome to StarRotator.
             ***********************
@@ -135,13 +136,14 @@ class StarRotator(object):
         self.wave_start=float(wave_start)
         self.wave_end=float(wave_end)
         self.grid_size=int(grid_size)
-        self.read_system(star_path=star_path,planet_path=planet_path,obs_path=obs_path)
+        self.read_system(star_path=star_path,planet_path=planet_path,obs_path=obs_path,input=input)
         self.linelist_path = linelist_path
         self.compute_spectrum()
 
         # return(self.wlF,F_out)#This is mad return statement. This whole function should be a class instead.
 
-    def read_system(self,star_path='demo_star.txt',planet_path='demo_planet.txt',obs_path='demo_observations.txt'):
+    def read_system(self,star_path='demo_star.txt',planet_path='demo_planet.txt',
+    obs_path='demo_observations.txt',input={}):
         """Reads in the stellar, planet and observation parameters from file; performing
         tests on the input and lifting the read variables to the class object.
 
@@ -153,50 +155,139 @@ class StarRotator(object):
                 Path to the parameter file defining the planet and its orbit.
             obs_path: str
                 Path to the parameter file defining the timestamps of the observations.
-        """
-        planetparams = open(planet_path,'r').read().splitlines()
-        starparams = open(star_path,'r').read().splitlines()
-        obsparams = open(obs_path,'r').read().splitlines()
-        self.velStar = float(starparams[0].split()[0])
-        self.stelinc = float(starparams[1].split()[0])
-        self.drr = float(starparams[2].split()[0])
-        self.T = float(starparams[3].split()[0])
-        self.Z = float(starparams[4].split()[0])
-        self.logg = float(starparams[5].split()[0])
-        self.u1 = float(starparams[6].split()[0])
-        self.u2 = float(starparams[7].split()[0])
-        self.mus = int(starparams[8].split()[0])
-        self.R = float(starparams[9].split()[0])
-        self.model = str(starparams[10].split()[0])
-        self.grid_model = str(starparams[11].split()[0])
-        self.abund = starparams[12:]
-        self.sma_Rs = float(planetparams[0].split()[0])
-        self.ecc = float(planetparams[1].split()[0])
-        self.omega = float(planetparams[2].split()[0])
-        self.orbinc = float(planetparams[3].split()[0])
-        self.pob = float(planetparams[4].split()[0])#Obliquity.
-        self.Rp_Rs = float(planetparams[5].split()[0])
-        self.orb_p = float(planetparams[6].split()[0])
-        self.transitC = float(planetparams[7].split()[0])
-        self.mode = planetparams[8].split()[0]#This is a string.
-        times = [] #These are in JD-24000000.0 or in orbital phase.
+            input: dict
+                A dictionary with input parameters, instead of using textfiles as input.
+                This allows programmatic control over all StarRotator inputs. The following keys
+                need to be defined in any order:
+                veq (equatorial velocity, float),
+                stelinc (stellar inclination axis, float),
+                drr (differential rotation, float),
+                T (Teff, float)
+                FeH (metallicity, float)
+                logg (float)
+                u1 (limb darkening parameter 1)
+                u2 (limb darkening parameter 2)
+                mus (number of mu angles, int)
+                R (resolving power, float)
+                model (model type, string, either PHOENIX or pySME)
+                sma_Rs (a over Rs, float)
+                e (eccentricity, float)
+                omega (longitude of periastron, float)
+                inclination (float)
+                obliquity (float)
+                RpRs (float)
+                P (orbital period, float)
+                mode (string, set either to phases or times)
+                Tc (transit center time, float, mode set to times)
+                phases (numpy array, set to the orbital phase values of the time series)
 
-        self.residual = None
-        self.exptimes = []
-        for i in obsparams:
-            times.append(float(i.split()[0]))
-        self.times = np.array(times)
-        self.Nexp = len(self.times)#Number of exposures.
-        if self.mode == 'times':
+
+
+        """
+        if len(input)==0:#If we read input from config files
+            planetparams = open(planet_path,'r').read().splitlines()
+            starparams = open(star_path,'r').read().splitlines()
+            obsparams = open(obs_path,'r').read().splitlines()
+            self.velStar = float(starparams[0].split()[0])
+            self.stelinc = float(starparams[1].split()[0])
+            self.drr = float(starparams[2].split()[0])
+            self.T = float(starparams[3].split()[0])
+            self.Z = float(starparams[4].split()[0])
+            self.logg = float(starparams[5].split()[0])
+            self.u1 = float(starparams[6].split()[0])
+            self.u2 = float(starparams[7].split()[0])
+            self.mus = int(starparams[8].split()[0])
+            self.R = float(starparams[9].split()[0])
+            self.model = str(starparams[10].split()[0])
+            if self.model.lower() in ['pysme','sme']:
+                self.grid_model = str(starparams[11].split()[0])
+                self.abund = starparams[12:]
+            self.sma_Rs = float(planetparams[0].split()[0])
+            self.ecc = float(planetparams[1].split()[0])
+            self.omega = float(planetparams[2].split()[0])
+            self.orbinc = float(planetparams[3].split()[0])
+            self.pob = float(planetparams[4].split()[0])#Obliquity.
+            self.Rp_Rs = float(planetparams[5].split()[0])
+            self.orb_p = float(planetparams[6].split()[0])
+            self.transitC = float(planetparams[7].split()[0])#Is this used?
+            self.mode = planetparams[8].split()[0]#This is a string.
+            times = [] #These are in JD-24000000.0 or in orbital phase.
             for i in obsparams:
-                self.exptimes.append(float(i.split()[1]))
-            self.exptimes = np.array(self.exptimes)
+                times.append(float(i.split()[0]))
+            self.times = np.array(times)
+            self.exptimes = []
+            if self.mode == 'times':
+                for i in obsparams:
+                    self.exptimes.append(float(i.split()[1]))
+                self.exptimes = np.array(self.exptimes)
+        else: #if the input dictionary is set.
+            req_keys = ['veq','stelinc','drr','T','FeH','logg','u1','u2','R','mus','model','sma_Rs',
+            'e','omega','inclination','obliquity','RpRs','P','Tc','mode']
+            for k in req_keys:
+                if k not in input:
+                    raise Exception(f"Missing key ('{k}') in input dictionary.")
+            self.velStar    = float(input['veq'])
+            self.stelinc    = float(input['stelinc'])
+            self.drr        = float(input['drr'])
+            self.T          = float(input['T'])
+            self.Z          = float(input['FeH'])
+            self.logg       = float(input['logg'])
+            self.u1         = float(input['u1'])
+            self.u2         = float(input['u2'])
+            self.R          = float(input['R'])
+            self.mus        = int(input['mus'])
+            self.model      = str(input['model'])
+            if self.model.lower() in ['pysme','sme']:
+                also_req_keys = ['grid_model','abund']
+                for k in also_req_keys:
+                    if k not in input:
+                        raise Exception(f"Missing key ('{k}') in input dictionary.")
+                self.grid_model = str(input['grid_model'])
+                self.abund      = np.array(input['abund'])
+            self.sma_Rs     = float(input['sma_Rs'])
+            self.ecc        = float(input['e'])
+            self.omega      = float(input['omega'])
+            self.orbinc     = float(input['inclination'])
+            self.pob        = float(input['obliquity'])#Obliquity.
+            self.Rp_Rs      = float(input['RpRs'])
+            self.orb_p      = float(input['P'])
+            self.transitC   = float(input['Tc'])#Is this used?
+            self.mode       = input['mode']#This is a string.
+            if self.mode == 'times':
+                also_req_keys = ['times','exptimes']
+                for k in also_req_keys:
+                    if k not in input:
+                        raise Exception(f"Missing key ('{k}') in input dictionary.")
+                self.times = np.array(input['times'])
+                self.exptimes = np.array(input['exptimes'])
+                if len(self.times) != len(self.exptimes):
+                    raise Exception("Time and exptime arrays should have the same lengths.")
+            elif self.mode == 'phases':
+                also_req_keys = ['phases']
+                for k in also_req_keys:
+                    if k not in input:
+                        raise Exception(f"Missing key ('{k}') in input dictionary.")
+                self.times = np.array(input['phases'])
+                self.exptimes = []
+
+
+
+        self.Nexp = len(self.times)#Number of exposures.
+        self.residual = None
+        self.blurred = 0
         try:
             test.typetest(self.wave_start,float,varname='wave_start in input')
             test.nantest(self.wave_start,varname='wave_start in input')
             test.notnegativetest(self.wave_start,varname='wave_start in input')
             test.notnegativetest(self.velStar,varname='velStar in input')
             test.notnegativetest(self.stelinc,varname='stelinc in input')
+            test.notnegativetest(self.T,varname='Teff in input')
+            test.notnegativetest(self.logg,varname='logg in input')
+            test.notnegativetest(self.R,varname='Resolution in input')
+            test.notnegativetest(self.orb_p,varname='period in input')
+            test.notnegativetest(self.Rp_Rs,varname='RpRs in input')
+            test.notnegativetest(self.ecc,varname='e in input')
+            test.notnegativetest(self.sma_Rs,varname='e in input')
         #add all the other input parameters
         except ValueError as err:
             print("Parser: ",err.args)
@@ -222,19 +313,19 @@ class StarRotator(object):
         self.vel_grid = vgrid.calc_vel_stellar(self.x,self.y, self.stelinc, self.velStar, self.drr,  self.pob)
         self.flux_grid = vgrid.calc_flux_stellar(self.x,self.y,self.u1,self.u2)
         if isinstance(self.mus,np.ndarray) != True:#SWITCH BETWEEN PHOENIX (mus=0) AND SPECTRUM
-            if self.model == 'PHOENIX':
+            if self.model.lower() == 'phoenix':
                 print('--- Reading spectrum from PHOENIX')
                 print('-----T=%sK, log(g)=%s, Z=%s.' % (self.T,self.logg,self.Z))
                 wl,fx = spectrum.read_spectrum(self.T,self.logg,metallicity=self.Z)
-                self.wl_in = wl*1.0
-                self.fx_in = fx*1.0
-            elif self.model == 'pySME': 
+            elif self.model.lower() in ['pysme','sme']:
                 print('--- Creating spectrum from pySME')
                 print('-----T=%sK, log(g)=%s, Z=%s.' % (self.T,self.logg,self.Z))
                 wl, fx= spectrum.get_spectrum_pysme(self.wave_start, self.wave_end, self.T, self.logg, self.Z, self.linelist_path, grid = self.grid_model)
             else:
-                print('ERROR: Invalid model spectrum chosen. Input either PHOENIX or pySME')
-                sys.exit()
+                raise Exception('Invalid model spectrum chosen. Input either PHOENIX or pySME in '
+                'star.txt')
+            self.wl_in = wl*1.0
+            self.fx_in = fx*1.0
             print('--- Integrating disk')
             if  self.drr == 0:
                 print('------ Fast integration')
@@ -242,20 +333,8 @@ class StarRotator(object):
             else:
                 print('------ Slow integration')
                 wlF,F = integrate.build_spectrum_slow(wl,fx,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid,self.flux_grid)
-        else:#Meaning, if we have no mu's do:
-            if self.model == 'SPECTRUM':
-                test.test_KURUCZ()
-                print('--- Computing limb-resolved spectra with SPECTRUM')
-                print('-----T=%sK, log(g)=%s, Z=%s.'% (self.T,self.logg,self.Z))
-                # print(self.wave_start,math.floor(ops.vactoair(self.wave_start)*10.0)/10.0)
-                # print(self.wave_end,math.ceil(ops.vactoair(self.wave_end)*10.0)/10.0)
-                # sys.exit()
-                maxvel = math.ceil(np.nanmax(np.abs(self.vel_grid)))
-                wl,fx_list = spectrum.compute_spectrum(self.T,self.logg,self.Z,self.mus,math.floor(ops.vactoair(self.wave_start*ops.doppler((-1.0)*maxvel))*10.0)/10.0,math.ceil(ops.vactoair(self.wave_end*ops.doppler(maxvel))*10.0)/10.0,mode='anM')
-                print('--- Integrating limb-resolved disk')
-                wlF,F = integrate.build_spectrum_fast(wl,fx,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid,self.flux_grid)
-
-            elif self.model == 'pySME':
+        else:
+            if self.model == 'pySME':
                 print('--- Computing limb-resolved spectra with pySME')
                 print('-----T=%sK, log(g)=%s, Z=%s.'% (self.T,self.logg,self.Z))
                 wl, fx_list = spectrum.get_spectrum_pysme(self.wave_start, self.wave_end, self.T, self.logg, self.Z, self.linelist_path, self.mus, self.abund, grid=self.grid_model)
@@ -263,12 +342,10 @@ class StarRotator(object):
                 wlF,F = integrate.build_spectrum_limb_resolved(wl,fx_list,self.mus, self.wave_start,self.wave_end,self.x,self.y,self.vel_grid, self.flux_grid)
 
             else:
-                print('ERROR: Invalid model spectrum chosen. Input either SPECTRUM or pySME')
-                sys.exit()
+                raise Exception('Invalid model spectrum chosen. Input pySME in star.txt')
 
 
         self.xp,self.yp,self.zp = ppos.calc_planet_pos(self.sma_Rs, self.ecc, self.omega, self.orbinc, self.pob, self.Rp_Rs, self.orb_p, self.transitC, self.mode, self.times, self.exptimes)
-
 
 
         F_out = np.zeros((self.Nexp,len(F)))
@@ -295,30 +372,9 @@ class StarRotator(object):
         self.spectra = copy.deepcopy(F_out)
         self.lightcurve = flux_out
         self.masks = mask_out
-        self.compute_residuals()
+        self.residual = self.spectra/self.stellar_spectrum
 
-    def compute_residuals(self):
-        """Compute and return the residuals of the time_series of spectra.
-        This may be considered to be the primary scientific output of StarRotator.
 
-        Parameters
-        ----------
-            None
-
-        Returns
-        -------
-            residual : np.array
-                2D matrix corresponding in dimensions to the length of the
-                time-series times the number of wavelength points, containing
-                the residuals of the spectra after dividing out the out-of-
-                transit flux.
-        """
-        import pdb
-        self.residual = self.spectra*0.0
-        for i in range(self.Nexp):
-            self.residual[i,:]=self.spectra[i]/self.stellar_spectrum
-        # pdb.set_trace()
-        # self.apply_spectral_resolution(self.R)
 
 
     def plot_residuals(self):
@@ -359,9 +415,13 @@ class StarRotator(object):
         import scipy.interpolate as interp
         from lib.integrate import statusbar as statusbar
         dv = const.c.value / self.R / 1000.0 #in km/s
-        print('---Blurring')
+
+        if self.blurred != 0:
+            raise Exception("Blurring has already been performed. Re-run compute-residuals if you "
+            "wish to repeat this operation with a different value of the resolving power. ")
 
         if self.residual is not None:
+            print('--- Blurring')
             for i in range(len(self.spectra)):
                 statusbar(i,len(self.spectra))
                 res = self.residual[i]
@@ -369,6 +429,9 @@ class StarRotator(object):
                 res_smooth = ops.smooth(res_constant_v,dv/a)
                 self.residual[i] = interp.interp1d(wl_constant_v,res_smooth,
                 fill_value='extrapolate',bounds_error=False)(self.wl)
+            self.blurred = 1
+        else:
+            print('--- Skipping blurring because no residuals have been computed.')
 
 
     def animate(self):
@@ -473,16 +536,60 @@ class StarRotator(object):
 
 
 
+def test_StarRotator():
+    from StarRotator import StarRotator
+    import matplotlib.pyplot as plt
+    error_trigger = 0
+    KELT9 = StarRotator(586.0,592.0,50.0)
+    wl = KELT9.wl
+    F_out = KELT9.stellar_spectrum
+    spectra = KELT9.spectra
+    residuals = KELT9.residual
+    KELT9.convolve_spectral_resolution()
 
 
-    # void1,void2,minflux,void3 = integrate.build_local_spectrum_fast(0,0,RpRs,wl,fx, wave_start, wave_end,x,y,vel_grid,flux_grid)
 
-    #The following puts a large circular spot with a T 1000K less than the star in the center.
-    # wl2,fx2 = spectrum.read_spectrum(T-1000,logg)
-    # wlp,Fp,flux,mask = integrate.build_local_spectrum_fast(0,0,0.2,wl,fx, wave_start, wave_end,x,y,vel_grid,flux_grid)
-    # wls,Fs,fluxs,masks = integrate.build_local_spectrum_fast(0,0,0.2,wl2,fx2, wave_start, wave_end,x,y,vel_grid,flux_grid)
-    # Ft = F-Fp+Fs
-    # plt.plot(wlF,F)
-    # plt.plot(wlF,Ft)
-    # plt.show()
-    # sys.exit()
+    #Test that multiple-convolution is detected and blocked:
+    try:
+        KELT9.convolve_spectral_resolution()
+        error_trigger=1
+    except:
+        pass
+    if error_trigger==1:
+        raise Exception("ERROR: Trying convolution twice in a row should be caught.")
+    error_trigger=0
+
+    #Testing another grid and another vartype.
+    KELT9 = StarRotator(586,592.0,13)
+    KELT9.convolve_spectral_resolution()
+
+
+    #Now test the whole thing with a dictionary as input. First test that the input is well
+    #tested:
+    in_dict = {'lala':1.0}
+    try:
+        KELT9 = StarRotator(586,592.0,13,input=in_dict)
+        error_trigger=1
+    except:
+        pass
+    if error_trigger==1:
+        raise Exception("ERROR: Wrong input dictionary not caught.")
+    error_trigger=0
+
+
+    in_dict = {'veq':114000.0,'stelinc':90.0,'drr':0.0,'T':10000.0,'FeH':0.0,'logg':4.0,
+    'u1':0.93,'u2':-0.23,'R':115000,'mus':0,'model':'PHOENIX','sma_Rs':3.153,
+            'e':0.0,'omega':0.0,'inclination':86.79,'obliquity':-84.8,'RpRs':0.08228,'P':1.4811235,
+            'Tc':57095.68572,'mode':'phases','phases':[-0.02,-0.01,0.0,0.01,0.02]}
+
+    KELT9 = StarRotator(586,592.0,13,input=in_dict)
+
+
+    in_dict = {'veq':114000.0,'stelinc':90.0,'drr':0.0,'T':10000.0,'FeH':0.0,'logg':4.0,
+    'u1':0.93,'u2':-0.23,'R':115000,'mus':0,'model':'PHOENIX','sma_Rs':3.153,
+            'e':0.0,'omega':0.0,'inclination':86.79,'obliquity':-84.8,'RpRs':0.08228,'P':1.4811235,
+            'Tc':57095.68572,'mode':'times','times':[5000.0,5000.1,5000.2,5000.3],
+            'exptimes':[10,10,10,10]}
+    KELT9 = StarRotator(586,592.0,13,input=in_dict)
+
+    print('Tests complete.')
