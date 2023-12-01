@@ -463,7 +463,7 @@ def get_spectrum_pysme(wave_start, wave_end, T, logg, Z, linelist = '', mu=[], a
             The model log(g) value. The surface gravity of the star in log(cgs).
         Z : int, float
             The model metallicity of the star in log_10 relative to the indiviual
-            abundances. 
+            abundances.
         linelist : str
             Path to VALD linelist used to generate spectrum
         mu : np.array()
@@ -476,7 +476,7 @@ def get_spectrum_pysme(wave_start, wave_end, T, logg, Z, linelist = '', mu=[], a
             Name of model atmosphere to be used. The default used by pySME is MARCS
             2014, which spans a temperature range of 2500 - 8000 K, logg between -0.5
             - 5.5 and metallicity -5 - 1. The other option is the ATLAS12 model, which
-            can be used by specifying "atlas12.sav". This spans a temperature of 
+            can be used by specifying "atlas12.sav". This spans a temperature of
             3500 - 50 000 K and logg between 0 - 5.
 
         Returns
@@ -497,7 +497,7 @@ def get_spectrum_pysme(wave_start, wave_end, T, logg, Z, linelist = '', mu=[], a
     sme.abund = Abund.solar()
     sme.teff, sme.logg, sme.monh = T, logg, Z
     sme.vsini = 0
-    
+
     # Change from default grid
     if grid:
         sme.atmo.method = 'grid'
@@ -514,22 +514,22 @@ def get_spectrum_pysme(wave_start, wave_end, T, logg, Z, linelist = '', mu=[], a
     if abund:
         for i in range(len(abund)):
             sme.abund.update_pattern(updates=ast.literal_eval(abund[i]))
-    
+
     sme.wran = [[wave_start, wave_end]]
     vald = ValdFile(linelist)
     sme.linelist = vald
-    
+
     if len(mu) > 0:
         fx = []
         for m in mu:#Loop over all mu angles
             sme.mu = m
             sme = synthesize_spectrum(sme)
-            
+
             w, f = *sme.wave/10, *sme.synth
             wl = w
             fx.append(f.copy())
-        return wl, fx
-        
+        return(wl, fx)
+
     else:
         sme = synthesize_spectrum(sme)
-        return *sme.wave/10, *sme.synth
+        return(*sme.wave/10, *sme.synth)
