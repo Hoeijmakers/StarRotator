@@ -305,7 +305,7 @@ class StarRotator(object):
         print('--- Computing velocity/flux grids')
         self.vel_grid = vgrid.calc_vel_stellar(self.x,self.y, self.stelinc, self.velStar, self.drr,  self.pob)
         self.flux_grid = vgrid.calc_flux_stellar(self.x,self.y,self.u1,self.u2)
-        if isinstance(self.mus,np.ndarray) != True:#SWITCH BETWEEN PHOENIX (mus=0) AND SPECTRUM
+        if isinstance(self.mus,np.ndarray) != True:#SWITCH BETWEEN PHOENIX (mus=0) AND pySME
             if self.model.lower() == 'phoenix':
                 print('--- Reading spectrum from PHOENIX')
                 print('-----T=%sK, log(g)=%s, Z=%s.' % (self.T,self.logg,self.Z))
@@ -321,10 +321,10 @@ class StarRotator(object):
             self.fx_in = fx*1.0
             print('--- Integrating disk')
             if  self.drr == 0:
-                print('------ Fast integration')
+                print('------ Fast integration (drr not set)')
                 wlF,F = integrate.build_spectrum_fast(wl,fx,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid,self.flux_grid)
             else:
-                print('------ Slow integration')
+                print('------ Slow integration (drr set)')
                 wlF,F = integrate.build_spectrum_slow(wl,fx,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid,self.flux_grid)
         else:
             if self.model == 'pySME':
@@ -335,7 +335,7 @@ class StarRotator(object):
                 wlF,F = integrate.build_spectrum_limb_resolved(wl,fx_list,self.mus, self.wave_start,self.wave_end,self.x,self.y,self.vel_grid, self.flux_grid)
 
             else:
-                raise Exception('Invalid model spectrum chosen. Input pySME in star.txt')
+                raise Exception('Invalid model spectrum chosen. Make pySME the input model.')
 
 
         self.xp,self.yp,self.zp = ppos.calc_planet_pos(self.sma_Rs, self.ecc, self.omega, self.orbinc, self.pob, self.Rp_Rs, self.orb_p, self.times, self.exptimes)
