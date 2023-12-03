@@ -12,14 +12,34 @@ In order to run StarRotator, perform the following steps:
 4) Access the simulation output using attributes defined on the `KELT9` object: The wavelength axis of the model is accessed as `wl = KELT9.wl`, the out-of-transit stellar spectrum as `F_out = KELT9.stellar_spectrum`, the time-series of the modelled spectrum as `spectra = KELT9.spectra` and the residuals as obtained by dividing the out-of-transit spectrum out of the time-series: `residuals = KELT9.residual`. These can be blurred to some spectral resolution defined in `KELT9.R` (defined by default as 115,000 in the `demo_star.txt` parameter file), using `KELT9.convolve_spectral_resolution()`. Convolution is applied to the residuals and not to the spectra that are divided by each other, because this introduces a numerical error.
 5) The StarRotator object contains methods to plot the simulation output. You can instantly plot the residuals of the time series like `KELT9.plot_residuals()`, and an animation of the entire time-series as `KELT9.animate()`, the result of which could look like the animation below:
 6) To use the simulation output, the user has access to the `KELT9.residual` numpy array, which can be written to file and loaded it when needed in an external workflow, or used as is.
-7) To change the parameters of your exoplanet system you can create new input files. The parameters in the input files need to be given in the exact same order as in the demo files. Alternatively, you can call the StarRotator object with a dictionary that contains all these input values. So, if providing input via`Planet = StarRotator(586.0,592.0,200.0,star_path='input/demo_star.txt',planet_path='input/demo_planet.txt',obs_path='input/demo_observations.txt')` if calling from the input parameter files. Otherwise, use `Planet = StarRotator(586.0,592.0,200.0,input=dict)`, with `dict` set to a dictionary containing all the following named parameter values:
-```
+7) To change the parameters of your exoplanet system you can create new input files. The parameters in the input files need to be given in the exact same order as in the demo files. Alternatively, you can call the StarRotator object with a dictionary that contains all these input values. See the example code block below' Otherwise, use `Planet = StarRotator(586.0,592.0,200.0,input=dict)`, with `dict` set to a dictionary containing all the following named parameter values:
+```{python}
+#When using the input files:
+Planet = StarRotator(586.0,592.0,200.0,star_path='input/demo_star.txt',planet_path='input/demo_planet.txt',obs_path='input/demo_observations.txt')
+
+
+#When using the dictionary:
 dict = {
-  veq, #equatorial velocity, float
-  stelinc, #stellar inclination axis, float
-  }
+  'veq':114000.0, #
+  'stelinc':90.0, #stellar inclination axis, degrees, float
+  'drr':0.0, #Differential rotation parameter, float
+  'T':10000.0, #Stellar effective temperature, K, float
+  'FeH':0.0, #metallicity, float
+  'logg':4.0, #log(g), cgs, float
+  'u1':0.93, #limb darkening parameter 1
+  'R':115000, #limb darkening parameter 2
+  'mus':0, #number of mu angles, int. Ignored if using PHOENIX.
+  'model':'PHOENIX', #model type, string, either PHOENIX or pySME
+  'sma_Rs':3.153, #a over Rs, float
+  'e':0.0, #eccentricity, float
+  'omega':0.0, #longitude of periastron, degrees, float
+  'inclination':86.79, #degrees, float
+  'obliquity':-84.8, #degrees, float
+  'RpRs':0.08228, #Planet star radius ratio, float
+  'P':1.4811235, #Orbital period, days, float
+  'Tc':57095.68572, #transit center time, float
+  'mode':'phases', #Only set to 'phases'
+  'phases':[-0.02,-0.01,0.0,0.01,0.02] #numpy array, set to the orbital phases of the time series
+}
 ```
-  `veq` , `stelinc` (stellar inclination axis, float), `drr` (differential rotation, float), `T` (Teff, float), `FeH` (metallicity, float), `logg` (float), `u1` (limb darkening parameter 1), `u2` (limb darkening parameter 2), `mus` (number of mu angles, int), `R` (resolving power, float), `model` (model type, string, either PHOENIX or pySME), `sma_Rs` (a over Rs, float), `e` (eccentricity, float), `omega` (longitude of periastron, float), `inclination` (float), `obliquity` (float), `RpRs` (float), `P` (orbital period, float), `mode` (string, set either to phases or times), `Tc` (transit center time, float, mode set to times), `phases` (numpy array, set to the orbital phase values of the time series).
-
-
 ![](demo.gif)

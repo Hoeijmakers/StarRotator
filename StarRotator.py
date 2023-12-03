@@ -537,8 +537,36 @@ class StarRotator(object):
 
 
 def test_StarRotator():
+    #Test all dependencies
     from StarRotator import StarRotator
     import matplotlib.pyplot as plt
+    from matplotlib import cm, colors
+    from mpl_toolkits.mplot3d import Axes3D
+    from scipy.special import sph_harm
+    
+    import requests
+    import shutil
+    import urllib.request as request
+    from contextlib import closing
+
+    import os.path
+    import lib.test as test
+    import lib.operations as ops
+    import lib.stellar_spectrum
+    import lib.vgrid as vgrid
+    import lib.integrate
+
+    import astropy.io.fits as fits
+    import astropy.units as u
+    import scipy.interpolate as interp
+    import astropy.constants as consts
+
+    import numpy as np
+    import copy
+    import imp
+    import sys
+
+    n_warnings = 0
     error_trigger = 0
     KELT9 = StarRotator(586.0,592.0,50.0)
     wl = KELT9.wl
@@ -577,7 +605,9 @@ def test_StarRotator():
     error_trigger=0
 
 
-    in_dict = {'veq':114000.0,'stelinc':90.0,'drr':0.0,'T':10000.0,'FeH':0.0,'logg':4.0,
+    in_dict = {'veq':114000.0, #test some stuff.
+    'stelinc':90.0,
+    'drr':0.0,'T':10000.0,'FeH':0.0,'logg':4.0,
     'u1':0.93,'u2':-0.23,'R':115000,'mus':0,'model':'PHOENIX','sma_Rs':3.153,
             'e':0.0,'omega':0.0,'inclination':86.79,'obliquity':-84.8,'RpRs':0.08228,'P':1.4811235,
             'Tc':57095.68572,'mode':'phases','phases':[-0.02,-0.01,0.0,0.01,0.02]}
@@ -592,4 +622,18 @@ def test_StarRotator():
             'exptimes':[10,10,10,10]}
     KELT9 = StarRotator(586,592.0,13,input=in_dict)
 
+
+
+    try:
+        from pysme.sme import SME_Structure as SME_Struct
+        from pysme.abund import Abund
+        from pysme.synthesize import synthesize_spectrum
+        from pysme.solve import solve
+        from pysme.linelist.vald import ValdFile
+    except:
+        print('WARNING: PYSME cannot be imported. PSME functionality will not be available.')
+        n_warnings+=1
+
+    print('')
     print('Tests complete.')
+    print(f'{n_warnings} warnings triggered.')

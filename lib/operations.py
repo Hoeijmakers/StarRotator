@@ -88,7 +88,6 @@ def smooth(fx,w,edge_degree=1):
 
     import numpy as np
 
-    from matplotlib import pyplot as plt
     truncsize=4.0#The gaussian is truncated at 8 sigma.
     shape=np.shape(fx)
 
@@ -106,11 +105,8 @@ def smooth(fx,w,edge_degree=1):
     if (-1.0)*kx[-1] != kx[0]:
         print(kx)
         raise Exception("ERROR in box_smooth: Kernel could not be made symmetric somehow. Attempted kernel grid is printed above. Kernel width is %s pixels." % kw)
-
     k=gaussian(kx,1.0,0.0,sig_w)
-
     k/=np.sum(k)
-
     return(convolve(fx,k,edge_degree))
 
 
@@ -527,10 +523,7 @@ def blur_spec(wl,spec,dv,truncsize = 20.0):
     # print('AND I HAVE NOT THOROUGHLY BENCHMARKED IT.')
     import numpy as np
     from matplotlib import pyplot as plt
-    import time
-    import pdb
     import astropy.constants as const
-    import numpy as np
     import lib.test as test
     # Do not perform tests because this thing is in a double forloop.
     # test.typetest(dv,float,varname='dv in doppler(dv)')
