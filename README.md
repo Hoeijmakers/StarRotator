@@ -39,8 +39,6 @@ dict = {
   'obliquity':-84.8, #degrees, float
   'RpRs':0.08228, #Planet star radius ratio, float
   'P':1.4811235, #Orbital period, days, float
-  'Tc':57095.68572, #transit center time, float
-  'mode':'phases', #Only set to 'phases'
   'phases':[-0.02,-0.01,0.0,0.01,0.02] #numpy array, set to the orbital phases of the time series
 }
 

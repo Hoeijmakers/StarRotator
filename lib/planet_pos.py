@@ -7,13 +7,14 @@ def calc_orbit_times(time_stamp, transitC, exposure_time, orb_p):
         exposure_times: type: float, exposure time in seconds
         orb_p: type: float, orbital period in days
     output:
-        orbit_start (, orbit_end, orbit_center): times of current exposure relative to transit start, end, center in days
+        orbit_start (, orbit_end, orbit_center): times of current exposure relative to transit
+        start, end, center in days
     """
-    #this allows to really think about start and end of the exposures. It might be interesting for long exposures, but I'm leaving this for later
+    #this allows to really think about start and end of the exposures. It might be interesting for
+    #long exposures, but I'm leaving this for later
     orbit_center = (time_stamp - transitC + 2400000.)% orb_p
     #orbit_start = (time_stamp-exposure_time/(2.*24.*3600.)- transitC + 2400000.) % orb_p
     #orbit_end = (time_stamp+exposure_time/(2.*24.*3600.)- transitC + 2400000.) % orb_p
-
     return  orbit_center# orbit_start, orbit_end,
 
 def func_kepler(ecc_anom,mean_anom,ecc):
@@ -70,56 +71,43 @@ def calc_true_anom(ecc,phases,omega_bar):
         #Eccentric anomaly :
         #  - M = E - e sin(E)
         #    - >0 counterclockwise
-        #  - angle, with origin at the ellipse center, between the major axis toward the periapsis and the line crossing the circle with radius 'a_Rs' at its intersection with the perpendicular to the major axis through the planet position
+        #  - angle, with origin at the ellipse center, between the major axis toward the periapsis
+        # and the line crossing the circle with radius 'a_Rs' at its intersection with the
+        #perpendicular to the major axis through the planet position
         ecc_anom=newton(func_kepler,mean_anom,args=(mean_anom,ecc,))
 
         #True anomaly of the planet at current time
         true_anom=2.*np.arctan(np.sqrt((1.+ecc)/(1.-ecc))*np.tan(ecc_anom/2.))
     return true_anom,ecc_anom
 
-def  calc_planet_pos(sma_Rs, ecc, omega, inclin, l_spinorbit, Rp_Rs, orb_p, transitC, flag, step_grid, exposure_times=0.):
+def  calc_planet_pos(sma_Rs,ecc,omega,inclin,l_spinorbit,Rp_Rs,orb_p,phase,exposure_times=0.):
     """
     Takes the stellar and planet parameters as input and calulates the path of the planet
     in front of the cartesian stellar coordiante system
     input:
         sma_Rs: type: float, scaled semi major axis in solar radii
         ecc: type: float, eccentricity
-        omega: type: float, Angle between the ascending node and the periastron, in the orbital plane (>0 counterclockwise)
-        inclin: type: float, Inclination from the line of sight toward the normal to the orbital plane
+        omega: type: float, Angle between the ascending node and the periastron, in the orbital
+        plane (>0 counterclockwise)
+        inclin: type: float, Inclination from the line of sight toward the normal to the orbital
+        plane
         l_spinorbit: Orbit obliquity in degrees.
         Rp_Rs: type: float, ratio planet to star radii
         orb_p: type: float, orbital period in days
-        transitC: type:float, transit center - 2400000.
-        flag: type: string, can either be "times" for input as a real observation time array, or "phases" for an array of phases
-        step_grid: type: np.array, if flag=="times", grid of times in jdb, if flag=="phases" grid of phases
+        phase: type: np.array, grid of phases
         exposure_times: type: np.array, all exposure times, only needed if flag=="times", default 0.
 
-    output: x_pl, y_pl, z_pl: type: np.arrays of floats, containing the position of the planet in units of stellar radii
+    output: x_pl, y_pl, z_pl: type: np.arrays of floats, containing the position of the planet in
+    units of stellar radii
 
     """
     import numpy as np
 
-
     inclin_bar = inclin*np.pi/180.
     omega_bar = omega*np.pi/180.
-    obs_n = len(step_grid) #number of steps
+    obs_n = len(phase) #number of steps
 
     positions= np.empty([3,obs_n], dtype=float)
-
-    if flag == "phases":
-        phase = step_grid
-    elif flag=="times":
-        phase = np.zeros(obs_n,float)
-        for i in range(obs_n):
-            mid_time = calc_orbit_times(step_grid[i], transitC, exposure_times[i], orb_p)
-            if mid_time<orb_p/2.:
-                phase[i] = mid_time/orb_p
-            else:
-                phase[i] = (mid_time-orb_p)/orb_p
-    else:
-        raise Exception("Wrong flag option in calc_planet_pos. "
-        "Possible values are 'phases' or 'times'.")
-
 
     #calc anomalies
     true_anom,ecc_anom = calc_true_anom(ecc,phase,omega_bar)
@@ -143,4 +131,4 @@ def  calc_planet_pos(sma_Rs, ecc, omega, inclin, l_spinorbit, Rp_Rs, orb_p, tran
         z_pl = X1_p*np.sin(inclin_bar)
     return(x_pl*np.cos(np.radians(l_spinorbit))-y_pl*np.sin(np.radians(l_spinorbit)),
     x_pl*np.sin(np.radians(l_spinorbit))+y_pl*np.cos(np.radians(l_spinorbit)), z_pl)
-    #CONVERT x_p and y_p to perpendicular x,y wrt stellar spin axis, see equation 4,5 of Cegla+ 2016.
+    #CONVERT x_p and y_p to perpendicular x,y wrt stellar spin axis, see eqs 4,5 of Cegla+ 2016.

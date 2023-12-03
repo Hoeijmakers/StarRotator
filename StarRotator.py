@@ -177,11 +177,9 @@ class StarRotator(object):
                 obliquity (float)
                 RpRs (float)
                 P (orbital period, float)
-                mode (string, set either to phases or times)
-                Tc (transit center time, float, mode set to times)
                 phases (numpy array, set to the orbital phase values of the time series)
 
-
+                Setting the input dictionary overrules the input parameter files.
 
         """
         if len(input)==0:#If we read input from config files
@@ -209,20 +207,21 @@ class StarRotator(object):
             self.pob = float(planetparams[4].split()[0])#Obliquity.
             self.Rp_Rs = float(planetparams[5].split()[0])
             self.orb_p = float(planetparams[6].split()[0])
-            self.transitC = float(planetparams[7].split()[0])#Is this used?
-            self.mode = planetparams[8].split()[0]#This is a string.
+            # self.transitC = float(planetparams[7].split()[0])#Is this used?
+            # self.mode = planetparams[8].split()[0]#This is a string.
             times = [] #These are in JD-24000000.0 or in orbital phase.
             for i in obsparams:
                 times.append(float(i.split()[0]))
             self.times = np.array(times)
             self.exptimes = []
-            if self.mode == 'times':
-                for i in obsparams:
-                    self.exptimes.append(float(i.split()[1]))
-                self.exptimes = np.array(self.exptimes)
+            # if self.mode == 'times':
+                # for i in obsparams:
+                    # self.exptimes.append(float(i.split()[1]))
+                # self.exptimes = np.array(self.exptimes)
+
         else: #if the input dictionary is set.
             req_keys = ['veq','stelinc','drr','T','FeH','logg','u1','u2','R','mus','model','sma_Rs',
-            'e','omega','inclination','obliquity','RpRs','P','Tc','mode']
+            'e','omega','inclination','obliquity','RpRs','P','phases']
             for k in req_keys:
                 if k not in input:
                     raise Exception(f"Missing key ('{k}') in input dictionary.")
@@ -251,26 +250,19 @@ class StarRotator(object):
             self.pob        = float(input['obliquity'])#Obliquity.
             self.Rp_Rs      = float(input['RpRs'])
             self.orb_p      = float(input['P'])
-            self.transitC   = float(input['Tc'])#Is this used?
-            self.mode       = input['mode']#This is a string.
-            if self.mode == 'times':
-                also_req_keys = ['times','exptimes']
-                for k in also_req_keys:
-                    if k not in input:
-                        raise Exception(f"Missing key ('{k}') in input dictionary.")
-                self.times = np.array(input['times'])
-                self.exptimes = np.array(input['exptimes'])
-                if len(self.times) != len(self.exptimes):
-                    raise Exception("Time and exptime arrays should have the same lengths.")
-            elif self.mode == 'phases':
-                also_req_keys = ['phases']
-                for k in also_req_keys:
-                    if k not in input:
-                        raise Exception(f"Missing key ('{k}') in input dictionary.")
-                self.times = np.array(input['phases'])
-                self.exptimes = []
-
-
+            # self.transitC   = float(input['Tc'])#Is this used?
+            # self.mode       = input['mode']#This is a string.
+            # if self.mode == 'times':
+            #     also_req_keys = ['times','exptimes']
+            #     for k in also_req_keys:
+            #         if k not in input:
+            #             raise Exception(f"Missing key ('{k}') in input dictionary.")
+            #     self.times = np.array(input['times'])
+            #     self.exptimes = np.array(input['exptimes'])
+            #     if len(self.times) != len(self.exptimes):
+            #         raise Exception("Time and exptime arrays should have the same lengths.")
+            self.times = np.array(input['phases'])
+            self.exptimes = []
 
         self.Nexp = len(self.times)#Number of exposures.
         self.residual = None
@@ -293,7 +285,8 @@ class StarRotator(object):
             print("Parser: ",err.args)
 
         if self.mus != 0:
-            self.mus = np.linspace(0.1,1.0,self.mus)#Uncomment this to run in CLV mode with SPECTRUM.
+            self.mus = np.linspace(0.1,1.0,self.mus)
+
 
 
     def compute_spectrum(self):
@@ -345,7 +338,7 @@ class StarRotator(object):
                 raise Exception('Invalid model spectrum chosen. Input pySME in star.txt')
 
 
-        self.xp,self.yp,self.zp = ppos.calc_planet_pos(self.sma_Rs, self.ecc, self.omega, self.orbinc, self.pob, self.Rp_Rs, self.orb_p, self.transitC, self.mode, self.times, self.exptimes)
+        self.xp,self.yp,self.zp = ppos.calc_planet_pos(self.sma_Rs, self.ecc, self.omega, self.orbinc, self.pob, self.Rp_Rs, self.orb_p, self.times, self.exptimes)
 
 
         F_out = np.zeros((self.Nexp,len(F)))
@@ -543,7 +536,7 @@ def test_StarRotator():
     from matplotlib import cm, colors
     from mpl_toolkits.mplot3d import Axes3D
     from scipy.special import sph_harm
-    
+
     import requests
     import shutil
     import urllib.request as request
@@ -605,22 +598,14 @@ def test_StarRotator():
     error_trigger=0
 
 
-    in_dict = {'veq':114000.0, #test some stuff.
+    in_dict = {'veq':114000.0,
     'stelinc':90.0,
     'drr':0.0,'T':10000.0,'FeH':0.0,'logg':4.0,
-    'u1':0.93,'u2':-0.23,'R':115000,'mus':0,'model':'PHOENIX','sma_Rs':3.153,
+    'u1':0.93,'u2':-0.23,'R':115000.,'mus':0,'model':'PHOENIX','sma_Rs':3.153,
             'e':0.0,'omega':0.0,'inclination':86.79,'obliquity':-84.8,'RpRs':0.08228,'P':1.4811235,
-            'Tc':57095.68572,'mode':'phases','phases':[-0.02,-0.01,0.0,0.01,0.02]}
-
+            'phases':[-0.02,-0.01,0.0,0.01,0.02]}
     KELT9 = StarRotator(586,592.0,13,input=in_dict)
 
-
-    in_dict = {'veq':114000.0,'stelinc':90.0,'drr':0.0,'T':10000.0,'FeH':0.0,'logg':4.0,
-    'u1':0.93,'u2':-0.23,'R':115000,'mus':0,'model':'PHOENIX','sma_Rs':3.153,
-            'e':0.0,'omega':0.0,'inclination':86.79,'obliquity':-84.8,'RpRs':0.08228,'P':1.4811235,
-            'Tc':57095.68572,'mode':'times','times':[5000.0,5000.1,5000.2,5000.3],
-            'exptimes':[10,10,10,10]}
-    KELT9 = StarRotator(586,592.0,13,input=in_dict)
 
 
 
