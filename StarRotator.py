@@ -21,6 +21,7 @@ import math
 from matplotlib.patches import Circle
 import lib.planet_pos as ppos
 import copy
+import os.path
 #main body of code
 
 
@@ -138,8 +139,8 @@ class StarRotator(object):
         self.wave_start=float(wave_start)
         self.wave_end=float(wave_end)
         self.grid_size=int(grid_size)
-        self.read_system(star_path=star_path,planet_path=planet_path,obs_path=obs_path,input=input)
         self.linelist_path = linelist_path
+        self.read_system(star_path=star_path,planet_path=planet_path,obs_path=obs_path,input=input)
         self.compute_spectrum()
 
         # return(self.wlF,F_out)#This is mad return statement. This whole function should be a class instead.
@@ -250,6 +251,9 @@ class StarRotator(object):
                 self.grid_model = str(input['grid_model'])
                 self.abund      = np.array(input['abund'])
                 self.linelist_path = input['linelist_path']
+                if not os.path.isfile(self.linelist_path):
+                    raise Exception("pySME linelist_path does not point to an existing file.")
+
             self.sma_Rs     = float(input['sma_Rs'])
             self.ecc        = float(input['e'])
             self.omega      = float(input['omega'])
