@@ -26,8 +26,8 @@ import copy
 
 class StarRotator(object):
     def __init__(self,wave_start,wave_end,grid_size,star_path='input/demo_star.txt',
-    planet_path='input/demo_planet.txt',obs_path='input/demo_observations.txt', linelist_path='',
-    input={}):
+    planet_path='input/demo_planet.txt',obs_path='input/demo_observations.txt',
+    input={},linelist_path=''):
         """
             Welcome to StarRotator.
             ***********************
@@ -110,6 +110,8 @@ class StarRotator(object):
                     0.06
             linelist_path: str
                 Path to the VALD linelist used for generating a spectrum using pySME.
+                This can also be provided in the input dictionary (see below), in which case it
+                overrides this setting.
 
             Class methods
             -------------
@@ -180,10 +182,11 @@ class StarRotator(object):
                 phases (numpy array, set to the orbital phase values of the time series)
 
 
-                Setting the input dictionary overrules the input parameter files.
-                If the model is set to pySME, then the parameters grid_model (str, either ATLAS12 or
-                MARCS)
-
+            Setting the input dictionary overrules the input parameter files.
+            If the model is set to pySME, then the following parameters also need to be set:
+                grid_model (str, either ATLAS12 or MARCS),
+                abund (dict, empty by default)
+                linelist_path (str, path to VALD-style line-list for pysme to use)
         """
         if len(input)==0:#If we read input from config files
             planetparams = open(planet_path,'r').read().splitlines()
@@ -240,12 +243,13 @@ class StarRotator(object):
             self.mus        = int(input['mus'])
             self.model      = str(input['model'])
             if self.model.lower() in ['pysme','sme']:
-                also_req_keys = ['grid_model','abund']
+                also_req_keys = ['grid_model','abund','linelist_path']
                 for k in also_req_keys:
                     if k not in input:
                         raise Exception(f"Missing key ('{k}') in input dictionary.")
                 self.grid_model = str(input['grid_model'])
                 self.abund      = np.array(input['abund'])
+                self.linelist_path = input['linelist_path']
             self.sma_Rs     = float(input['sma_Rs'])
             self.ecc        = float(input['e'])
             self.omega      = float(input['omega'])
@@ -645,11 +649,12 @@ def test_StarRotator():
         'drr':0.0,'T':10000.0,'FeH':0.0,'logg':4.0,
         'u1':0.93,'u2':-0.23,'R':115000.,'mus':5,'model':'pySME','sma_Rs':3.153,
         'e':0.0,'omega':0.0,'inclination':86.79,'obliquity':-84.8,'RpRs':0.08228,'P':1.4811235,
-        'phases':[-0.02,-0.01,0.0,0.01,0.02],'grid_model':'ATLAS12','abund':{}}
+        'phases':[-0.02,-0.01,0.0,0.01,0.02],'grid_model':'ATLAS12','abund':{},
+        linelist_path='input/demo_ges_linelist.dat'}
         KELT9 = StarRotator(586,592.0,13,input=in_dict)
 
 
-        
+
     print('')
     print('Tests complete.')
     print(f'{n_warnings} warnings triggered.')
