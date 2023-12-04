@@ -179,7 +179,10 @@ class StarRotator(object):
                 P (orbital period, float)
                 phases (numpy array, set to the orbital phase values of the time series)
 
+
                 Setting the input dictionary overrules the input parameter files.
+                If the model is set to pySME, then the parameters grid_model (str, either ATLAS12 or
+                MARCS)
 
         """
         if len(input)==0:#If we read input from config files
@@ -608,7 +611,7 @@ def test_StarRotator():
 
 
 
-
+    pysme_error = 0
     try:
         from pysme.sme import SME_Structure as SME_Struct
         from pysme.abund import Abund
@@ -618,6 +621,31 @@ def test_StarRotator():
     except:
         print('WARNING: PYSME cannot be imported. PSME functionality will not be available.')
         n_warnings+=1
+        pysme_error = 1
+
+
+    if pysme_error == 0:
+        in_dict = {'veq':114000.0,
+        'stelinc':90.0,
+        'drr':0.0,'T':10000.0,'FeH':0.0,'logg':4.0,
+        'u1':0.93,'u2':-0.23,'R':115000.,'mus':0,'model':'pySME','sma_Rs':3.153,
+        'e':0.0,'omega':0.0,'inclination':86.79,'obliquity':-84.8,'RpRs':0.08228,'P':1.4811235,
+        'phases':[-0.02,-0.01,0.0,0.01,0.02]}#Without setting abund and grid_model keywords.
+        try:
+            KELT9 = StarRotator(586,592.0,13,input=in_dict)
+            error_trigger=1
+        except:
+            pass
+        if error_trigger==1:
+            raise Exception("ERROR: Wrong input dictionary not caught.")
+        error_trigger=0
+
+        in_dict = {'veq':114000.0,
+        'stelinc':90.0,
+        'drr':0.0,'T':10000.0,'FeH':0.0,'logg':4.0,
+        'u1':0.93,'u2':-0.23,'R':115000.,'mus':0,'model':'pySME','sma_Rs':3.153,
+        'e':0.0,'omega':0.0,'inclination':86.79,'obliquity':-84.8,'RpRs':0.08228,'P':1.4811235,
+        'phases':[-0.02,-0.01,0.0,0.01,0.02],grid_model:'ATLAS12',abund:{}}
 
     print('')
     print('Tests complete.')

@@ -1,0 +1,6 @@
+numpy
+matplotlib
+astropy
+scipy
+requests
+pysme-astro
