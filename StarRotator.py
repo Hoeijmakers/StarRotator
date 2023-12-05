@@ -658,6 +658,15 @@ def test_StarRotator():
         KELT9 = StarRotator(586,592.0,13,input=in_dict)
 
 
+        in_dict = {'veq':114000.0,
+        'stelinc':90.0,
+        'drr':0.0,'T':6000.0,'FeH':0.3,'logg':4.2,
+        'u1':0.93,'u2':-0.23,'R':115000.,'mus':5,'model':'pySME','sma_Rs':3.153,
+        'e':0.0,'omega':0.0,'inclination':86.79,'obliquity':-84.8,'RpRs':0.08228,'P':1.4811235,
+        'phases':[-0.02,-0.01,0.0,0.01,0.02],'grid_model':'marcs2014.sav','abund':{},
+        'linelist_path':'input/demo_linelist.dat'}
+        KELT9 = StarRotator(586,592.0,13,input=in_dict)
+
 
     print('')
     print('Tests complete.')
