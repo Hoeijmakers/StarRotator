@@ -186,7 +186,8 @@ class StarRotator(object):
             Setting the input dictionary overrules the input parameter files.
             If the model is set to pySME, then the following parameters also need to be set:
                 grid_model (str, either atlas12.sav or marcs2012.sav are provided by default),
-                abund (dict, empty by default)
+                abund (list, empty by default) The elements are strings of definitions of
+                single-key dictionaries of the form ["{X:6.4}","{Y:6.3}"] etc.
                 linelist_path (str, path to VALD-style line-list for pysme to use)
         """
         if len(input)==0:#If we read input from config files
@@ -653,7 +654,7 @@ def test_StarRotator():
         'drr':0.0,'T':10000.0,'FeH':0.0,'logg':4.0,
         'u1':0.93,'u2':-0.23,'R':115000.,'mus':5,'model':'pySME','sma_Rs':3.153,
         'e':0.0,'omega':0.0,'inclination':86.79,'obliquity':-84.8,'RpRs':0.08228,'P':1.4811235,
-        'phases':[-0.02,-0.01,0.0,0.01,0.02],'grid_model':'atlas12.sav','abund':{},
+        'phases':[-0.02,-0.01,0.0,0.01,0.02],'grid_model':'atlas12.sav','abund':[],
         'linelist_path':'input/demo_linelist.dat'}
         KELT9 = StarRotator(586,592.0,13,input=in_dict)
 
@@ -663,7 +664,7 @@ def test_StarRotator():
         'drr':0.0,'T':6000.0,'FeH':0.3,'logg':4.2,
         'u1':0.93,'u2':-0.23,'R':115000.,'mus':5,'model':'pySME','sma_Rs':3.153,
         'e':0.0,'omega':0.0,'inclination':86.79,'obliquity':-84.8,'RpRs':0.08228,'P':1.4811235,
-        'phases':[-0.02,-0.01,0.0,0.01,0.02],'grid_model':'marcs2014.sav','abund':{},
+        'phases':[-0.02,-0.01,0.0,0.01,0.02],'grid_model':'marcs2014.sav','abund':[],
         'linelist_path':'input/demo_linelist.dat'}
         KELT9 = StarRotator(586,592.0,13,input=in_dict)
 

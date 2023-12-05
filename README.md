@@ -29,6 +29,7 @@ dict = {
   'FeH':0.0, #metallicity, float
   'logg':4.0, #log(g), cgs, float
   'u1':0.93, #limb darkening parameter 1
+  'u2':-0.23, #Spectral resolution
   'R':115000, #limb darkening parameter 2
   'mus':0, #number of mu angles, int. Ignored if using PHOENIX.
   'model':'PHOENIX', #model type, string, either PHOENIX or pySME
@@ -44,4 +45,44 @@ dict = {
 
 Planet = StarRotator(586.0,592.0,200.0,input=dict)
 ```
+
 ![](demo.gif)
+
+<br><br><br>
+
+### A typical use case: running StarRotator with pySME as a forward model.
+
+![PySME](https://github.com/AWehrhahn/SME) is used in StarRotator to allow a user to generate more precise forward-models of the Doppler-Shadow residuals for real exoplanet systems. Using known stellar parameters (T, log(g), Z, vsin i) and individual elemental abundances, in theory it should be possible to precisely forward model the residual and recalibrate observed spectra. To model the distortion in the Na lines in a sodium-rich variation on the KELT-9 system with pySME, you can use the following example:
+
+
+```python
+
+from StarRotator import StarRotator
+import matplotlib.pyplot as plt
+import numpy as np
+
+dict = {
+  'veq':114000.0,'stelinc':90.0,'drr':0.0,
+  'T':10500.0,'FeH':0.23,'logg':3.9,'u1':0.93,'u2':-0.23,
+  'R':115000,'mus':5,'model':'pySME',
+  'sma_Rs':3.153,'e':0.0,'omega':0.0,'inclination':86.79,'obliquity':-84.8,'RpRs':0.08228,
+  'P':1.4811235,'phases':np.arange(-0.03,0.03,100),'grid_model':'atlas12.sav','abund':{},
+  'linelist_path':'input/demo_linelist.dat'
+}
+
+KELT9_nominal = StarRotator(586.0,592.0,200.0,input=dict)
+
+dict['abund']=["{'Na':6.6}"]#Nominally it is 6.4
+KELT9_rich = StarRotator(586.0,592.0,200.0,input=dict)
+
+plt.plot(KELT9_nominal.wl,KELT9_nominal.stellar_spectrum,label='Nominal sodium')
+plt.plot(KELT9_rich.wl,KELT9_rich.stellar_spectrum,label='Sodium enhanced')
+plt.legend(frameon=False)
+plt.xlabel('Wavelength (nm)')
+plt.ylabel('Relative flux')
+plt.show()
+
+```
+
+This gives the following figure:
+![](demo_spectrum.png)
