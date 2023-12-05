@@ -52,7 +52,7 @@ Planet = StarRotator(586.0,592.0,200.0,input=dict)
 
 ### A typical use case: running StarRotator with pySME as a forward model.
 
-![PySME](https://github.com/AWehrhahn/SME) is used in StarRotator to allow a user to generate more precise forward-models of the Doppler-Shadow residuals for real exoplanet systems. Using known stellar parameters (T, log(g), Z, vsin i) and individual elemental abundances, in theory it should be possible to precisely forward model the residual and recalibrate observed spectra. To model the distortion in the Na lines in a sodium-rich variation on the KELT-9 system with pySME, you can use the following example:
+[PySME](https://github.com/AWehrhahn/SME) is used in StarRotator to allow a user to generate more precise forward-models of the Doppler-Shadow residuals for real exoplanet systems. Using known stellar parameters (T, log(g), Z, vsin i) and individual elemental abundances, in theory it should be possible to precisely forward model the residual and recalibrate observed spectra. To the broadened spectrum in the Na lines in a sodium-rich variation on the KELT-9 system with pySME, you can use the following example.
 
 
 ```python
@@ -66,7 +66,7 @@ dict = {
   'T':10500.0,'FeH':0.23,'logg':3.9,'u1':0.93,'u2':-0.23,
   'R':115000,'mus':5,'model':'pySME',
   'sma_Rs':3.153,'e':0.0,'omega':0.0,'inclination':86.79,'obliquity':-84.8,'RpRs':0.08228,
-  'P':1.4811235,'phases':np.arange(-0.03,0.03,100),'grid_model':'atlas12.sav','abund':{},
+  'P':1.4811235,'phases':np.arange(-0.03,0.03,40),'grid_model':'atlas12.sav','abund':{},
   'linelist_path':'input/demo_linelist.dat'
 }
 
@@ -84,5 +84,5 @@ plt.show()
 
 ```
 
-This gives the following figure:
+This creates the following figure of the out-of-transit broadened stellar sodium lines. Adding extra broadening to account for the instrumental resolving power and  accessing the residuals can subsequently be done via `KELT9_rich.convolve_spectral_resolution()` and `KELT9_rich.residuals()` but this is left for the user to explore.
 ![](demo_spectrum.png)
