@@ -249,7 +249,7 @@ class StarRotator(object):
                     if k not in input:
                         raise Exception(f"Missing key ('{k}') in input dictionary.")
                 self.grid_model = str(input['grid_model'])
-                self.abund      = np.array(input['abund'])
+                self.abund      = input['abund']
                 self.linelist_path = input['linelist_path']
                 if not os.path.isfile(self.linelist_path):
                     raise Exception("pySME linelist_path does not point to an existing file.")
@@ -667,7 +667,8 @@ def test_StarRotator():
         'linelist_path':'input/demo_linelist.dat'}
         KELT9 = StarRotator(586,592.0,13,input=in_dict)
 
-
+    print('')
+    print('')
     print('')
     print('Tests complete.')
     print(f'{n_warnings} warnings triggered.')
