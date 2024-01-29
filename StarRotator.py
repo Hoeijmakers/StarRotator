@@ -481,6 +481,8 @@ class StarRotator(object):
                 edgecolor='black', lw=1)
                 ax[0][0].add_patch(planet1)
                 ax[1][0].add_patch(planet2)
+            ax[0][0].set_xlim((min(self.x),max(self.x)))
+            ax[1][0].set_xlim((min(self.x),max(self.x)))
             ax[0][0].set_ylim((min(self.y),max(self.y)))
             ax[1][0].set_ylim((min(self.y),max(self.y)))
             ax[0][1].plot(self.times[0:i],self.lightcurve[0:i],'.',color='black')
