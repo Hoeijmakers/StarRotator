@@ -297,8 +297,7 @@ class StarRotator(object):
             print("Parser: ",err.args)
 
         if self.mus != 0:
-            self.mus = np.linspace(0.1,1.0,self.mus)
-
+            self.mus = np.sqrt(0.5 * (2 * np.agrange(self.mus) + 1) / self.mus)
 
 
     def compute_spectrum(self):
@@ -373,6 +372,7 @@ class StarRotator(object):
         #This defines the output.
         self.wl = wlF
         self.stellar_spectrum = F
+        self.fx_list = copy.deepcopy(fx_list)
         self.Fp = copy.deepcopy(F_planet)
         self.spectra = copy.deepcopy(F_out)
         self.lightcurve = flux_out
