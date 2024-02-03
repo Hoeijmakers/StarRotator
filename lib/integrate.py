@@ -387,6 +387,7 @@ def build_spectrum_limb_resolved(wl,fx_list,mu_list,wlmin,wlmax,x,y,vel_grid,flu
     F = 0#output
     # start = time.time()
     
+    # Calculate radii at the edge of the annuli
     rmu = np.sqrt(1 - mu_list**2)
     rlist = np.sqrt(0.5 * (rmu[:-1] ** 2 + rmu[1:] ** 2))  # area midpoints between rmu
     rlist = np.concatenate(([1], rlist))
@@ -397,6 +398,7 @@ def build_spectrum_limb_resolved(wl,fx_list,mu_list,wlmin,wlmax,x,y,vel_grid,flu
                 # mu = 1 - np.sqrt(x[i]**2 + y[j]**2) # mu angle corresponding to the pixel
                 # diff = abs(mu - mu_new) # chooses nearest mu
                 # index = np.argmin(diff)
+                # Determine which annulus ths pixel is in
                 r = np.sqrt(x[i]**2 + y[j]**2)
                 index = np.where(r < rlist)[-1][-1]
                 if mu_list[index] > 0:
@@ -497,6 +499,8 @@ def build_local_spectrum_limb_resolved(xp,yp,zp,RpRs,wl,fx_list,mu_list,wlmin,wl
 
     F = 0#output
     # start = time.time()
+    
+    # Calculate radii at the edge of the annuli
     rmu = np.sqrt(1 - mu_list**2)
     rlist = np.sqrt(0.5 * (rmu[:-1] ** 2 + rmu[1:] ** 2))  # area midpoints between rmu
     rlist = np.concatenate(([1], rlist))
@@ -504,6 +508,7 @@ def build_local_spectrum_limb_resolved(xp,yp,zp,RpRs,wl,fx_list,mu_list,wlmin,wl
     for i in range(len(x)):
         for j in range(len(y)):
             if np.isnan(mask[j,i]) == False:
+                # Determine which annulus the pixel is in
                 r = np.sqrt(x[i]**2 + y[j]**2)
                 index = np.where(r < rlist)[-1][-1]
                 if mu_list[index] > 0:
