@@ -297,7 +297,7 @@ class StarRotator(object):
             print("Parser: ",err.args)
 
         if self.mus != 0:
-            self.mus = np.sqrt(0.5 * (2 * np.agrange(self.mus) + 1) / self.mus)
+            self.mus = np.sqrt(0.5 * (2 * np.arange(self.mus) + 1) / self.mus)
 
 
     def compute_spectrum(self):
