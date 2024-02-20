@@ -386,12 +386,21 @@ def build_spectrum_limb_resolved(wl,fx_list,mu_list,wlmin,wlmax,x,y,vel_grid,flu
     wlc,fxc = ops.crop_spectrum(wl,fx_list[0],1.0*np.nanmax(np.abs(vel_grid)))#I do this for only one spectrum because I only care about wlc
     F = 0#output
     # start = time.time()
+    
+    # Calculate radii at the edge of the annuli
+    rmu = np.sqrt(1 - mu_list**2)
+    rlist = np.sqrt(0.5 * (rmu[:-1] ** 2 + rmu[1:] ** 2))  # area midpoints between rmu
+    rlist = np.concatenate(([1], rlist))
+
     for i in range(len(x)):
         for j in range(len(y)):
             if np.isnan(vel_grid[j,i]) == False:
-                mu = 1 - np.sqrt(x[i]**2 + y[j]**2) # mu angle corresponding to the pixel
-                diff = abs(mu_list - mu) # chooses nearest mu
-                index = np.argmin(diff)
+                # mu = 1 - np.sqrt(x[i]**2 + y[j]**2) # mu angle corresponding to the pixel
+                # diff = abs(mu - mu_new) # chooses nearest mu
+                # index = np.argmin(diff)
+                # Determine which annulus ths pixel is in
+                r = np.sqrt(x[i]**2 + y[j]**2)
+                index = np.where(r < rlist)[-1][-1]
                 if mu_list[index] > 0:
                     fxc_wide = fx_list[index]
                     # print(i,j,x[i],y[j],mu,mu_list[index])
@@ -490,14 +499,18 @@ def build_local_spectrum_limb_resolved(xp,yp,zp,RpRs,wl,fx_list,mu_list,wlmin,wl
 
     F = 0#output
     # start = time.time()
-
+    
+    # Calculate radii at the edge of the annuli
+    rmu = np.sqrt(1 - mu_list**2)
+    rlist = np.sqrt(0.5 * (rmu[:-1] ** 2 + rmu[1:] ** 2))  # area midpoints between rmu
+    rlist = np.concatenate(([1], rlist))
     # pdb.set_trace()
     for i in range(len(x)):
         for j in range(len(y)):
             if np.isnan(mask[j,i]) == False:
-                mu = 1 - np.sqrt(x[i]**2 + y[j]**2)
-                diff = np.abs(mu_list - mu)
-                index = np.argmin(diff)
+                # Determine which annulus the pixel is in
+                r = np.sqrt(x[i]**2 + y[j]**2)
+                index = np.where(r < rlist)[-1][-1]
                 if mu_list[index] > 0:
                     fxc_wide = fx_list[index]
                     # print(i,j,x[i],y[j],mu,mu_list[index])
