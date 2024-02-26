@@ -344,7 +344,6 @@ class StarRotator(object):
                 wl, fx_list = spectrum.get_spectrum_pysme(self.wave_start, self.wave_end, self.T, self.logg, self.Z, self.linelist_path, self.mus, self.abund, grid=self.grid_model)
                 print('--- Integrating limb-resolved disk')
                 wlF,F = integrate.build_spectrum_limb_resolved(wl,fx_list,self.mus, self.wave_start,self.wave_end,self.x,self.y,self.vel_grid, self.flux_grid)
-
             else:
                 raise Exception('Invalid model spectrum chosen. Make pySME the input model.')
 
@@ -360,7 +359,6 @@ class StarRotator(object):
         for i in range(self.Nexp):
             if isinstance(self.mus,np.ndarray) == True:
                 wlp,Fp,flux,mask = integrate.build_local_spectrum_limb_resolved(self.xp[i],self.yp[i],self.zp[i],self.Rp_Rs,wl,fx_list,self.mus,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid, self.flux_grid)
-
             else:
                 wlp,Fp,flux,mask = integrate.build_local_spectrum_fast(self.xp[i],self.yp[i],self.zp[i],self.Rp_Rs,wl,fx,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid,self.flux_grid)
             integrate.statusbar(i,self.Nexp)
