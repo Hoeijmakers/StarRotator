@@ -315,7 +315,7 @@ class StarRotator(object):
         #Calculate the velocity and flux grids
         print('--- Computing velocity/flux grids')
         self.vel_grid = vgrid.calc_vel_stellar(self.x,self.y, self.stelinc, self.velStar, self.drr,  self.pob)
-        self.flux_grid = vgrid.calc_flux_stellar(self.x,self.y,self.u1,self.u2)
+        # self.flux_grid = vgrid.calc_flux_stellar(self.x,self.y,self.u1,self.u2)
         if isinstance(self.mus,np.ndarray) != True:#SWITCH BETWEEN PHOENIX (mus=0) AND pySME
             if self.model.lower() == 'phoenix':
                 print('--- Reading spectrum from PHOENIX')
@@ -333,17 +333,17 @@ class StarRotator(object):
             print('--- Integrating disk')
             if  self.drr == 0:
                 print('------ Fast integration (drr not set)')
-                wlF,F = integrate.build_spectrum_fast(wl,fx,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid,self.flux_grid)
+                wlF,F = integrate.build_spectrum_fast(wl,fx,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid)
             else:
                 print('------ Slow integration (drr set)')
-                wlF,F = integrate.build_spectrum_slow(wl,fx,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid,self.flux_grid)
+                wlF,F = integrate.build_spectrum_slow(wl,fx,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid)
         else:
             if self.model == 'pySME':
                 print('--- Computing limb-resolved spectra with pySME')
                 print('-----T=%sK, log(g)=%s, Z=%s.'% (self.T,self.logg,self.Z))
                 wl, fx_list = spectrum.get_spectrum_pysme(self.wave_start, self.wave_end, self.T, self.logg, self.Z, self.linelist_path, self.mus, self.abund, grid=self.grid_model)
                 print('--- Integrating limb-resolved disk')
-                wlF,F = integrate.build_spectrum_limb_resolved(wl,fx_list,self.mus, self.wave_start,self.wave_end,self.x,self.y,self.vel_grid, self.flux_grid)
+                wlF,F = integrate.build_spectrum_limb_resolved(wl,fx_list,self.mus, self.wave_start,self.wave_end,self.x,self.y,self.vel_grid)
             else:
                 raise Exception('Invalid model spectrum chosen. Make pySME the input model.')
 
@@ -358,9 +358,9 @@ class StarRotator(object):
         print('--- Building local spectrum')
         for i in range(self.Nexp):
             if isinstance(self.mus,np.ndarray) == True:
-                wlp,Fp,flux,mask = integrate.build_local_spectrum_limb_resolved(self.xp[i],self.yp[i],self.zp[i],self.Rp_Rs,wl,fx_list,self.mus,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid, self.flux_grid)
+                wlp,Fp,flux,mask = integrate.build_local_spectrum_limb_resolved(self.xp[i],self.yp[i],self.zp[i],self.Rp_Rs,wl,fx_list,self.mus,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid)
             else:
-                wlp,Fp,flux,mask = integrate.build_local_spectrum_fast(self.xp[i],self.yp[i],self.zp[i],self.Rp_Rs,wl,fx,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid,self.flux_grid)
+                wlp,Fp,flux,mask = integrate.build_local_spectrum_fast(self.xp[i],self.yp[i],self.zp[i],self.Rp_Rs,wl,fx,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid)
             integrate.statusbar(i,self.Nexp)
 
             F_out[i,:]=F-Fp
@@ -373,12 +373,38 @@ class StarRotator(object):
         self.fx_list = copy.deepcopy(fx_list)
         self.Fp = copy.deepcopy(F_planet)
         self.spectra = copy.deepcopy(F_out)
-        self.lightcurve = flux_out
+        self.lightcurve = np.mean(F_out, axis=1) / np.max(np.mean(F_out, axis=1))
         self.masks = mask_out
         self.residual = self.spectra/self.stellar_spectrum
 
 
+    def compute_flux_grid(self):
+        import numpy as np
+        import lib.operations as ops
+        import lib.stellar_spectrum as spectrum
+        import sys
+        import lib.test as test
 
+        F = 0#output
+
+        # Calculate radii at the edge of the annuli
+        rmu = np.sqrt(1 - self.mus**2)
+        rlist = np.sqrt(0.5 * (rmu[:-1] ** 2 + rmu[1:] ** 2))  # area midpoints between rmu
+        rlist = np.concatenate(([1], rlist))
+        
+        z,x_full,y_full = vgrid.calc_z(self.x,self.y)
+        flux_grid = z*0.0
+
+        for i in range(len(self.x)):
+            for j in range(len(self.y)):
+                if np.sqrt(self.x[i]**2+self.y[j]**2) <= 1.0:
+                    r = np.sqrt(self.x[i]**2 + self.y[j]**2)
+                    index = np.where(r < rlist)[-1][-1]
+                    if self.mus[index] > 0:
+                        flux_grid[j,i] = np.nanmean(self.fx_list[index])
+
+        flux_grid /= np.nansum(flux_grid)
+        return flux_grid
 
     def plot_residuals(self):
         """Plot the residuals if available.
@@ -464,11 +490,11 @@ class StarRotator(object):
         os.mkdir('anim/')
         minflux = min(self.lightcurve)
         F=self.stellar_spectrum
+        flux_grid = self.compute_flux_grid()
         for i in range(self.Nexp):
             mask = self.masks[i]
             fig,ax = plt.subplots(nrows=2, ncols=2,figsize=(8,8))
-            ax[0][0].pcolormesh(self.x,self.y,self.flux_grid*mask,vmin=0,
-            vmax=1.0*np.nanmax(self.flux_grid),cmap='autumn')
+            ax[0][0].pcolormesh(self.x,self.y,flux_grid*mask,vmin=0, vmax=1.0*np.nanmax(flux_grid),cmap='autumn')
             ax[1][0].pcolormesh(self.x,self.y,self.vel_grid*mask,cmap='bwr')
             ax[0][0].axes.set_aspect('equal')
             ax[1][0].axes.set_aspect('equal')
