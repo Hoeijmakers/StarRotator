@@ -379,6 +379,17 @@ class StarRotator(object):
 
 
     def compute_flux_grid(self):
+        """Compute the average flux over the stellar disc based on the computed
+        spectra per mu angle. This is useful for visualising the limb darkening
+        computed by pysme.
+        
+        Parameters
+        ----------
+            None
+        Returns
+        -------
+            2d np.array flux_grid
+        """
         import numpy as np
         import lib.operations as ops
         import lib.stellar_spectrum as spectrum
