@@ -229,6 +229,7 @@ def get_spectrum_pysme(wave_start, wave_end, T, logg, Z, linelist = '', mu=[], a
     sme.abund = Abund.solar()
     sme.teff, sme.logg, sme.monh = T, logg, Z
     sme.vsini = 0
+    sme.normalize_by_continuum = False
 
     # Change from default grid
     if grid:
