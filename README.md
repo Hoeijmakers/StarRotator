@@ -7,7 +7,7 @@ StarRotator is a package that simulates a rotation-broadened stellar spectrum du
 StarRotator will run out of the box using a default exoplanet system defined in prepackaged configuration files (the demo `.txt` files included in the `./input/` folder).
 In order to run StarRotator, perform the following steps:
 1) Clone the repo / pull it to your machine.
-2) To begin, open python in the root folder and hit `from StarRotator import StarRotator, testStarRotator`.
+2) To begin, open python in the root folder and hit `from StarRotator import StarRotator, test_StarRotator`.
 3) Run `testStarRotator()` to test that StarRotator functions normally. Functionality with PHOENIX models is possible even if you do not have pySME installed.
 4) StarRotator can be called as `KELT9 = StarRotator(586.0,592.0,200.0)` for a model spectrum of the Na-D lines of KELT-9, a fast-rotating 10,000K A-star orbited by KELT-9b, computed on a grid of (2x200)x(2x200) i.e. 400x400 square pixels.
 5) Access the simulation output using attributes defined on the `KELT9` object: The wavelength axis of the model is accessed as `wl = KELT9.wl`, the out-of-transit stellar spectrum as `F_out = KELT9.stellar_spectrum`, the modelled time-series as `spectra = KELT9.spectra` and the residuals as obtained by dividing the out-of-transit spectrum out of the time-series: `residuals = KELT9.residual`. These can be blurred to some spectral resolution defined in `KELT9.R` (defined by default as 115,000 in the `demo_star.txt` parameter file), using `KELT9.convolve_spectral_resolution()`. Convolution is applied to the residuals and not to the spectra that are divided by each other, because this introduces a numerical error.
@@ -29,10 +29,10 @@ dict = {
   'FeH':0.0, #metallicity, float
   'logg':4.0, #log(g), cgs, float
   'u1':0.93, #limb darkening parameter 1
-  'u2':-0.23, #Spectral resolution
-  'R':115000, #limb darkening parameter 2
+  'u2':-0.23, #limb darkening parameter 2
+  'R':115000, #Spectral resolution
   'mus':0, #number of mu angles, int. Ignored if using PHOENIX.
-  'model':'PHOENIX', #model type, string, either PHOENIX or pySME
+  'model':'phoenix', #model type, string, either phoenix or pySME
   'sma_Rs':3.153, #a over Rs, float
   'e':0.0, #eccentricity, float
   'omega':0.0, #longitude of periastron, degrees, float
