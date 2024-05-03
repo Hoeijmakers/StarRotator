@@ -100,7 +100,7 @@ A few tips on configuring your data request:
 3) Yes, include HFS splitting unless you know you don't need it.
 4) Don't require known values unless you know you will need them.
 5) Choose a custom line list configuration (more details below).
-6) Stick to the default units, as these are the units used in most popular spectral synthesis codes.
+6) Stick to the default units, as these are the units used in most popular spectral synthesis codes, in particular PySME.
 
 #### Custom lline list configuration
 
