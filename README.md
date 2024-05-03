@@ -102,4 +102,15 @@ A few tips on configuring your data request:
 5) Choose a custom line list configuration (more details below).
 6) Stick to the default units, as these are the units used in most popular spectral synthesis codes.
 
-## Custom lline list configuration
+#### Custom lline list configuration
+
+The data for some of the molecules is extensive and will quickly fill your download quote if you include them in your requests. In particular, the TiO data is a culprit, so it is highly recommended that you omit this molecule from your Extract All requests for most purposes.
+
+The custom linelist configuration is attached to your login, so you only need to configure this once. You can click on "Linelist Configuration" on the Extract All page or go to
+http://vald.astro.uu.se/~vald/php/vald.php?page=persconf
+
+To remove the TiO lines go down to: Plez 2012 Ti46O, polynomial fits to Phillips obs. wavelengths, Nordlander molecular constants
+You wlil see an "X" in the Active? column. Select Edit and remove the X. Do it for all isotopes. Afterwards it should look like this:
+![](vald.png)
+
+With this removed, you can extract most of the visible wavelength range in one go. After the first query, check the wavelength of the last entry and start a new query from there. Finally, stitch the files together and voila, you have a list of lines to use with your favourite spectral synthesis code.
