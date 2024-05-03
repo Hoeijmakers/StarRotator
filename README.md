@@ -96,7 +96,7 @@ It is possible to view a very short range of wavelengths directly via the web in
 
 A few tips on configuring your data request:
 1) Choose "long format" for your data, as this will allow your synthesis code to access more information, which may be needed if you are modelling NLTE in spectroscopy, for example.
-2) Choose FTP as the delivery platform, this is necessary above a certain size, which is not that large.
+2) Choose FTP as your delivery platform, this is necessary above a certain size, which is not that large.
 3) Yes, include HFS splitting unless you know you don't need it.
 4) Don't require known values unless you know you will need them.
 5) Choose a custom line list configuration (more details below).
@@ -104,7 +104,7 @@ A few tips on configuring your data request:
 
 #### Custom lline list configuration
 
-The data for some of the molecules is extensive and will quickly fill your download quote if you include them in your requests. In particular, the TiO data is a culprit, so it is highly recommended that you omit this molecule from your Extract All requests for most purposes.
+The data for some of the molecules is extensive and will quickly fill your download quota if you include them in your requests. In particular, the TiO data is a culprit, so it is highly recommended that you omit this molecule from your Extract All requests for most purposes.
 
 The custom linelist configuration is attached to your login, so you only need to configure this once. You can click on "Linelist Configuration" on the Extract All page or go to
 http://vald.astro.uu.se/~vald/php/vald.php?page=persconf
