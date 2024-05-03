@@ -89,19 +89,17 @@ This creates the following figure of the out-of-transit broadened stellar sodium
 
 ### VALD service for atomic and molecular data
 
-The Vienna Atomic Line Database (VALD) is a collection of atomic and molecular energy level transition parameters of astronomical interest. VALD offers tools for extracting a list of energy level transition parameters, a so called line list, within a given energy range (wavelength range). An email is needed for registering as that will be the primary delivery platform. Note that the service works exclusively in wavelenghts in air and species that are given with ionization in integer format, i.e. Fe 1 for neutral iron.
 
-It is possible to view a very short wavelength range directly via the webinterface, however the feature of most interest is the "Extract All" feature as that will allow you to download all energy level transitions in a given wavelength range.
+The Vienna Atomic Line Database (VALD) is a collection of atomic and molecular energy level transition parameters of astronomical interest. VALD provides tools to extract a list of energy level transition parameters, a so-called line list, within a given energy range (wavelength range). An email is required for registration, as this will be the primary delivery platform. Note that the service only works in wavelengths in air and species that are given with ionisation in integer format, i.e. Fe 1 for neutral iron.
+
+It is possible to view a very short range of wavelengths directly via the web interface, but the most interesting feature is the "Extract All" function, which allows you to download all energy level transitions in a given wavelength range.
 
 A few tips on configuring your data request:
-1) Choose "Long format" for your data as that will allow your synthesis code access to more information that may be needed, if for instance you model NLTE in spectroscopy.
-2) Choose FTP as delivery platform, that is necessary above a certain size that is not that big.
+1) Choose "long format" for your data, as this will allow your synthesis code to access more information, which may be needed if you are modelling NLTE in spectroscopy, for example.
+2) Choose FTP as the delivery platform, this is necessary above a certain size, which is not that large.
 3) Yes, include HFS splitting unless you know you don't need it.
-4) Don't make any requirement of known values unless you know you need it.
-5) Chose a Custom line list configuration (more details below).
-6) Stick to default units, as it they are the units used in most popular spectral synthesis codes.
+4) Don't require known values unless you know you will need them.
+5) Choose a custom line list configuration (more details below).
+6) Stick to the default units, as these are the units used in most popular spectral synthesis codes.
 
-
-
-
-
+## Custom lline list configuration
