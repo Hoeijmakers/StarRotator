@@ -89,7 +89,7 @@ This creates the following figure of the out-of-transit broadened stellar sodium
 
 ### VALD service for atomic and molecular data
 
-The Vienna Atomic Line Database (VALD) is a collection of atomic and molecular energy level transition parameters of astronomical interest. VALD offers tools for selecting energy levels within a given energy range (wavelength range). An email is needed for registering as that will be the primary delivery platform. Note that the service works exclusively in wavelenghts in air and species that are given with ionization in integer format, i.e. Fe 1 for neutral iron.
+The Vienna Atomic Line Database (VALD) is a collection of atomic and molecular energy level transition parameters of astronomical interest. VALD offers tools for extracting a list of energy level transition parameters, a so called line list, within a given energy range (wavelength range). An email is needed for registering as that will be the primary delivery platform. Note that the service works exclusively in wavelenghts in air and species that are given with ionization in integer format, i.e. Fe 1 for neutral iron.
 
 It is possible to view a very short wavelength range directly via the webinterface, however the feature of most interest is the "Extract All" feature as that will allow you to download all energy level transitions in a given wavelength range.
 
