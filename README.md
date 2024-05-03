@@ -86,3 +86,22 @@ plt.show()
 
 This creates the following figure of the out-of-transit broadened stellar sodium lines. Adding extra broadening to account for the instrumental resolving power and  accessing the residuals can subsequently be done via `KELT9_rich.convolve_spectral_resolution()` and `KELT9_rich.residuals()`. In addition, in reality you will wish to use more complete line-lists (in VALD format) and data-driven stellar and system parameters. All this is left for the user to explore.
 ![](demo_spectrum.png)
+
+### VALD service for atomic and molecular data
+
+The Vienna Atomic Line Database (VALD) is a collection of atomic and molecular energy level transition parameters of astronomical interest. VALD offers tools for selecting energy levels within a given energy range (wavelength range). An email is needed for registering as that will be the primary delivery platform. Note that the service works exclusively in wavelenghts in air and species that are given with ionization in integer format, i.e. Fe 1 for neutral iron.
+
+It is possible to view a very short wavelength range directly via the webinterface, however the feature of most interest is the "Extract All" feature as that will allow you to download all energy level transitions in a given wavelength range.
+
+A few tips on configuring your data request:
+1) Choose "Long format" for your data as that will allow your synthesis code access to more information that may be needed, if for instance you model NLTE in spectroscopy.
+2) Choose FTP as delivery platform, that is necessary above a certain size that is not that big.
+3) Yes, include HFS splitting unless you know you don't need it.
+4) Don't make any requirement of known values unless you know you need it.
+5) Chose a Custom line list configuration (more details below).
+6) Stick to default units, as it they are the units used in most popular spectral synthesis codes.
+
+
+
+
+
