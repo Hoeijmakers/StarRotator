@@ -87,7 +87,7 @@ plt.show()
 This creates the following figure of the out-of-transit broadened stellar sodium lines. Adding extra broadening to account for the instrumental resolving power and  accessing the residuals can subsequently be done via `KELT9_rich.convolve_spectral_resolution()` and `KELT9_rich.residuals()`. In addition, in reality you will wish to use more complete line-lists (in VALD format) and data-driven stellar and system parameters. All this is left for the user to explore.
 ![](demo_spectrum.png)
 
-### VALD service for atomic and molecular data
+### VALD service for atomic and molecular data. i.e. line lists
 
 
 The Vienna Atomic Line Database (VALD) is a collection of atomic and molecular energy level transition parameters of astronomical interest. VALD provides tools to extract a list of energy level transition parameters, a so-called line list, within a given energy range (wavelength range). An email is required for registration, as this will be the primary delivery platform. Note that the service only works in wavelengths in air and species that are given with ionisation in integer format, i.e. Fe 1 for neutral iron.
@@ -102,7 +102,7 @@ A few tips on configuring your data request:
 5) Choose a custom line list configuration (more details below).
 6) Stick to the default units, as these are the units used in most popular spectral synthesis codes, in particular PySME.
 
-#### Custom lline list configuration
+#### Custom line list configuration
 
 The data for some of the molecules is extensive and will quickly fill your download quota if you include them in your requests. In particular, the TiO data is a culprit, so it is highly recommended that you omit this molecule from your Extract All requests for most purposes.
 
