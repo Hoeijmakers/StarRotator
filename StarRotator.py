@@ -360,7 +360,7 @@ class StarRotator(object):
         for i in range(self.Nexp):
             if isinstance(self.mus,np.ndarray) == True:
                 wlp,Fp,flux,mask = integrate.build_local_spectrum_limb_resolved(self.xp[i],self.yp[i],self.zp[i],self.Rp_Rs,wl,fx_list,self.mus,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid, self.flux_grid)
-
+                self.fx_list = copy.deepcopy(fx_list)
             else:
                 wlp,Fp,flux,mask = integrate.build_local_spectrum_fast(self.xp[i],self.yp[i],self.zp[i],self.Rp_Rs,wl,fx,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid,self.flux_grid)
             integrate.statusbar(i,self.Nexp)
@@ -372,14 +372,11 @@ class StarRotator(object):
         #This defines the output.
         self.wl = wlF
         self.stellar_spectrum = F
-        self.fx_list = copy.deepcopy(fx_list)
         self.Fp = copy.deepcopy(F_planet)
         self.spectra = copy.deepcopy(F_out)
         self.lightcurve = flux_out
         self.masks = mask_out
         self.residual = self.spectra/self.stellar_spectrum
-
-
 
 
     def plot_residuals(self):
