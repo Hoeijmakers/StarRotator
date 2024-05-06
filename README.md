@@ -115,7 +115,7 @@ To remove the TiO lines go down to: Plez 2012 Ti46O, polynomial fits to Phillips
 You wlil see an "X" in the Active? column. Select Edit and remove the X. Do it for all isotopes. Afterwards it should look like this:
 ![](vald.png)
 
-With this removed, you can extract most of the visible wavelength range in one go. After the first query, check the wavelength of the last entry. If the last entry is not the desired final wavelength, make a new request starting at the last wavelength. If you end up with several files, just stich them together at the end. The headers will be the same in all files and only need to be present once in the final file. The only thing to make sure of is that the references are all at the end of the file, as references in the middle of the line list file can confuse the PySME parser.
+After the first query, check the wavelength of the last entry. If the last entry is not the desired final wavelength, make a new query starting from the last wavelength. If you end up with several files, simply stitch them together at the end. The headers will be the same in all files and must only be present once in the first two lines of the final file. Make sure that the references at the end of each file are collected at the end of the final file, as references in the middle of a line list file can confuse the PySME parser.
 
 A VALD line list file typically looks like this:
 
