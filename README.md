@@ -115,4 +115,46 @@ To remove the TiO lines go down to: Plez 2012 Ti46O, polynomial fits to Phillips
 You wlil see an "X" in the Active? column. Select Edit and remove the X. Do it for all isotopes. Afterwards it should look like this:
 ![](vald.png)
 
-With this removed, you can extract most of the visible wavelength range in one go. After the first query, check the wavelength of the last entry and start a new query from there. Finally, stitch the files together and voila, you have a list of lines to use with your favourite spectral synthesis code.
+With this removed, you can extract most of the visible wavelength range in one go. After the first query, check the wavelength of the last entry. If the last entry is not the desired final wavelength, make a new request starting at the last wavelength. If you end up with several files, just stich them together at the end. The headers will be the same in all files and only need to be present once in the final file. The only thing to make sure of is that the references are all at the end of the file, as references in the middle of the line list file can confuse the PySME parser.
+
+A VALD line list file typically looks like this:
+
+```
+                                                                     Lande factors        Damping parameters
+Elm Ion       WL_air(A)  log gf* E_low(eV) J lo  E_up(eV) J up   lower   upper    mean   Rad.  Stark    Waals
+'Fe 1',      3000.00258,  -4.771,  3.3009,  2.0,  7.4325,  3.0,  1.180,  0.720,  0.260, 7.310,-4.180,-7.320,
+  LS                                                                      3d7.(2D2).4s a3D
+  JK                                                              3d7.(4F<3/2>).4f 2[7/2]*
+'_          Kurucz Fe I 2014   1 wl:K14   1 gf:K14   1 K14   1 K14   1 K14   1 K14   1 K14   1 K14   1 K14    Fe'
+'Fe 1',      3000.02013,  -8.668,  3.3320,  5.0,  7.4636,  5.0,  1.400,  1.230,  1.310, 7.380,-3.590,-7.180,
+  LS                                                             3d6.(5D).4s.4p.(3P*) z5F*
+  JK                                                            3d6.4s.(6D<3/2>).5g 2[9/2]
+'_          Kurucz Fe I 2014   1 wl:K14   1 gf:K14   1 K14   1 K14   1 K14   1 K14   1 K14   1 K14   1 K14    Fe'
+
+[...skipping a lot of lines...]
+'Fe 1',      4199.98361,  -5.305,  0.0873,  2.0,  3.0385,  2.0,  1.500,  2.330,  1.920, 3.140,-6.170,-7.820,
+  LS                                                                           3d6.4s2 a5D
+  LS                                                             3d6.(5D).4s.4p.(3P*) z7P*
+'_          Kurucz Fe I 2014  11 wl:K14  11 gf:K14  11 K14  11 K14  11 K14  11 K14  11 K14  11 K14  11 K14    Fe'
+'Ca 1',      4199.98872,  -2.561,  4.5347,  2.0,  7.4859,  2.0,  1.500,  1.180,  1.340, 7.510,-3.740,-6.880,
+  LS                                                                         3p6.4s.5p 3P*
+  LS                                                                          3p6.3d.7d 1D
+'_      A   Kurucz CaI 2007    1 wl:K07   1 gf:K07   1 K07   1 K07   1 K07   1 K07   1 K07   1 K07   1 K07    Ca'
+* oscillator strengths were scaled by the solar isotopic ratios.
+ References:
+  1. Kurucz obs. energy level: Fe 1
+  2. Kurucz obs. energy level: Mn 2
+  3. Kurucz obs. energy level: O 4
+  4. Kurucz obs. energy level: Cr 2
+[...can be many references...]
+```
+
+To import the line list into your PySME coude, use this code snippet:
+
+'''
+from pysme.sme import SME_Structure
+sme = SME_Structure()
+
+from pysme.linelist.vald import ValdFile
+sme.linelist = ValdFile(vald_line_lisst_file_name)
+'''
