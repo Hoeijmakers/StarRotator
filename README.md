@@ -156,5 +156,5 @@ from pysme.sme import SME_Structure
 sme = SME_Structure()
 
 from pysme.linelist.vald import ValdFile
-sme.linelist = ValdFile(vald_line_lisst_file_name)
+sme.linelist = ValdFile(vald_line_list_file_name)
 ```
