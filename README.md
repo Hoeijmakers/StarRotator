@@ -150,7 +150,7 @@ Elm Ion       WL_air(A)  log gf* E_low(eV) J lo  E_up(eV) J up   lower   upper  
 [...can be many references...]
 ```
 
-To import the line list into your PySME coude, use this code snippet:
+To import the line list into your PySME code, use this code snippet:
 
 ```
 from pysme.sme import SME_Structure
