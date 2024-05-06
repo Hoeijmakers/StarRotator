@@ -21,7 +21,7 @@ Planet = StarRotator(586.0,592.0,200.0,star_path='input/demo_star.txt',planet_pa
 
 
 #When using the dictionary:
-dict = {
+input_dict = {
   'veq':114000.0, #
   'stelinc':90.0, #stellar inclination axis, degrees, float
   'drr':0.0, #Differential rotation parameter, float
@@ -43,7 +43,7 @@ dict = {
   'phases':[-0.02,-0.01,0.0,0.01,0.02] #numpy array, set to the orbital phases of the time series
 }
 
-Planet = StarRotator(586.0,592.0,200.0,input=dict)
+Planet = StarRotator(586.0,592.0,200.0,input=input_dict)
 ```
 
 ![](demo.gif)
