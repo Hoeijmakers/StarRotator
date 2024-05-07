@@ -52,7 +52,7 @@ Planet = StarRotator(586.0,592.0,200.0,input=input_dict)
 
 ### A typical use case: running StarRotator with pySME as a forward model.
 
-[PySME](https://github.com/AWehrhahn/SME) is used in StarRotator to allow a user to generate more precise forward-models of the Doppler-Shadow residuals for real exoplanet systems. Using known stellar parameters (T, log(g), Z, vsin i) and individual elemental abundances, in theory it should be possible to precisely forward model the residual and recalibrate observed spectra. To the broadened spectrum in the Na lines in a sodium-rich variation on the KELT-9 system with pySME, you can use the following example.
+[PySME](https://github.com/AWehrhahn/SME) is used in StarRotator to allow a user to generate more precise forward-models of the Doppler-Shadow residuals for real exoplanet systems. Using known stellar parameters (T, log(g), Z, vsin i) and individual elemental abundances, in theory it should be possible to precisely forward model the residual and recalibrate observed spectra. To the broadened spectrum in the Na lines in a sodium-rich variation on the KELT-9 system with pySME, you can use the following example. Please be reminded that the provided demo line list `input\demo_linelist.dat` contains ONLY stellar lines for Na in the wavelength range of the Fraunhofer D lines. For any other wavelength range and element, see section below on VALD line lists.
 
 
 ```python
