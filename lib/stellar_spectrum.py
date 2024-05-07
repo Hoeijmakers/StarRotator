@@ -268,6 +268,6 @@ def get_spectrum_pysme(wave_start, wave_end, T, logg, Z, linelist = '', mu=[], a
 
     else:
         sme = synthesize_spectrum(sme)
-         if len(*sme.wave) < 5:
+        if len(*sme.wave) < 5:
                 print("get_spectrum_pysme: It seems that your returned wavelength grid is shorter than expected. Please make sure that your line list has spectral lines in your specified wavelength range.")
         return(*sme.wave/10, *sme.synth)

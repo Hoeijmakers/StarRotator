@@ -122,7 +122,7 @@ def build_local_spectrum_fast(xp,yp,zp,RpRs,wl,fx,wlmin,wlmax,x,y,vel_grid,flux_
 
     #Standard tests on input:
     input_tests_local(xp,yp,RpRs)
-    input_tests_global(wl,fx,wlmin,wlmax,x,y,vel_grid,fname='build_local_spectrum_fast')
+    input_tests_global(wl,fx,wlmin,wlmax,x,y,vel_grid,flux_grid,fname='build_local_spectrum_fast')
 
     #Creates a mask that selects just the area of the star that is
     #covered by the planet, as well as its inverse for
@@ -140,8 +140,8 @@ def build_local_spectrum_fast(xp,yp,zp,RpRs,wl,fx,wlmin,wlmax,x,y,vel_grid,flux_
     if zp < 0.0:
         d*=np.nan#Force the planet to not be in front of the disk if the z-coordinate is such that it is behind the star.
         di[np.isnan(di)]=1.0#started as 1.0, set back to 1.0
-    mask = (d*0.0+1.0)#Set that to 1.0 and multiply with flux grid. Nansum coming!
-    mask_i = (di*0.0+1.0)#Inverse of mask.
+    mask = flux_grid*(d*0.0+1.0)#Set that to 1.0 and multiply with flux grid. Nansum coming!
+    mask_i = flux_grid*(di*0.0+1.0)#Inverse of mask.
     wlc,fxc,wlc_wide,fxc_wide = ops.clip_spectrum(wl,fx,wlmin,wlmax,pad=2.0*np.nanmax(np.abs(vel_grid)))
 
 
@@ -154,7 +154,7 @@ def build_local_spectrum_fast(xp,yp,zp,RpRs,wl,fx,wlmin,wlmax,x,y,vel_grid,flux_
     #in the flux variable.
     for i in range(len(x)):
         if np.isnan(v[i]) == False:
-            F+=ops.shift(wlc,wlc_wide,fxc_wide,v[i])
+            F+=ops.shift(wlc,wlc_wide,fxc_wide,v[i])*flux[i]
 
     return(wlc,F,np.nansum(mask_i),(di*0.0)+1.0)
 
@@ -214,7 +214,7 @@ def build_local_spectrum_slow(xp,yp,zp,RpRs,wl,fx,wlmin,wlmax,x,y,vel_grid,flux_
     import warnings
     #Standard tests on input:
     input_tests_local(xp,yp,RpRs)
-    input_tests_global(wl,fx,wlmin,wlmax,x,y,vel_grid,fname='build_local_spectrum_slow')
+    input_tests_global(wl,fx,wlmin,wlmax,x,y,vel_grid,flux_grid,fname='build_local_spectrum_slow')
 
 
     #Creates a mask that selects just the area of the star that is
@@ -287,17 +287,18 @@ def build_spectrum_fast(wl,fx,wlmin,wlmax,x,y,vel_grid,flux_grid):
     import warnings
     import pdb
     #Standard tests on input:
-    input_tests_global(wl,fx,wlmin,wlmax,x,y,vel_grid,fname='build_spectrum_fast')
+    input_tests_global(wl,fx,wlmin,wlmax,x,y,vel_grid,flux_grid,fname='build_spectrum_fast')
 
     wlc,fxc,wlc_wide,fxc_wide = ops.clip_spectrum(wl,fx,wlmin,wlmax,pad=2.0*np.nanmax(np.abs(vel_grid)))
     F = 0#output
+    flux = np.nansum(flux_grid,axis=0)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
         v=np.nanmedian(vel_grid,axis = 0)
     v[(np.isnan(v))] = 0.0
     for i in range(len(x)):
         if np.isnan(v[i]) == False:
-            F+=ops.shift(wlc,wlc_wide,fxc_wide,v[i])
+            F+=ops.shift(wlc,wlc_wide,fxc_wide,v[i])*flux[i]
         statusbar(i,len(x))
     return(wlc,F)
 
@@ -342,7 +343,7 @@ def build_spectrum_slow(wl,fx,wlmin,wlmax,x,y,vel_grid,flux_grid):
     for i in range(len(x)):
         for j in range(len(y)):
             if np.isnan(vel_grid[j,i]) == False:
-                F+=ops.shift(wlc,wlc_wide,fxc_wide,vel_grid[j,i])
+                F+=ops.shift(wlc,wlc_wide,fxc_wide,vel_grid[j,i])*flux_grid[j,i]
         statusbar(i,len(x))
     return(wlc,F)
 
@@ -391,7 +392,7 @@ def build_spectrum_limb_resolved(wl,fx_list,mu_list,wlmin,wlmax,x,y,vel_grid,flu
     #Standard tests on input
     test.typetest(mu_list,np.ndarray,varname='mu_list in build_spectrum_limb_resolved')
     test.dimtest(mu_list,[len(fx_list)],varname='mu_list in build_spectrum_limb_resolved')
-    input_tests_global(wlc_wide,fx_list[0],wlmin,wlmax,x,y,vel_grid,vel_grid,fname='build_spectrum_limb_resolved')
+    input_tests_global(wlc_wide,fx_list[0],wlmin,wlmax,x,y,vel_grid,flux_grid,fname='build_spectrum_limb_resolved')
     wlc,fxc = ops.crop_spectrum(wl,fx_list[0],1.0*np.nanmax(np.abs(vel_grid)))#I do this for only one spectrum because I only care about wlc
     F = 0#output
     
@@ -471,7 +472,7 @@ def build_local_spectrum_limb_resolved(xp,yp,zp,RpRs,wl,fx_list,mu_list,wlmin,wl
     wlc_wide = wl
     #Standard tests on input:
     input_tests_local(xp,yp,RpRs)
-    input_tests_global(wl,fx_list[0],wlmin,wlmax,x,y,vel_grid,vel_grid,fname='build_local_spectrum_limb_resolved')
+    input_tests_global(wl,fx_list[0],wlmin,wlmax,x,y,vel_grid,flux_grid,fname='build_local_spectrum_limb_resolved')
     test.typetest(mu_list,np.ndarray,varname='mu_list in build_local_spectrum_limb_resolved')
     test.dimtest(mu_list,[len(fx_list)],varname='mu_list in build_local_spectrum_limb_resolved')
 
