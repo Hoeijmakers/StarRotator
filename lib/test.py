@@ -68,12 +68,6 @@ def test_smoothing():
     # Res_2 = KELT9.residuals()
     Res_3 = KELT9.residuals()
 
-
-
-    # plt.plot(KELT9.wl,F_unsmooth_1)
-    # plt.plot(KELT9.wl,F_smooth)
-    # plt.show()
-
     fig = plt.figure(figsize=(12,6))
     plt.plot(wl_low,Res_1[10],label='No blurring')
     plt.plot(wl_low,Res_2[10],label='Blurring, normal sampling')
@@ -115,7 +109,6 @@ def test_integrators():
     wl,fx = spectrum.read_spectrum(T,logg)
     wlF,F = integrate.build_spectrum_fast(wl,fx,wlmin,wlmax,x,y,vel_grid,flux_grid)
 
-
     #Test the building of the local spectrum in-between.
     wlFp,Fp,fluxp,mask = integrate.build_local_spectrum_fast(0.4,0.0,0.15,wl,fx,wlmin,wlmax,x,y,vel_grid,flux_grid)
     wlFp2,Fp2,fluxp2,mask2 = integrate.build_local_spectrum_slow(0.4,0.0,0.15,wl,fx,wlmin,wlmax,x,y,vel_grid,flux_grid)
@@ -123,23 +116,11 @@ def test_integrators():
     if epsilon > 1e-8:
         raise Exception("Error: The integrated difference of the local spectra built with the slow and fast integrators differs by more than 1e-8 times the integrated spectrum.")
 
-    #
-    # pdb.set_trace()
-    # pl.plot(wlF,F-np.nanmax(F))
-    # pl.plot(wlF,(F-Fp)-np.nanmax(F-Fp))
-    # pl.show()
-
     #Test the slow star integrator and compare.
     wlF2,F2 = integrate.build_spectrum_slow(wl,fx,wlmin,wlmax,x,y,vel_grid,flux_grid)
     epsilon = np.abs(np.nansum(F-F2)/np.nansum(F))
     if epsilon > 1e-8:
         raise Exception("Error: The integrated difference of the disk-integrated spectra built with the slow and fast integrators differs by more than 1e-8 times the integrated spectrum.")
-    # pl.plot(wl,fx)
-    # pl.plot(wlF,F)
-    # pl.plot(wlF2,F2)
-    # pl.xlim((550.0,560.0))
-    # pl.show()
-
 
 def test_plotting():
     import numpy as np
@@ -167,10 +148,6 @@ def test_plot_3D():
     import lib.plotting
     lib.plotting.plot_star_3D()
 
-
-
-
-#I copied the following functions from my own project that I use to test variables.
 def nantest(var,varname=''):
     import numpy as np
     if np.isnan(var).any()  == True:
