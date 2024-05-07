@@ -1,13 +1,6 @@
 #This file contains a collection of functions that operate on spectra.
 def convolve(array,kernel,edge_degree=1,fit_width=2):
-    """It's unbelievable, but I could not find the python equivalent of IDL's
-    /edge_truncate keyword, which truncates the kernel at the edge of the convolution.
-    Therefore, unfortunately, I need to code a convolution operation myself.
-    Stand by to be slowed down by an order of magnitude #thankspython.
-
-    Nope! Because I can just use np.convolve for most of the array, just not the edge...
-
-    So the strategy is to extrapolate the edge of the array using a polynomial fit
+    """np.convolve with accounting for edge effects via extrapolation of the edge of the array using a polynomial fit
     to the edge elements. By default, I fit over a range that is twice the length of the kernel; but
     this value can be modified using the fit_width parameter.
 
@@ -68,7 +61,7 @@ def convolve(array,kernel,edge_degree=1,fit_width=2):
     array_padded = np.append(left_array_pad,array)
     array_padded = np.append(array_padded,right_array_pad)
 
-    #Reverse the kernel because np.convol does that automatically and I don't want that.
+    #Reverse the kernel because np.convol does that automatically.
     #(Imagine doing a derivative with a kernel [-1,0,1] and it gets reversed...)
     kr = kernel[::-1]
     #The valid keyword effectively undoes the padding, leaving only those values for which the kernel was entirely in the padded array.
@@ -135,9 +128,6 @@ def derivative(x):
     d_kernel=np.array([-1,0,1])/2.0
     return(convolve(x,d_kernel,fit_width=3))
 
-
-
-
 def constant_velocity_wl_grid(wl,fx,oversampling=1.0):
     """This function will define a constant-velocity grid that is (optionally)
     sampled a number of times finer than the SMALLEST velocity difference that is
@@ -184,7 +174,6 @@ def constant_velocity_wl_grid(wl,fx,oversampling=1.0):
     fx=np.array(fx)
 
     c=consts.c.to('km/s').value
-
 
     dl=derivative(wl)
     dv=dl/wl*c

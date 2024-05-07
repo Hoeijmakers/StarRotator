@@ -358,7 +358,8 @@ class StarRotator(object):
         print('--- Building local spectrum')
         for i in range(self.Nexp):
             if isinstance(self.mus,np.ndarray) == True:
-                wlp,Fp,flux,mask = integrate.build_local_spectrum_limb_resolved(self.xp[i],self.yp[i],self.zp[i],self.Rp_Rs,wl,fx_list,self.mus,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid)
+                wlp,Fp,flux,mask = integrate.build_local_spectrum_limb_resolved(self.xp[i],self.yp[i],self.zp[i],self.Rp_Rs,wl,fx_list,self.mus,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid, self.flux_grid)
+                self.fx_list = copy.deepcopy(fx_list)
             else:
                 wlp,Fp,flux,mask = integrate.build_local_spectrum_fast(self.xp[i],self.yp[i],self.zp[i],self.Rp_Rs,wl,fx,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid)
             integrate.statusbar(i,self.Nexp)
@@ -370,52 +371,12 @@ class StarRotator(object):
         #This defines the output.
         self.wl = wlF
         self.stellar_spectrum = F
-        self.fx_list = copy.deepcopy(fx_list)
         self.Fp = copy.deepcopy(F_planet)
         self.spectra = copy.deepcopy(F_out)
         self.lightcurve = np.mean(F_out, axis=1) / np.max(np.mean(F_out, axis=1))
         self.masks = mask_out
         self.residual = self.spectra/self.stellar_spectrum
 
-
-    def compute_flux_grid(self):
-        """Compute the average flux over the stellar disc based on the computed
-        spectra per mu angle. This is useful for visualising the limb darkening
-        computed by pysme.
-        
-        Parameters
-        ----------
-            None
-        Returns
-        -------
-            2d np.array flux_grid
-        """
-        import numpy as np
-        import lib.operations as ops
-        import lib.stellar_spectrum as spectrum
-        import sys
-        import lib.test as test
-
-        F = 0#output
-
-        # Calculate radii at the edge of the annuli
-        rmu = np.sqrt(1 - self.mus**2)
-        rlist = np.sqrt(0.5 * (rmu[:-1] ** 2 + rmu[1:] ** 2))  # area midpoints between rmu
-        rlist = np.concatenate(([1], rlist))
-        
-        z,x_full,y_full = vgrid.calc_z(self.x,self.y)
-        flux_grid = z*0.0
-
-        for i in range(len(self.x)):
-            for j in range(len(self.y)):
-                if np.sqrt(self.x[i]**2+self.y[j]**2) <= 1.0:
-                    r = np.sqrt(self.x[i]**2 + self.y[j]**2)
-                    index = np.where(r < rlist)[-1][-1]
-                    if self.mus[index] > 0:
-                        flux_grid[j,i] = np.nanmean(self.fx_list[index])
-
-        flux_grid /= np.nansum(flux_grid)
-        return flux_grid
 
     def plot_residuals(self):
         """Plot the residuals if available.
