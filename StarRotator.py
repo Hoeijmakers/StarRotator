@@ -315,7 +315,10 @@ class StarRotator(object):
         #Calculate the velocity and flux grids
         print('--- Computing velocity/flux grids')
         self.vel_grid = vgrid.calc_vel_stellar(self.x,self.y, self.stelinc, self.velStar, self.drr,  self.pob)
-        self.flux_grid = vgrid.calc_flux_stellar(self.x,self.y,self.u1,self.u2)
+        if self.model == "pySME":
+            self.flux_grid = vgrid.calc_flux_stellar(self.x,self.y,0,0) #Let pysme do the limb darkening
+        else:
+            self.flux_grid = vgrid.calc_flux_stellar(self.x,self.y,self.u1,self.u2)
         if isinstance(self.mus,np.ndarray) != True:#SWITCH BETWEEN PHOENIX (mus=0) AND pySME
             if self.model.lower() == 'phoenix':
                 print('--- Reading spectrum from PHOENIX')
@@ -343,8 +346,7 @@ class StarRotator(object):
                 print('-----T=%sK, log(g)=%s, Z=%s.'% (self.T,self.logg,self.Z))
                 wl, fx_list = spectrum.get_spectrum_pysme(self.wave_start, self.wave_end, self.T, self.logg, self.Z, self.linelist_path, self.mus, self.abund, grid=self.grid_model)
                 print('--- Integrating limb-resolved disk')
-                wlF,F = integrate.build_spectrum_limb_resolved(wl,fx_list,self.mus, self.wave_start,self.wave_end,self.x,self.y,self.vel_grid, self.flux_grid)
-
+                wlF,F = integrate.build_spectrum_limb_resolved(wl,fx_list,self.mus, self.wave_start,self.wave_end,self.x,self.y,self.vel_grid,self.flux_grid)
             else:
                 raise Exception('Invalid model spectrum chosen. Make pySME the input model.')
 
@@ -374,7 +376,7 @@ class StarRotator(object):
         self.stellar_spectrum = F
         self.Fp = copy.deepcopy(F_planet)
         self.spectra = copy.deepcopy(F_out)
-        self.lightcurve = flux_out
+        self.lightcurve = np.mean(F_out, axis=1) / np.max(np.mean(F_out, axis=1))
         self.masks = mask_out
         self.residual = self.spectra/self.stellar_spectrum
 
@@ -436,6 +438,46 @@ class StarRotator(object):
             print('--- Skipping blurring because no residuals have been computed.')
 
 
+    def compute_flux_grid_pysme(self):
+        '''Calculate the flux grid used for visualisation purposes when using pySME-generated
+        spectra. Note that this flux grid is not used in any calculations.
+        
+        Parameters:
+        -----------
+        None
+        
+        Returns:
+        --------
+        flux_grid: 2d np.array
+            Flux grid calculated from mean flux of pySME spectra at each calculated mu angle.
+        '''
+        import numpy as np
+        import lib.operations as ops
+        import lib.stellar_spectrum as spectrum
+        import sys
+        import lib.test as test
+
+        F = 0#output
+
+        # Calculate radii at the edge of the annuli
+        rmu = np.sqrt(1 - self.mus**2)
+        rlist = np.sqrt(0.5 * (rmu[:-1] ** 2 + rmu[1:] ** 2))  # area midpoints between rmu
+        rlist = np.concatenate(([1], rlist))
+
+        z,x_full,y_full = vgrid.calc_z(self.x,self.y)
+        flux_grid = z*0.0
+
+        for i in range(len(self.x)):
+            for j in range(len(self.y)):
+                if np.sqrt(self.x[i]**2+self.y[j]**2) <= 1.0:
+                    r = np.sqrt(self.x[i]**2 + self.y[j]**2)
+                    index = np.where(r < rlist)[-1][-1]
+                    if self.mus[index] > 0:
+                        flux_grid[j,i] = np.nanmean(self.fx_list[index])
+
+        flux_grid /= np.nansum(flux_grid)
+        return flux_grid
+    
     def animate(self):
         """Plots an animation of the transit event, the stellar flux and velocity
         fields, and the resulting transit and line-shape variations. The animation
@@ -463,11 +505,14 @@ class StarRotator(object):
         os.mkdir('anim/')
         minflux = min(self.lightcurve)
         F=self.stellar_spectrum
+        if self.model.lower() in ['pysme','sme'] and isinstance(self.mus,np.ndarray) == True:
+            flux_grid = self.compute_flux_grid_pysme()
+        else:
+            flux_grid = self.flux_grid
         for i in range(self.Nexp):
             mask = self.masks[i]
             fig,ax = plt.subplots(nrows=2, ncols=2,figsize=(8,8))
-            ax[0][0].pcolormesh(self.x,self.y,self.flux_grid*mask,vmin=0,
-            vmax=1.0*np.nanmax(self.flux_grid),cmap='autumn')
+            ax[0][0].pcolormesh(self.x,self.y,flux_grid*mask,vmin=0, vmax=1.0*np.nanmax(flux_grid),cmap='autumn')
             ax[1][0].pcolormesh(self.x,self.y,self.vel_grid*mask,cmap='bwr')
             ax[0][0].axes.set_aspect('equal')
             ax[1][0].axes.set_aspect('equal')
@@ -490,7 +535,6 @@ class StarRotator(object):
             ymax = np.nanmax(F/np.nanmax(F))
             linedepth = ymax - ymin
             ax[1][1].plot(self.wl,self.spectra[i]/np.nanmax(self.spectra[i]),color='black')
-            # ax[1][1].set_xlim((588.5,590.2))
             yl = (ymin-0.1*linedepth,ymax+0.3*linedepth)
             ax[1][1].set_ylim(yl)
             ax2 = ax[1][1].twinx()

@@ -239,7 +239,6 @@ def build_local_spectrum_slow(xp,yp,zp,RpRs,wl,fx,wlmin,wlmax,x,y,vel_grid,flux_
     wlc,fxc,wlc_wide,fxc_wide = ops.clip_spectrum(wl,fx,wlmin,wlmax,pad=2.0*np.nanmax(np.abs(vel_grid)))
 
     F = 0#output
-    flux = np.nansum(mask,axis = 0)#This is the sum of the flux grid.
 
     for i in range(len(x)):
         for j in range(len(y)):
@@ -247,7 +246,6 @@ def build_local_spectrum_slow(xp,yp,zp,RpRs,wl,fx,wlmin,wlmax,x,y,vel_grid,flux_
                 F+=ops.shift(wlc,wlc_wide,fxc_wide,vel_grid[j,i])*flux_grid[j,i]
 
     return(wlc,F,np.nansum(mask_i),(di*0.0)+1.0)
-
 
 def build_spectrum_fast(wl,fx,wlmin,wlmax,x,y,vel_grid,flux_grid):
     """This is the fast and easy way of building the stellar spectrum assuming
@@ -293,7 +291,7 @@ def build_spectrum_fast(wl,fx,wlmin,wlmax,x,y,vel_grid,flux_grid):
 
     wlc,fxc,wlc_wide,fxc_wide = ops.clip_spectrum(wl,fx,wlmin,wlmax,pad=2.0*np.nanmax(np.abs(vel_grid)))
     F = 0#output
-    flux = np.nansum(flux_grid,axis = 0)#This is the sum of the flux grid.
+    flux = np.nansum(flux_grid,axis=0)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
         v=np.nanmedian(vel_grid,axis = 0)
@@ -394,7 +392,7 @@ def build_spectrum_limb_resolved(wl,fx_list,mu_list,wlmin,wlmax,x,y,vel_grid,flu
     #Standard tests on input
     test.typetest(mu_list,np.ndarray,varname='mu_list in build_spectrum_limb_resolved')
     test.dimtest(mu_list,[len(fx_list)],varname='mu_list in build_spectrum_limb_resolved')
-    input_tests_global(wlc_wide,fx_list[0],wlmin,wlmax,x,y,vel_grid,vel_grid,fname='build_spectrum_limb_resolved')
+    input_tests_global(wlc_wide,fx_list[0],wlmin,wlmax,x,y,vel_grid,flux_grid,fname='build_spectrum_limb_resolved')
     wlc,fxc = ops.crop_spectrum(wl,fx_list[0],1.0*np.nanmax(np.abs(vel_grid)))#I do this for only one spectrum because I only care about wlc
     F = 0#output
     
@@ -406,9 +404,6 @@ def build_spectrum_limb_resolved(wl,fx_list,mu_list,wlmin,wlmax,x,y,vel_grid,flu
     for i in range(len(x)):
         for j in range(len(y)):
             if np.isnan(vel_grid[j,i]) == False:
-                # mu = 1 - np.sqrt(x[i]**2 + y[j]**2) # mu angle corresponding to the pixel
-                # diff = abs(mu - mu_new) # chooses nearest mu
-                # index = np.argmin(diff)
                 # Determine which annulus ths pixel is in
                 r = np.sqrt(x[i]**2 + y[j]**2)
                 index = np.where(r < rlist)[-1][-1]
@@ -477,7 +472,7 @@ def build_local_spectrum_limb_resolved(xp,yp,zp,RpRs,wl,fx_list,mu_list,wlmin,wl
     wlc_wide = wl
     #Standard tests on input:
     input_tests_local(xp,yp,RpRs)
-    input_tests_global(wl,fx_list[0],wlmin,wlmax,x,y,vel_grid,vel_grid,fname='build_local_spectrum_limb_resolved')
+    input_tests_global(wl,fx_list[0],wlmin,wlmax,x,y,vel_grid,flux_grid,fname='build_local_spectrum_limb_resolved')
     test.typetest(mu_list,np.ndarray,varname='mu_list in build_local_spectrum_limb_resolved')
     test.dimtest(mu_list,[len(fx_list)],varname='mu_list in build_local_spectrum_limb_resolved')
 
