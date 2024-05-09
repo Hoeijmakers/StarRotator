@@ -59,6 +59,124 @@ def compute_likelihood(data,errdata,model):
 
 # The following is all StarRotator related!
 
+def remove_output(outpath):
+    import os
+    import glob
+    for filename in glob.glob(outpath+'*'):
+        print(f"--- [INFO] removing {filename}")
+        os.remove(filename)
+        
+    return 0
+
+def write_json(outpath, parameters):
+    import os
+    
+    line = '['
+    for i in range(len(parameters) - 1):
+        line = line + '"' + parameters[i] +'",'
+    
+    line = line + '"' + parameters[-1] +'"]'
+    
+    if os.path.exists(outpath+'params.json'):
+        print(f"--- [INFO] {outpath}params.json already exists. Writing a new one for you ")
+        os.remove(outpath+'params.json')
+    
+    else:
+        print(f"--- [INFO] Writing {outpath}params.json ")
+    with open(outpath+'params.json', 'w') as f:
+        f.write(line)  # python will convert \n to os.linesep
+
+    f.close()
+    
+    return 0
+
+def multinest_marginals_corner(prefix, save=False):
+    import numpy
+    from numpy import exp, log
+    import matplotlib.pyplot as plt
+    import sys, os
+    import json
+    import pymultinest
+    import corner
+    
+    # #plt.rcParams.update({'font.size': 16})
+    # plt.rc('font', size=12)          # controls default text sizes
+    # #plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
+    # plt.rc('axes', labelsize=15)    # fontsize of the x and y labels
+    # plt.rc('xtick', labelsize=15)    # fontsize of the tick labels
+    # plt.rc('ytick', labelsize=15)    # fontsize of the tick labels
+    # plt.rc('legend', fontsize=16)    # legend fontsize
+    # #plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+    # plt.rcParams["xtick.direction"] = "in"
+    # plt.rcParams["ytick.direction"] = "in"
+    # plt.rcParams["ytick.major.width"] = 2
+    # plt.rcParams["xtick.major.width"] = 2
+    # plt.rcParams["xtick.major.size"] = 5
+    # plt.rcParams["ytick.major.size"] = 5
+    # plt.rcParams["xtick.minor.size"] = 3.5
+    # plt.rcParams["ytick.minor.size"] = 3.5
+    # #print(plt.rcParams.keys())
+    # plt.rcParams["ytick.minor.width"] = 1
+    # plt.rcParams["xtick.minor.width"] = 1
+    # plt.rcParams['axes.linewidth'] = 2
+    # plt.rcParams['legend.facecolor'] = 'white'
+    # plt.rcParams['legend.edgecolor'] = 'white'
+    # plt.rcParams['legend.framealpha'] = 1
+    
+    """
+    Adapted from https://github.com/JohannesBuchner/PyMultiNest
+    
+    """
+
+    print('model "%s"' % prefix)
+    if not os.path.exists(prefix + 'params.json'):
+        sys.stderr.write("""Expected the file %sparams.json with the parameter names.
+    For example, for a three-dimensional problem:
+
+    ["Redshift $z$", "my parameter 2", "A"]
+    %s""" % (sys.argv[1], __doc__))
+        sys.exit(2)
+    parameters = json.load(open(prefix + 'params.json'))
+    n_params = len(parameters)
+
+    a = pymultinest.Analyzer(n_params = n_params, outputfiles_basename = prefix)
+    s = a.get_stats()
+
+    json.dump(s, open(prefix + 'stats.json', 'w'), indent=4)
+
+    print('  marginal likelihood:')
+    print('    ln Z = %.1f +- %.1f' % (s['global evidence'], s['global evidence error']))
+    print('  parameters:')
+    for p, m in zip(parameters, s['marginals']):
+        lo, hi = m['1sigma']
+        med = m['median']
+        sigma = (hi - lo) / 2
+        if sigma == 0:
+            i = 3
+        else:
+            i = max(0, int(-numpy.floor(numpy.log10(sigma))) + 1)
+        fmt = '%%.%df' % i
+        fmts = '\t'.join(['    %-15s' + fmt + " +- " + fmt])
+        print(fmts % (p, med, sigma))
+
+    print('creating marginal plot ...')
+    data = a.get_data()[:,2:]
+    weights = a.get_data()[:,0]
+
+    #mask = weights.cumsum() > 1e-5
+    mask = weights > 1e-4
+
+    corner.corner(data[mask,:], weights=weights[mask], 
+        labels=parameters, show_titles=True)
+    
+    if save:
+        plt.savefig(prefix + 'corner.pdf')
+        plt.savefig(prefix + 'corner.png')
+    
+    plt.show()
+    plt.close()
+
+
 def generate_flux_grid(u1, u2, gridsize=25):
     # This is the function generating the flux grid for your retrieval in a minimal way.
     
@@ -82,12 +200,12 @@ def generate_flux_grid(u1, u2, gridsize=25):
     
     return xx, yy, flux_grid
     
-def doppler_shadow(parameters, radial_velocity, phases, period, xx, yy, flux_grid, orbinc, aRs, vsys, ecc=0.0, omega=0.0):
+def doppler_shadow(parameters, radial_velocity, phases, xx, yy, flux_grid, orbinc, aRs, vsys, ecc=0.0, omega=0.0):
     #model function
     # ecc omega are currently 0. New version for non-circular orbits is coming soon.
     # parameters for model fit    
     pob, RpRs, vsini, amp, width = parameters
-    
+    #width = width*1000 # unit conversion!
     
     exp = len(phases) # number of exposures is equal to the number of phases
     alpha = np.radians(pob)
@@ -100,12 +218,12 @@ def doppler_shadow(parameters, radial_velocity, phases, period, xx, yy, flux_gri
     v = np.where(np.isnan(v_avg) == False, v_avg, 0) # we don't care about NaNs!
     
     # Now comes the shifting and adding part
-    radial_velocity_shifted = v[:, np.newaxis] - radial_velocity + vsys
+    radial_velocity_shifted = v[:, np.newaxis] - radial_velocity*1000 + vsys*1000
     
-    f = 1. - amp * np.exp(-0.5 * radial_velocity_shifted**2 / width**2)
+    f = 1. - amp * np.exp(-0.5 * radial_velocity_shifted**2 / (width*1000)**2)
     
     ## next we are going to calculate the position of the planet on the orbit, for every phase. Wish me luck.
-    # xp, yp, zp = calc_planet_pos(sma_Rs, ecc, omega, orbinc, pob, Rp_Rs, orb_p, transitC, times)
+    # xp, yp, zp = calc_planet_pos(sma_Rs, ecc, omega, orbinc, pob, Rp_Rs, orb_p, times)
     
     inclin_bar = np.radians(orbinc)
     true_anom = 2.*np.pi*phases # CAREFUL, THIS ASSUMES A CIRCULAR ORBIT
@@ -147,7 +265,7 @@ def doppler_shadow(parameters, radial_velocity, phases, period, xx, yy, flux_gri
     return(residuals.T)
 
 
-def rossiter_mclaughlin_2D(p, wl, phi, transit, wlS_wide, Fs_wide, transitC, period, xx, yy, flux_grid, orbinc, aRs, ecc=0.0, omega=0.0):
+def rossiter_mclaughlin_2D(p, wl, phi, transit, wlS_wide, Fs_wide, xx, yy, flux_grid, orbinc, aRs, ecc=0.0, omega=0.0):
     pob, RpRs, vsini = p
     
     # planetary trace
@@ -182,7 +300,7 @@ def rossiter_mclaughlin_2D(p, wl, phi, transit, wlS_wide, Fs_wide, transitC, per
         f[i] = interp1d(wl_shifted[i], Fs_wide, bounds_error=None, fill_value='extrapolate')(wlS_wide)
     
     ## next we are going to calculate the position of the planet on the orbit, for every phase. Wish me luck.
-    # xp, yp, zp = calc_planet_pos(sma_Rs, ecc, omega, orbinc, pob, Rp_Rs, orb_p, transitC, times)
+    # xp, yp, zp = calc_planet_pos(sma_Rs, ecc, omega, orbinc, pob, Rp_Rs, orb_p, times)
     
     inclin_bar = np.radians(orbinc)
     
@@ -232,7 +350,7 @@ def rossiter_mclaughlin_2D(p, wl, phi, transit, wlS_wide, Fs_wide, transitC, per
     return(residuals.T)
 
 
-def rossiter_mclaughlin_1D(p, wl, phi, transit, wlS_wide, Fs_wide, transitC, period, xx, yy, flux_grid, orbinc, aRs, ecc=0.0, omega=0.0):
+def rossiter_mclaughlin_1D(p, wl, phi, transit, wlS_wide, Fs_wide, xx, yy, flux_grid, orbinc, aRs, ecc=0.0, omega=0.0):
     
     residual = rossiter_mclaughlin_2D()
     residual_time_averaged = np.nanmean(residual, axis=0)
@@ -242,30 +360,29 @@ def rossiter_mclaughlin_1D(p, wl, phi, transit, wlS_wide, Fs_wide, transitC, per
 
 class DopplerShadow:
     
-    def __init__(self,logL,prior,ndim,data,errdata,radial_velocity,phases,xx,yy,flux_grid,orbinc,aRs,vsys):
+    def __init__(self,logL,prior,ndim,init_limits,data,errdata,radial_velocity,phases,xx,yy,flux_grid,orbinc,aRs,vsys):
         self.logL = logL
         self.prior = prior
         self.ndim = ndim
         self.data = data
         self.errdata = errdata
+        self.init_limits = init_limits
         
         # these are the constant parameters
-        self.radial_velocity = radial_velocity * 1000 # unit conversion
+        self.radial_velocity = radial_velocity # unit conversion
         self.phases = phases
-        self.period = period
         self.xx = xx
         self.yy = yy
         self.flux_grid = flux_grid
         self.orbinc = orbinc
         self.aRs = aRs
-        self.vsys = vsys*1000 #unit conversion    
+        self.vsys = vsys #unit conversion    
         
     def cpte_model(self,param):
         
         model = doppler_shadow(parameters=param, # param are the fitting parameters!
                     radial_velocity=self.radial_velocity, 
                     phases=self.phases, 
-                    period=self.period, 
                     xx=self.xx,
                     yy=self.yy,
                     flux_grid=self.flux_grid,
@@ -278,7 +395,7 @@ class DopplerShadow:
 
     def cpte_prior(self,unit_cube):
         pr = []
-        limits = init_limits
+        limits = self.init_limits
         
         for k,i in enumerate(unit_cube):
             pr.append(self.prior(i,limits[k]))
@@ -298,17 +415,17 @@ class DopplerShadow:
 
 class RM2D:
     
-    def __init__(self,logL,prior,ndim,data,errdata,wl,phases,period,xx,yy,flux_grid,orbinc,aRs,wlS,fxS,transitC, transit):
+    def __init__(self,logL,prior,ndim,init_limits,data,errdata,wl,phases,xx,yy,flux_grid,orbinc,aRs,wlS,fxS, transit):
         self.logL = logL
         self.prior = prior
         self.ndim = ndim
+        self.init_limits = init_limits
         self.data = data
         self.errdata = errdata
         
         # these are the constant parameters
         self.wavelength = wl # unit conversion
         self.phases = phases
-        self.period = period
         
         self.xx = xx
         self.yy = yy
@@ -317,11 +434,10 @@ class RM2D:
         self.aRs = aRs
         self.wlS = wlS 
         self.fxS = fxS
-        self.transitC = transitC
         self.transit = transit
     
     def cpte_model(self,param):
-        # p, wl, phi, transit, wlS_wide, Fs_wide, transitC, period, xx, yy, flux_grid, orbinc, aRs, ecc=0.0, omega=0.0
+        # p, wl, phi, transit, wlS_wide, Fs_wide, xx, yy, flux_grid, orbinc, aRs, ecc=0.0, omega=0.0
         
         model = rossiter_mclaughlin_2D(p=param, # param are the fitting parameters!
                              wl=self.wavelength, 
@@ -329,8 +445,6 @@ class RM2D:
                              transit=self.transit,
                              wlS_wide=self.wlS,
                              Fs_wide=self.fxS, 
-                             transitC=self.transitC,
-                             period=self.period, 
                              xx=self.xx,
                              yy=self.yy,
                              flux_grid=self.flux_grid,
@@ -343,7 +457,7 @@ class RM2D:
 
     def cpte_prior(self,unit_cube):
         pr = []
-        limits = init_limits
+        limits = self.init_limits
         
         for k,i in enumerate(unit_cube):
             pr.append(self.prior(i,limits[k]))
@@ -364,17 +478,17 @@ class RM2D:
     
 class RM1D:
     
-    def __init__(self,logL,prior,ndim,data,errdata,wl,phases,period,xx,yy,flux_grid,orbinc,aRs,wlS,fxS,transitC, transit):
+    def __init__(self,logL,prior,ndim,init_limits,data,errdata,wl,phases,xx,yy,flux_grid,orbinc,aRs,wlS,fxS, transit):
         self.logL = logL
         self.prior = prior
         self.ndim = ndim
+        self.init_limits = init_limits
         self.data = data
         self.errdata = errdata
         
         # these are the constant parameters
         self.wavelength = wl # unit conversion
         self.phases = phases
-        self.period = period
         
         self.xx = xx
         self.yy = yy
@@ -383,11 +497,10 @@ class RM1D:
         self.aRs = aRs
         self.wlS = wlS 
         self.fxS = fxS
-        self.transitC = transitC
         self.transit = transit
     
     def cpte_model(self,param):
-        # p, wl, phi, transit, wlS_wide, Fs_wide, transitC, period, xx, yy, flux_grid, orbinc, aRs, ecc=0.0, omega=0.0
+        # p, wl, phi, transit, wlS_wide, Fs_wide, xx, yy, flux_grid, orbinc, aRs, ecc=0.0, omega=0.0
         
         model = rossiter_mclaughlin_1D(p=param, # param are the fitting parameters!
                              wl=self.wavelength, 
@@ -395,8 +508,6 @@ class RM1D:
                              transit=self.transit,
                              wlS_wide=self.wlS,
                              Fs_wide=self.fxS, 
-                             transitC=self.transitC,
-                             period=self.period, 
                              xx=self.xx,
                              yy=self.yy,
                              flux_grid=self.flux_grid,
@@ -409,7 +520,7 @@ class RM1D:
 
     def cpte_prior(self,unit_cube):
         pr = []
-        limits = init_limits
+        limits = self.init_limits
         
         for k,i in enumerate(unit_cube):
             pr.append(self.prior(i,limits[k]))
