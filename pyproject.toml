@@ -1,0 +1,29 @@
+[project]
+name = "starrotator"
+version = "1.0.0"
+description = "Simulating a rotation-broadened stellar spectrum during an exoplanet transit event"
+authors = [
+  { name="Jens Hoeijmakers", email="jens.hoeijmakers@fysik.lu.se" }
+]
+readme = "README.md"
+requires-python = ">=3.11"
+
+dependencies = [
+  "numpy",
+  "matplotlib",
+  "astropy",
+  "scipy",
+  "requests",
+  "pysme-astro",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["starrotator"]
+
+[tool.setuptools.package-data]
+starrotator = ["data/*.txt", "data/*.dat"]

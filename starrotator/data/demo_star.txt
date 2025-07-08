@@ -1,0 +1,11 @@
+114000.0 v_eq
+90.0 stellar i
+0.0 drr (alpha)
+10000.0 T
+0.0 Fe/H
+4.0 logg
+0.93 u1
+-0.23 u2
+0 Number of mu angles
+115000 Spectral resolution
+PHOENIX Model type
