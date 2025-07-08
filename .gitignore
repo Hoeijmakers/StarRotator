@@ -1,16 +1,2 @@
-lib/*.pyc
-lib/__pycache__
-lib/.DS_Store
-data/
 .DS_Store
-anim/
-animation.gif
-*.png
-*.fits
-*_obs.txt
-*_planet.txt
-*_star.txt
-__pycache__/
-lib/SPECTRUM/*.o
-lib/SPECTRUM/*.dat
-temp
+starrotator.egg-info

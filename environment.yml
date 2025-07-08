@@ -7,6 +7,7 @@ dependencies:
   - astropy
   - matplotlib
   - numpy
+  - requests
   - pip
   - pip:
       - pysme-astro
