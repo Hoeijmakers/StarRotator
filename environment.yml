@@ -1,0 +1,12 @@
+name: starrotator-env
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - astropy
+  - matplotlib
+  - numpy
+  - pip
+  - pip:
+      - pysme-astro
