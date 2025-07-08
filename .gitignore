@@ -1,2 +1,8 @@
+starrotator/__pycache__/
+starrotator/lib/__pycache__/
+docs/.DS_Store
+docs/example/.DS_Store
+docs/example/doppler_shadow_fit/.DS_Store
+starrotator.egg-info/
+starrotator/.DS_Store
 .DS_Store
-starrotator.egg-info
