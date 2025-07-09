@@ -1,4 +1,4 @@
-[![CI](https://github.com/your-username/StarRotator/actions/workflows/ci.yml/badge.svg)](https://github.com/your-username/StarRotator/actions/workflows/ci.yml)
+[![CI](https://github.com/Hoeijmakers/StarRotator/actions/workflows/ci.yml/badge.svg?branch=refactor)](https://github.com/Hoeijmakers/StarRotator/actions/workflows/ci.yml)
 
 # StarRotator
 
