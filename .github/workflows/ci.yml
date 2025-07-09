@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - refactor       # your development branch
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Miniconda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-activate-base: false
+          environment-file: environment.yml
+          activate-environment: starrotator
+          python-version: 3.11
+
+      - name: Install package
+        shell: bash -l {0}
+        run: |
+          pip install -e .
+
+      - name: Run tests
+        shell: bash -l {0}
+        run: |
+          pytest
