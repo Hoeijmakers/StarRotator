@@ -1,3 +1,5 @@
+[![CI](https://github.com/your-username/StarRotator/actions/workflows/ci.yml/badge.svg)](https://github.com/your-username/StarRotator/actions/workflows/ci.yml)
+
 # StarRotator
 
 StarRotator is a package that simulates a rotation-broadened stellar spectrum during an exoplanet transit event. The simulation is done via numerical integration of the stellar disk, with model photosphere spectra from either PHOENIX or pySME.
