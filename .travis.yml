@@ -1,1 +1,24 @@
 language: python
+python:
+  - "3.11"
+
+# Set environment variable so Travis doesn't fail on unset variables
+env:
+  - PYTHONUNBUFFERED=1
+
+# Install dependencies via conda
+install:
+  - wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
+  - bash miniconda.sh -b -p $HOME/miniconda
+  - export PATH="$HOME/miniconda/bin:$PATH"
+  - source "$HOME/miniconda/etc/profile.d/conda.sh"
+  - conda config --set always_yes yes --set changeps1 no
+  - conda update -q conda
+  - conda env create -f environment.yml
+  - conda activate starrotator-env  # or whatever your environment is named
+  - pip install -e .
+  - conda list  # optional: shows installed packages
+
+# Run tests
+script:
+  - pytest
