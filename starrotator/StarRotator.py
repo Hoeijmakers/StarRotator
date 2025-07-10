@@ -6,29 +6,26 @@
 #####################
 
 #import statements
-import sys
 import numpy as np
-import lib.test as test
-import lib.vgrid as vgrid
-import lib.plotting as pl
-import lib.operations as ops
-import lib.stellar_spectrum as spectrum
-import lib.integrate as integrate
-import pdb
-import time
+import starrotator.lib.vgrid as vgrid
+import starrotator.lib.plotting as pl
+import starrotator.lib.operations as ops
+import starrotator.lib.stellar_spectrum as spectrum
+import starrotator.lib.integrate as integrate
+import starrotator.lib.planet_pos as ppos
+import starrotator.lib.util as util
+from importlib.resources import files
 import matplotlib.pyplot as plt
-import math
 from matplotlib.patches import Circle
-import lib.planet_pos as ppos
+
 import copy
 import os.path
 #main body of code
 
 
 class StarRotator(object):
-    def __init__(self,wave_start,wave_end,grid_size,star_path='input/demo_star.txt',
-    planet_path='input/demo_planet.txt',obs_path='input/demo_observations.txt',
-    input={},linelist_path=''):
+    def __init__(self,wave_start,wave_end,grid_size,system_path=None,
+    obs_path=None,input={},linelist_path=''):
         """
             Welcome to StarRotator.
             ***********************
@@ -136,19 +133,27 @@ class StarRotator(object):
 
 
         """
+        import pdb
+        self.status = 'initialised'
         self.wave_start=float(wave_start)
         self.wave_end=float(wave_end)
         self.grid_size=int(grid_size)
         self.linelist_path = linelist_path
-        self.read_system(star_path=star_path,planet_path=planet_path,obs_path=obs_path,input=input)
+        self.input = input
+        if (system_path is None or obs_path is None) and len(self.input) == 0:
+            #Meaning, if no input is provided, default to the demo data.
+            self.system_path = files("starrotator.data").joinpath("demo_system.txt")
+            self.obs_path = files("starrotator.data").joinpath("demo_observations.txt")
+
+        self.read_system(system_path=self.system_path,obs_path=self.obs_path,input=self.input)
+
+        pdb.set_trace()
         self.compute_spectrum()
+        self.status = 'success'
 
-        # return(self.wlF,F_out)#This is mad return statement. This whole function should be a class instead.
-
-    def read_system(self,star_path='demo_star.txt',planet_path='demo_planet.txt',
-    obs_path='demo_observations.txt',input={}):
+    def read_system(self,system_path=None,obs_path=None,input={}):
         """Reads in the stellar, planet and observation parameters from file; performing
-        tests on the input and lifting the read variables to the class object.
+        tests on the input and raising the read variables to the class.
 
         Parameters
         ----------
@@ -191,108 +196,68 @@ class StarRotator(object):
                 linelist_path (str, path to VALD-style line-list for pysme to use)
         """
         if len(input)==0:#If we read input from config files
-            planetparams = open(planet_path,'r').read().splitlines()
-            starparams = open(star_path,'r').read().splitlines()
+            input = util.read_into_dictionary(system_path)
+            util.check_integrity_input(input)
+
+            phases = [] #These are in orbital phase.
             obsparams = open(obs_path,'r').read().splitlines()
-            self.velStar = float(starparams[0].split()[0])
-            self.stelinc = float(starparams[1].split()[0])
-            self.drr = float(starparams[2].split()[0])
-            self.T = float(starparams[3].split()[0])
-            self.Z = float(starparams[4].split()[0])
-            self.logg = float(starparams[5].split()[0])
-            self.u1 = float(starparams[6].split()[0])
-            self.u2 = float(starparams[7].split()[0])
-            self.mus = int(starparams[8].split()[0])
-            self.R = float(starparams[9].split()[0])
-            self.model = str(starparams[10].split()[0])
-            if self.model.lower() in ['pysme','sme']:
-                self.grid_model = str(starparams[11].split()[0])
-                self.abund = starparams[12:]
-            self.sma_Rs = float(planetparams[0].split()[0])
-            self.ecc = float(planetparams[1].split()[0])
-            self.omega = float(planetparams[2].split()[0])
-            self.orbinc = float(planetparams[3].split()[0])
-            self.pob = float(planetparams[4].split()[0])#Obliquity.
-            self.Rp_Rs = float(planetparams[5].split()[0])
-            self.orb_p = float(planetparams[6].split()[0])
-            # self.transitC = float(planetparams[7].split()[0])#Is this used?
-            # self.mode = planetparams[8].split()[0]#This is a string.
-            times = [] #These are in JD-24000000.0 or in orbital phase.
             for i in obsparams:
-                times.append(float(i.split()[0]))
-            self.times = np.array(times)
-            self.exptimes = []
-            # if self.mode == 'times':
-                # for i in obsparams:
-                    # self.exptimes.append(float(i.split()[1]))
-                # self.exptimes = np.array(self.exptimes)
+                phases.append(float(i.split()[0]))
+            self.phases = np.array(phases)
+        else:
+            util.check_integrity_input(input,['phases'])
+            self.phases = np.array(input['phases'])
+        self.velStar    = float(input['veq'])
+        self.stelinc    = float(input['stelinc'])
+        self.drr        = float(input['drr'])
+        self.T          = float(input['T'])
+        self.Z          = float(input['FeH'])
+        self.logg       = float(input['logg'])
+        self.u1         = float(input['u1'])
+        self.u2         = float(input['u2'])
+        self.R          = float(input['R'])
+        self.mus        = int(input['mus'])
+        self.model      = str(input['model'])
+        self.sma_Rs     = float(input['sma_Rs'])
+        self.ecc        = float(input['e'])
+        self.omega      = float(input['omega'])
+        self.orbinc     = float(input['inclination'])
+        self.pob        = float(input['obliquity'])#Obliquity.
+        self.Rp_Rs      = float(input['RpRs'])
+        self.orb_p      = float(input['P'])
 
-        else: #if the input dictionary is set.
-            req_keys = ['veq','stelinc','drr','T','FeH','logg','u1','u2','R','mus','model','sma_Rs',
-            'e','omega','inclination','obliquity','RpRs','P','phases']
-            for k in req_keys:
-                if k not in input:
-                    raise Exception(f"Missing key ('{k}') in input dictionary.")
-            self.velStar    = float(input['veq'])
-            self.stelinc    = float(input['stelinc'])
-            self.drr        = float(input['drr'])
-            self.T          = float(input['T'])
-            self.Z          = float(input['FeH'])
-            self.logg       = float(input['logg'])
-            self.u1         = float(input['u1'])
-            self.u2         = float(input['u2'])
-            self.R          = float(input['R'])
-            self.mus        = int(input['mus'])
-            self.model      = str(input['model'])
-            if self.model.lower() in ['pysme','sme']:
-                also_req_keys = ['grid_model','abund','linelist_path']
-                for k in also_req_keys:
-                    if k not in input:
-                        raise Exception(f"Missing key ('{k}') in input dictionary.")
-                self.grid_model = str(input['grid_model'])
-                self.abund      = input['abund']
-                self.linelist_path = input['linelist_path']
-                if not os.path.isfile(self.linelist_path):
-                    raise Exception("pySME linelist_path does not point to an existing file.")
+        if self.model.lower() in ['pysme','sme']:
+            also_req_keys = ['grid_model','abund','linelist_path']
+            util.check_integrity_input(input,also_req_keys)
 
-            self.sma_Rs     = float(input['sma_Rs'])
-            self.ecc        = float(input['e'])
-            self.omega      = float(input['omega'])
-            self.orbinc     = float(input['inclination'])
-            self.pob        = float(input['obliquity'])#Obliquity.
-            self.Rp_Rs      = float(input['RpRs'])
-            self.orb_p      = float(input['P'])
-            # self.transitC   = float(input['Tc'])#Is this used?
-            # self.mode       = input['mode']#This is a string.
-            # if self.mode == 'times':
-            #     also_req_keys = ['times','exptimes']
-            #     for k in also_req_keys:
-            #         if k not in input:
-            #             raise Exception(f"Missing key ('{k}') in input dictionary.")
-            #     self.times = np.array(input['times'])
-            #     self.exptimes = np.array(input['exptimes'])
-            #     if len(self.times) != len(self.exptimes):
-            #         raise Exception("Time and exptime arrays should have the same lengths.")
-            self.times = np.array(input['phases'])
-            self.exptimes = []
 
-        self.Nexp = len(self.times)#Number of exposures.
+            self.grid_model = str(input['grid_model'])
+            self.abund      = input['abund']
+            self.linelist_path = input['linelist_path']
+            if not os.path.isfile(self.linelist_path):
+                raise Exception("pySME linelist_path does not point to an existing file.")
+
+
+
+
+        self.Nexp = len(self.phases)#Number of exposures.
         self.residual = None
         self.blurred = 0
         try:
-            test.typetest(self.wave_start,float,varname='wave_start in input')
-            test.nantest(self.wave_start,varname='wave_start in input')
-            test.notnegativetest(self.wave_start,varname='wave_start in input')
-            test.notnegativetest(self.velStar,varname='velStar in input')
-            test.notnegativetest(self.stelinc,varname='stelinc in input')
-            test.notnegativetest(self.T,varname='Teff in input')
-            test.notnegativetest(self.logg,varname='logg in input')
-            test.notnegativetest(self.R,varname='Resolution in input')
-            test.notnegativetest(self.orb_p,varname='period in input')
-            test.notnegativetest(self.Rp_Rs,varname='RpRs in input')
-            test.notnegativetest(self.ecc,varname='e in input')
-            test.notnegativetest(self.sma_Rs,varname='e in input')
-        #add all the other input parameters
+            util.vartest(self.wave_start,varname='wave_start in input',nan=True,pos=True,types=[float])
+            util.vartest(self.wave_end,varname='wave_end in input',nan=True,pos=True,types=[float])
+
+            #Do the rest too.
+            util.notnegativetest(self.velStar,varname='veq in input')
+            util.notnegativetest(self.stelinc,varname='stelinc in input')
+            util.notnegativetest(self.T,varname='Teff in input')
+            util.notnegativetest(self.logg,varname='logg in input')
+            util.notnegativetest(self.R,varname='Resolution in input')
+            util.notnegativetest(self.orb_p,varname='period in input')
+            util.notnegativetest(self.Rp_Rs,varname='RpRs in input')
+            util.notnegativetest(self.ecc,varname='e in input')
+            util.notnegativetest(self.sma_Rs,varname='sma_Rs in input')
+            #add all the other input parameters
         except ValueError as err:
             print("Parser: ",err.args)
 
@@ -584,135 +549,4 @@ class StarRotator(object):
 
 
 
-def test_StarRotator():
-    #Test all dependencies
-    from StarRotator import StarRotator
-    import matplotlib.pyplot as plt
-    from matplotlib import cm, colors
-    from mpl_toolkits.mplot3d import Axes3D
-    from scipy.special import sph_harm
 
-    import requests
-    import shutil
-    import urllib.request as request
-    from contextlib import closing
-
-    import os.path
-    import lib.test as test
-    import lib.operations as ops
-    import lib.stellar_spectrum
-    import lib.vgrid as vgrid
-    import lib.integrate
-
-    import astropy.io.fits as fits
-    import astropy.units as u
-    import scipy.interpolate as interp
-    import astropy.constants as consts
-
-    import numpy as np
-    import copy
-    import imp
-    import sys
-
-    n_warnings = 0
-    error_trigger = 0
-    KELT9 = StarRotator(586.0,592.0,50.0)
-    wl = KELT9.wl
-    F_out = KELT9.stellar_spectrum
-    spectra = KELT9.spectra
-    residuals = KELT9.residual
-    KELT9.convolve_spectral_resolution()
-
-
-
-    #Test that multiple-convolution is detected and blocked:
-    try:
-        KELT9.convolve_spectral_resolution()
-        error_trigger=1
-    except:
-        pass
-    if error_trigger==1:
-        raise Exception("ERROR: Trying convolution twice in a row should be caught.")
-    error_trigger=0
-
-    #Testing another grid and another vartype.
-    KELT9 = StarRotator(586,592.0,13)
-    KELT9.convolve_spectral_resolution()
-
-
-    #Now test the whole thing with a dictionary as input. First test that the input is well
-    #tested:
-    in_dict = {'lala':1.0}
-    try:
-        KELT9 = StarRotator(586,592.0,13,input=in_dict)
-        error_trigger=1
-    except:
-        pass
-    if error_trigger==1:
-        raise Exception("ERROR: Wrong input dictionary not caught.")
-    error_trigger=0
-
-
-    in_dict = {'veq':114000.0,
-    'stelinc':90.0,
-    'drr':0.0,'T':10000.0,'FeH':0.0,'logg':4.0,
-    'u1':0.93,'u2':-0.23,'R':115000.,'mus':0,'model':'PHOENIX','sma_Rs':3.153,
-            'e':0.0,'omega':0.0,'inclination':86.79,'obliquity':-84.8,'RpRs':0.08228,'P':1.4811235,
-            'phases':[-0.02,-0.01,0.0,0.01,0.02]}
-    KELT9 = StarRotator(586,592.0,13,input=in_dict)
-
-
-
-    pysme_error = 0
-    try:
-        from pysme.sme import SME_Structure as SME_Struct
-        from pysme.abund import Abund
-        from pysme.synthesize import synthesize_spectrum
-        from pysme.solve import solve
-        from pysme.linelist.vald import ValdFile
-    except:
-        print('WARNING: PYSME cannot be imported. PSME functionality will not be available.')
-        n_warnings+=1
-        pysme_error = 1
-
-
-    if pysme_error == 0:
-        in_dict = {'veq':114000.0,
-        'stelinc':90.0,
-        'drr':0.0,'T':10000.0,'FeH':0.0,'logg':4.0,
-        'u1':0.93,'u2':-0.23,'R':115000.,'mus':0,'model':'pySME','sma_Rs':3.153,
-        'e':0.0,'omega':0.0,'inclination':86.79,'obliquity':-84.8,'RpRs':0.08228,'P':1.4811235,
-        'phases':[-0.02,-0.01,0.0,0.01,0.02]}#Without setting abund and grid_model keywords.
-        try:
-            KELT9 = StarRotator(586,592.0,13,input=in_dict)
-            error_trigger=1
-        except:
-            pass
-        if error_trigger==1:
-            raise Exception("ERROR: Wrong input dictionary not caught.")
-        error_trigger=0
-
-        in_dict = {'veq':114000.0,
-        'stelinc':90.0,
-        'drr':0.0,'T':10000.0,'FeH':0.0,'logg':4.0,
-        'u1':0.93,'u2':-0.23,'R':115000.,'mus':5,'model':'pySME','sma_Rs':3.153,
-        'e':0.0,'omega':0.0,'inclination':86.79,'obliquity':-84.8,'RpRs':0.08228,'P':1.4811235,
-        'phases':[-0.02,-0.01,0.0,0.01,0.02],'grid_model':'atlas12.sav','abund':[],
-        'linelist_path':'input/demo_linelist.dat'}
-        KELT9 = StarRotator(586,592.0,13,input=in_dict)
-
-
-        in_dict = {'veq':114000.0,
-        'stelinc':90.0,
-        'drr':0.0,'T':6000.0,'FeH':0.3,'logg':4.2,
-        'u1':0.93,'u2':-0.23,'R':115000.,'mus':5,'model':'pySME','sma_Rs':3.153,
-        'e':0.0,'omega':0.0,'inclination':86.79,'obliquity':-84.8,'RpRs':0.08228,'P':1.4811235,
-        'phases':[-0.02,-0.01,0.0,0.01,0.02],'grid_model':'marcs2014.sav','abund':[],
-        'linelist_path':'input/demo_linelist.dat'}
-        KELT9 = StarRotator(586,592.0,13,input=in_dict)
-
-    print('')
-    print('')
-    print('')
-    print('Tests complete.')
-    print(f'{n_warnings} warnings triggered.')

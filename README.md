@@ -1,4 +1,4 @@
-[![CI](https://github.com/Hoeijmakers/StarRotator/actions/workflows/ci.yml/badge.svg?branch=refactor)](https://github.com/Hoeijmakers/StarRotator/actions/workflows/ci.yml)
+[![CI](https://github.com/Hoeijmakers/StarRotator/actions/workflows/ci.yml/badge.svg?branch=refactor)](https://github.com/Hoeijmakers/StarRotator/actions/workflows/ci.yml) [![codecov](https://codecov.io/gh/Hoeijmakers/StarRotator/branch/refactor/graph/badge.svg?token=HYVVP4722Y)](https://codecov.io/gh/Hoeijmakers/StarRotator)
 
 # StarRotator
 
@@ -10,8 +10,8 @@ StarRotator will run out of the box using a default exoplanet system defined in 
 In order to install and run StarRotator, perform the following steps:
 1) Clone the repo / pull it to your machine.
 2) From the root directory, install it using `pip` as: `pip install .`.
-3) Open python and import the package: `from StarRotator import StarRotator, test_StarRotator`, then run `testStarRotator()` to test that StarRotator functions normally. Alternatively, you can run `pytest` from the repo's root folder. Even if not all tests pass if you don't have pySME installed, functionality with PHOENIX models is possible even without pySME.
-4) StarRotator can be called as `KELT9 = StarRotator(586.0,592.0,200.0)` for a model spectrum of the Na-D lines of KELT-9, a fast-rotating 10,000K A-star orbited by KELT-9b, computed on a grid of (2x200)x(2x200) i.e. 400x400 square pixels.
+3) Open python and import the package: `from StarRotator import StarRotator'. You can run `pytest` from the repo's root folder. Even if not all tests pass if you don't have pySME installed, functionality with PHOENIX models is possible even without pySME.
+4) StarRotator can be called as `KELT9 = StarRotator(586.0,592.0,200.0)`. Without providing system parameters as input, this will compute a model spectrum of the Na-D lines of assuming the KELT-9 system (a fast-rotating 10,000K A-star orbited by a gas giant), computed on a grid of (2x200)x(2x200) i.e. 400x400 square pixels. To create your own input parameters, see below.
 5) Access the simulation output using attributes defined on the `KELT9` object: The wavelength axis of the model is accessed as `wl = KELT9.wl`, the out-of-transit stellar spectrum as `F_out = KELT9.stellar_spectrum`, the modelled time-series as `spectra = KELT9.spectra` and the residuals as obtained by dividing the out-of-transit spectrum out of the time-series: `residuals = KELT9.residual`. These can be blurred to some spectral resolution defined in `KELT9.R` (defined by default as 115,000 in the `demo_star.txt` parameter file), using `KELT9.convolve_spectral_resolution()`. Convolution is applied to the residuals and not to the spectra that are divided by each other, because this introduces a numerical error.
 6) The StarRotator object contains methods to plot the simulation output. You can instantly plot the residuals of the time series like `KELT9.plot_residuals()`, and an animation of the entire time-series as `KELT9.animate()`, the result of which could look like the animation below.
 7) To use the simulation output, the user has access to the `KELT9.residual` numpy array, which can be written to file and loaded it when needed in an external workflow, or used as is.
