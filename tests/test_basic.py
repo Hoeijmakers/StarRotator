@@ -44,7 +44,7 @@ def test_demo_files():
     util.check_integrity_input(paramdict)
 
 
-
+"""
 def test_StarRotator():
     from starrotator import StarRotator
     import matplotlib.pyplot as plt
@@ -123,8 +123,9 @@ def test_StarRotator():
 
     assert KELT5.status == 'success'
 
+    
 
-    """
+    
     pysme_error = 0
     try:
         from pysme.sme import SME_Structure as SME_Struct

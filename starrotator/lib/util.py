@@ -23,7 +23,7 @@ def read_into_dictionary(filepath):
 
 def check_integrity_input(input_dict,additional_keywords=[]):
     mandatory_keywords = ['sma_Rs','e','omega','inclination','obliquity',
-                          'inclination','RpRs','P','veq','stelinc',
+                          'RpRs','P','veq','stelinc',
                           'drr','T','FeH','logg','u1','u2','mus','R','model']
     if len(additional_keywords) > 0:
         mandatory_keywords=mandatory_keywords+additional_keywords
