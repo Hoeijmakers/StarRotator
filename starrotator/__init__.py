@@ -6,12 +6,12 @@ and modeling stellar rotation data.
 
 Modules:
 --------
-- starrotator: Contains the StarRotator class and all high level functions..
+- core: Contains the StarRotator class and all high level functions..
 - lib: Utility functions for calculations, operations, etc.
 """
 
 from . import lib # Expose important submodules and functions
-from .starrotator import StarRotator
+from .core import StarRotator
 
 # Optional: Define what gets imported with `from starrotator import *`
 # __all__ = ["lib", "StarRotator"]

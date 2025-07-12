@@ -33,6 +33,11 @@ jobs:
         run: |
           pip install -e .
 
+      - name: Debug sys.path
+        shell: bash -l {0}
+        run: |
+          python -c "import sys; print('\n'.join(sys.path))"
+
       - name: Run tests
         shell: bash -l {0}
         run: |

@@ -5,4 +5,5 @@ docs/example/.DS_Store
 docs/example/doppler_shadow_fit/.DS_Store
 starrotator.egg-info/
 starrotator/.DS_Store
+tests/__pycache__/
 .DS_Store
