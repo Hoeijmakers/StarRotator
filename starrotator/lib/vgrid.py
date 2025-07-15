@@ -2,6 +2,7 @@ import jax
 import jax.numpy as jnp
 from jax import jit
 import numpy as np
+import starrotator.lib.operations as ops
 
 @jit
 def calc_vel_stellar(x,y,i_stellar, vel_eq, diff_rot_rate):
@@ -129,19 +130,29 @@ def calc_z(x,y):
 
 
 
-# CONTINUE HERE NEXT TIME. THIS CAN BE VASTLY SPED UP.
-def calc_flux_stellar(x,y,u1,u2):
+
+def calc_flux_stellar_old(x,y,u1,u2):
     import numpy as np
-    import lib.operations as ops
+    import starrotator.lib.operations as ops
 
 
     z,x_full,y_full = calc_z(x,y)
+    z = np.array(z)
     flux_grid = z*0.0
     for i in range(len(x)):
         for j in range(len(y)):
             if np.sqrt(x[i]**2+y[j]**2) <= 1.0:
-                flux_grid[j,i]=ops.limb_darkening((np.sqrt(x[i]**2+y[j]**2)),u1,u2)*(z[j,i]*0.0+1.0)#Last multiplication is to put NaNs back into place.
+                flux_grid[j,i]=ops.limb_darkening_old((np.sqrt(x[i]**2+y[j]**2)),u1,u2)*(z[j,i]*0.0+1.0)#Last multiplication is to put NaNs back into place.
 
     # plotting.plot_star_2D(x,y,mu_grid,cmap="hot",quantities=['','',''],units=['','',''],noshow=False)
     flux_grid /= np.nansum(flux_grid)
     return(flux_grid)
+
+
+@jit
+def calc_flux_stellar(x,y,u1,u2):
+    # I timed this to be 1000 times faster than the older for-loop way. Thanks jax.
+    z,x_full,y_full = calc_z(x,y)#Jitted
+    d=1-z
+    flux_grid = ops.limb_darkening(z,u1,u2)#Jitted
+    return(flux_grid/jnp.nansum(flux_grid))

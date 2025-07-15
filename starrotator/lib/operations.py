@@ -411,7 +411,7 @@ def vactoair(wlnm):
 
 
 
-def limb_darkening_old(mu,u1,u2):
+def limb_darkening_older(mu,u1,u2):
     """Evaluate quadratic limb darkening, taken from de Mooij 2017,
     (https://arxiv.org/pdf/1709.00680.pdf). Provide the mu-angle of grid cell i,j
     and multiply the resulting weight against spectrum i,j.
@@ -435,6 +435,13 @@ def limb_darkening_old(mu,u1,u2):
 
     return(w)
 
+
+
+
+import jax
+from jax import jit
+import jax.numpy as jnp
+@jit
 def limb_darkening(z,a1,a2):
     """Evaluate quadratic limb darkening, taken straight from wikipedia, eq 1.
     (https://en.wikipedia.org/wiki/Limb_darkening). Provide the z-coordinate of grid cell i,j
@@ -458,20 +465,40 @@ def limb_darkening(z,a1,a2):
         w: float
             The weight, <= 1.
     """
-    import lib.test as test
-    #First run standard tests on the input
-    test.typetest(z,[int,float],varname='z in limb_darkening')
-    test.typetest(a1,[int,float],varname='a1 in limb_darkening')
-    test.typetest(a2,[int,float],varname='a2 in limb_darkening')
-    test.nantest(z,varname='z in limb_darkening')
-    test.nantest(a1,varname='a1 in limb_darkening')
-    test.nantest(a2,varname='a2 in limb_darkening')
+
+    psi = jnp.arcsin(z)
+    a0 = 1-a1-a2
+    I = a0+a1*jnp.cos(psi)+a2*jnp.cos(psi)**2
+    return(I)
+
+
+
+
+def limb_darkening_old(z,a1,a2):
+    """Evaluate quadratic limb darkening, taken straight from wikipedia, eq 1.
+    (https://en.wikipedia.org/wiki/Limb_darkening). Provide the z-coordinate of grid cell i,j
+    and multiply the resulting weight against spectrum i,j.
+
+    z = sin(psi), with psi the angle of incidence.
+    psi = arcsin(z)
+
+    I(z) = I(0) * (a0 + a1*cos(psi) + a2*cos(psi)**2 + ....)
+    with a0 = 1 - (a1+a2+...).
+
+        Parameters
+        ----------
+        z : float, np.array()
+            The projected distance from the stellar center in units of stellar radii,
+            bounded between 0 and 1.
+        u1,u2: float,
+            Linear and quadratic limb-darkening coefficients.
+        Returns
+        -------
+        w: float
+            The weight, <= 1.
+    """
 
     import numpy as np
-    if z > 1 or z < 0:
-        raise ValueError("z coordinate should be in [0,1].")
-
-
     psi = np.arcsin(z)
     a0 = 1-a1-a2
     I = a0+a1*np.cos(psi)+a2*np.cos(psi)**2
