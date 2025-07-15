@@ -442,8 +442,11 @@ import jax
 from jax import jit
 import jax.numpy as jnp
 
+
+
+
 @jit
-def limb_darkening(z,a1,a2):
+def limb_darkening(r,a1,a2):
     """Evaluate quadratic limb darkening, taken straight from wikipedia, eq 1.
     (https://en.wikipedia.org/wiki/Limb_darkening). Provide the z-coordinate of grid cell i,j
     and multiply the resulting weight against spectrum i,j.
@@ -459,7 +462,7 @@ def limb_darkening(z,a1,a2):
 
         Parameters
         ----------
-        z : float, np.array()
+        r : float, np.array()
             The projected distance from the stellar center in units of stellar radii,
             bounded between 0 and 1.
         u1,u2: float,
@@ -470,43 +473,18 @@ def limb_darkening(z,a1,a2):
             The weight, <= 1.
     """
 
-    psi = jnp.arcsin(z)
+    # Note that this is the same as the route with the psi's:
+    # psi = jnp.arcsin(r)
+    # a0 = 1-a1-a2
+    # I = a0+a1*np.cos(psi)+a2*np.cos(psi)**2
+
+    # I suspect that this is trivally integrable.
+    z = 1-r**2
+    
     a0 = 1-a1-a2
-    I = a0+a1*jnp.cos(psi)+a2*jnp.cos(psi)**2
+    I = a0+a1*jnp.sqrt(z)+a2*z
     return(I)
 
-
-
-
-def limb_darkening_old(z,a1,a2):
-    """Evaluate quadratic limb darkening, taken straight from wikipedia, eq 1.
-    (https://en.wikipedia.org/wiki/Limb_darkening). Provide the z-coordinate of grid cell i,j
-    and multiply the resulting weight against spectrum i,j.
-
-    z = sin(psi), with psi the angle of incidence.
-    psi = arcsin(z)
-
-    I(z) = I(0) * (a0 + a1*cos(psi) + a2*cos(psi)**2 + ....)
-    with a0 = 1 - (a1+a2+...).
-
-        Parameters
-        ----------
-        z : float, np.array()
-            The projected distance from the stellar center in units of stellar radii,
-            bounded between 0 and 1.
-        u1,u2: float,
-            Linear and quadratic limb-darkening coefficients.
-        Returns
-        -------
-        w: float
-            The weight, <= 1.
-    """
-
-    import numpy as np
-    psi = np.arcsin(z)
-    a0 = 1-a1-a2
-    I = a0+a1*np.cos(psi)+a2*np.cos(psi)**2
-    return(I)
 
 
 
