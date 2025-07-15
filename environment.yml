@@ -13,6 +13,7 @@ dependencies:
   - sphinx
   - sphinx-autodoc-typehints
   - sphinx-rtd-theme
+  - jax[cpu]
   - pip
   - pip:
       - pysme-astro
