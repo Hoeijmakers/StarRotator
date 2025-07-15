@@ -441,11 +441,15 @@ def limb_darkening_older(mu,u1,u2):
 import jax
 from jax import jit
 import jax.numpy as jnp
+
 @jit
 def limb_darkening(z,a1,a2):
     """Evaluate quadratic limb darkening, taken straight from wikipedia, eq 1.
     (https://en.wikipedia.org/wiki/Limb_darkening). Provide the z-coordinate of grid cell i,j
     and multiply the resulting weight against spectrum i,j.
+
+    WARNING: WHAT FORMALISM DOES THIS USE? WIKIPEDIA IS NOT AUTHORITATIVE. WE NEED TO REFERENCE COMMONLY USED
+    LIMB DARKENING LAWS.
 
     z = sin(psi), with psi the angle of incidence.
     psi = arcsin(z)
@@ -503,6 +507,24 @@ def limb_darkening_old(z,a1,a2):
     a0 = 1-a1-a2
     I = a0+a1*np.cos(psi)+a2*np.cos(psi)**2
     return(I)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 def findgen(n,int=False):
     """This is basically IDL's findgen function.
