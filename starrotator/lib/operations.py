@@ -473,17 +473,42 @@ def limb_darkening(r,a1,a2):
             The weight, <= 1.
     """
 
-    # Note that this is the same as the route with the psi's:
+    # Note that this is equal as the route with the psi's:
     # psi = jnp.arcsin(r)
     # a0 = 1-a1-a2
     # I = a0+a1*np.cos(psi)+a2*np.cos(psi)**2
+    # Because cos(arcsin(r)) = sqrt(1-r**2)
 
     # I suspect that this is trivally integrable.
     z = 1-r**2
     
     a0 = 1-a1-a2
-    I = a0+a1*jnp.sqrt(z)+a2*z
+    I = a0+a1*jnp.sqrt(z)+a2*z #The last z is the sqrt squared.
     return(I)
+
+
+@jit
+def vert_int_q_ld(x,a1,a2):
+    """Evaluate the vertical integral of the quadratic limb darkening law, integrating in the +y
+    direction from the x-axis. Evaluated at some value of x. This is analytical and not very pretty.
+
+        Parameters
+        ----------
+        x : float, array-like
+            The projected distance from the stellar center in units of stellar radii,
+            bounded between 0 and 1, along the x-axis.
+        u1,u2: float,
+            Linear and quadratic limb-darkening coefficients.
+        Returns
+        -------
+        II : float, array-like
+            The integral at location x.
+    """ 
+    #I have established that this returns the same answer as 
+    U = 1-x**2
+    a0 = 1-a1-a2
+    return( jnp.sqrt(U) * (a0+a2-a2*x**2 - a2*U/3) + jnp.pi*a1/4 * U)
+
 
 
 

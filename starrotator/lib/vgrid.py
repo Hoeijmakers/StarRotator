@@ -3,6 +3,10 @@ import jax.numpy as jnp
 from jax import jit
 import numpy as np
 import starrotator.lib.operations as ops
+from functools import partial
+
+# The routines in this file calculate the velocity and flux grids of a 2D pixellated stellar disk, 
+# meant for summing to create the broadened stellar spectrum.
 
 @jit
 def calc_vel_stellar(x,y,i_stellar, vel_eq, diff_rot_rate):
@@ -85,7 +89,7 @@ def calc_vel_stellar_old(x,y,i_stellar, vel_eq, diff_rot_rate):
 def calc_z(x,y):
     """
     This calculates the z-coordinate of the star as used in [1]_. See Fig. 3 and equations 2 - 8.
-    It takes the 1D x and y grids.
+    It takes the 1D x and y grids as input.
 
     Parameters
     ----------
@@ -129,6 +133,47 @@ def calc_z(x,y):
     return(jnp.sqrt(d_clipped),x_full,y_full)
 
 
+@partial(jax.jit,static_argnames=["norm"])
+def calc_flux_stellar(x,y,u1,u2,norm=True):
+    """
+    This calculates a flux map of the stellar disk assuming quadratic limb darkening.
+
+    Parameters
+    ----------
+        x : array
+            1D numpy arrays to create the stellar grid in units of stellar radius in the x-direction.
+
+        y : array
+            1D numpy arrays to create the stellar grid in units of stellar radius in the y-direction.
+
+        u1 : float
+            Linear limb darkening term.
+
+        u2 : float
+            Quadratic limb darkening term.
+
+        norm : bool
+            If set to true, the flux map is divided by its sum, normalising the sum to 1.0
+            This meant to be physically relevant in case the full disk is considered; but may not
+            always be desired (e.g. when comparing absolute flux values of parts of the disk). 
+
+    Returns
+    -------
+        flux_grid : array-like
+            A 2D, pixellated model of the stellar disk mapping its relative flux. If norm = True,
+            this sums to 1.0.
+    """
+    # I timed this to be 1000 times faster than the older for-loop way. Thanks jax.
+    # I also confirmed that this mathematically is identical to the old one.
+
+
+    # The limb darkening function below is jitted. And x,y are passed such that they broadcast
+    # into a 2D array.
+    flux_grid = ops.limb_darkening(jnp.sqrt(x[:, None]**2 + y[None, :]**2),u1,u2)
+    if norm:
+        return(flux_grid/jnp.nansum(flux_grid))
+    else:
+        return(flux_grid)
 
 
 def calc_flux_stellar_old(x,y,u1,u2):
@@ -142,17 +187,9 @@ def calc_flux_stellar_old(x,y,u1,u2):
     for i in range(len(x)):
         for j in range(len(y)):
             if np.sqrt(x[i]**2+y[j]**2) <= 1.0:
-                flux_grid[j,i]=ops.limb_darkening_old((np.sqrt(x[i]**2+y[j]**2)),u1,u2)*(z[j,i]*0.0+1.0)#Last multiplication is to put NaNs back into place.
-
-    # plotting.plot_star_2D(x,y,mu_grid,cmap="hot",quantities=['','',''],units=['','',''],noshow=False)
+                flux_grid[j,i]=ops.limb_darkening((np.sqrt(x[i]**2+y[j]**2)),u1,u2)*(z[j,i]*0.0+1.0)#Last multiplication is to put NaNs back into place.
     flux_grid /= np.nansum(flux_grid)
     return(flux_grid)
 
 
-@jit
-def calc_flux_stellar(x,y,u1,u2):
-    # I timed this to be 1000 times faster than the older for-loop way. Thanks jax.
-    z,x_full,y_full = calc_z(x,y)#Jitted
-    d=1-z
-    flux_grid = ops.limb_darkening(z,u1,u2)#Jitted
-    return(flux_grid/jnp.nansum(flux_grid))
+
