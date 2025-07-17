@@ -1,7 +1,7 @@
 from jax import jit
 from jax import numpy as jnp
 from jaxoplanet.orbits import keplerian
-from starrotator.lib.constants import rad_in_deg, R_sun, d_in_seconds, c_light
+from starrotator.lib.constants import rad_in_deg, R_sun, d_in_seconds, c as c_light
 
 @jit
 def pos_eccentric(phase, M = 1.0, m = 0.0, P = 365.0, e = 0.0, omega = 0.0,
@@ -97,3 +97,35 @@ def doppler_factor(v):
     beta = v * 1e5 / c_light # c is in cgs so convert v to km/s.
     f = jnp.sqrt((1 + beta)/(1 - beta))
     return(f)
+
+
+
+
+@jit
+def doppler_shift(wl,fx,v):
+    """Doppler-shift a spectrum.
+
+        Parameters
+        ----------
+        wl : array-like
+            The wavelength axis of the spectrum, 1D array.
+        fx : array-like
+            The corresponding flux axis, 1D array.
+        v : float, array-like
+            The radial velocity (positive = redshift) in km/s.
+            Multiple velocities can be provided in the same array.
+
+
+        Returns
+        -------
+        fx_shifted: array-like
+            The shifted spectrum evaluated on the original wavelength axis.
+            If multiple velocities are given, this is a 2D array matching the 
+            number of RVs to be shifted to. Note that edges are not extrapolated
+            or handled: Edge values are repeated.
+    """
+    g = doppler_factor(v)
+    fx_shifted = jnp.interp(wl/g[:,None], wl, fx)
+    return(fx_shifted)
+
+
