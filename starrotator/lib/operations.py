@@ -504,7 +504,8 @@ def vert_int_q_ld(x,a1,a2):
         II : float, array-like
             The integral at location x.
     """ 
-    #I have established that this returns the same answer as 
+    # I have established that this returns the same answer as numerically
+    # integrating the limb darkened flux disk in the y direction.
     U = 1-x**2
     a0 = 1-a1-a2
     return( jnp.sqrt(U) * (a0+a2-a2*x**2 - a2*U/3) + jnp.pi*a1/4 * U)

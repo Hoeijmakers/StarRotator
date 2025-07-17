@@ -1,13 +1,8 @@
 def test_placeholder():
     assert 1 + 1 == 2
 
-
-# def test_import():
-#     from starrotator import starrotator 
-
-
 def test_imports():
-    #Test all dependencies
+    #Test all import statements that occur in this codebase.
     from starrotator import StarRotator
     import matplotlib.pyplot as plt
     from matplotlib import cm, colors
@@ -22,8 +17,9 @@ def test_imports():
     import starrotator.lib.operations as ops
     import starrotator.lib.stellar_spectrum
     import starrotator.lib.vgrid as vgrid
-    import starrotator.lib.integrate
+    import starrotator.lib.integrate_depr
     import starrotator.lib.util as util
+    from starrotator.lib.util import gaussian
     import astropy.io.fits as fits
     import astropy.units as u
     import scipy.interpolate as interp
@@ -33,8 +29,13 @@ def test_imports():
     import imp
     import sys
     from importlib.resources import files
+    from functools import partial
+    import jax
+    from jax import jit, lax
+    import jax.numpy as jnp
+    from starrotator.lib.constants import rad_in_deg, R_sun, d_in_seconds, c as c_light
 
-"""
+
 def test_demo_files():
     from importlib.resources import files
     import starrotator.lib.util as util
@@ -45,6 +46,45 @@ def test_demo_files():
 
 
 
+def test_integrators():
+    """This tests the consistency of the v1 and v2 integrators."""
+    import numpy as np
+    from starrotator.lib.util import gaussian
+    from starrotator.lib.vgrid import calc_vel_stellar, calc_flux_stellar
+    from starrotator.lib.integrate import sum_stellar_spectrum_v1, sum_stellar_spectrum_v2
+
+    Nwl = 5000
+    wl = np.linspace(399,401,Nwl)
+    fx = gaussian(wl,-0.5,400,0.01,1.0) 
+
+    N = 100
+    x = np.linspace(-1,1,N)
+    y = x*1.0
+    a1,a2 = 0.2,0.2
+    i_stellar,vel_eq,diff_rot_rate = 90.0,100.0,0.0
+
+    flux_disk = calc_flux_stellar(x,y,a1,a2)
+    vel_disk  = calc_vel_stellar(x,y,i_stellar, vel_eq, diff_rot_rate)
+
+    F1 = sum_stellar_spectrum_v1(wl,fx,x,vel_eq,i_stellar,a1,a2)
+    F2 = sum_stellar_spectrum_v2(wl,fx,vel_disk,flux_disk)
+
+    maxdiff = np.max(np.abs((F1-F2)/F1))
+    
+    assert(maxdiff < 3e-4 * (100/N)**2 )
+    #The relative error between these two methods may be more than 
+    # 3e-4 for any wavelength point when N = 100. Error goes as the
+    # square of N. And I suspect that the 2D integrator is actually
+    # the source of the inaccuracy, for low N.
+
+
+
+
+
+
+#This breaks until integration, dynamics and new ways of calling these, are refactored. 
+#I.e. until a long while from now. But we're getting there!
+"""
 def test_StarRotator():
     from starrotator import StarRotator
     import matplotlib.pyplot as plt
@@ -60,7 +100,7 @@ def test_StarRotator():
     import starrotator.lib.operations as ops
     import starrotator.lib.stellar_spectrum
     import starrotator.lib.vgrid as vgrid
-    import starrotator.lib.integrate
+    import starrotator.lib.integrate_depr
     import astropy.io.fits as fits
     import astropy.units as u
     import scipy.interpolate as interp
@@ -123,9 +163,7 @@ def test_StarRotator():
 
     assert KELT5.status == 'success'
 
-    
-
-
+    #
     pysme_error = 0
     try:
         from pysme.sme import SME_Structure as SME_Struct
