@@ -161,3 +161,14 @@ def dimtest(var,sizes,varname=''):
         if sizes[i] > 0:
             if sizes[i] != sizes_var[i]:
                 raise Exception("Dimension Error: Axis %s of variable %s contains %s elements, but %s were required." % (i,varname,sizes_var[i],sizes[i]))
+
+
+from jax import jit
+import jax.numpy as jnp
+
+@jit
+def gaussian(x,A,mu,sig,cont=0.0):
+    """This produces a gaussian function on the grid x with amplitude A, mean mu
+    and standard deviation sig. Will need to expand it with a version that has
+    a polynomial continuum in the same way that IDL does it."""
+    return A * jnp.exp(-0.5*(x - mu)/sig*(x - mu)/sig)+cont
