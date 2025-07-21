@@ -170,7 +170,9 @@ def calc_flux_stellar(x,y,u1,u2,norm=True):
 
     # The limb darkening function below is jitted. And x,y are passed such that they broadcast
     # into a 2D array.
-    flux_grid = ops.limb_darkening(jnp.sqrt(x[None, :]**2 + y[:,None]**2),u1,u2)
+    d = jnp.sqrt(x[None, :]**2 + y[:,None]**2)
+    d_clipped = jnp.where(d > 1,jnp.nan,d)
+    flux_grid = ops.limb_darkening(d_clipped,u1,u2)
     if norm:
         return(flux_grid/jnp.nansum(flux_grid))
     else:

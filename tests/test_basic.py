@@ -26,7 +26,6 @@ def test_imports():
     import astropy.constants as consts
     import numpy as np
     import copy
-    import imp
     import sys
     from importlib.resources import files
     from functools import partial
@@ -52,6 +51,7 @@ def test_integrators():
     from starrotator.lib.util import gaussian
     from starrotator.lib.vgrid import calc_vel_stellar, calc_flux_stellar
     from starrotator.lib.integrate import sum_stellar_spectrum_v1, sum_stellar_spectrum_v2
+    from starrotator.lib.operations import circ_int_q_ld
 
     Nwl = 5000
     wl = np.linspace(399,401,Nwl)
@@ -60,7 +60,7 @@ def test_integrators():
     N = 100
     x = np.linspace(-1,1,N)
     y = x*1.0
-    a1,a2 = 0.2,0.2
+    a1,a2 = 0.2,0.3
     i_stellar,vel_eq,diff_rot_rate = 90.0,100.0,0.0
 
     flux_disk = calc_flux_stellar(x,y,a1,a2)
@@ -76,6 +76,19 @@ def test_integrators():
     # 3e-4 for any wavelength point when N = 100. Error goes as the
     # square of N. And I suspect that the 2D integrator is actually
     # the source of the inaccuracy, for low N.
+
+    flux_disk_2 = calc_flux_stellar(x,y,a1,a2,norm=False)
+    dx = x[1]-x[0]
+    dy = dx*1.0
+    int_numerical = np.nansum(flux_disk_2*dx*dy)
+    int_theoretical = circ_int_q_ld(a1,a2)
+    numerical_error = (int_numerical-int_theoretical) / int_theoretical
+
+    assert(np.abs(numerical_error) < 0.003)
+    # For N=100, the relative error on the total integral is 3e-3 and 
+    # # this depends a bit on the limb darkening parameters.
+
+
 
 
 

@@ -487,28 +487,52 @@ def limb_darkening(r,a1,a2):
     return(I)
 
 
+#Agruably this should be in integrate.py.
 @jit
 def vert_int_q_ld(x,a1,a2):
     """Evaluate the vertical integral of the quadratic limb darkening law, integrating in the +y
-    direction from the x-axis. Evaluated at some value of x. This is analytical and not very pretty.
+    direction from the x-axis. Evaluated at some value of x. This is analytical and obtaining
+    this is not very pretty.
 
         Parameters
         ----------
         x : float, array-like
             The projected distance from the stellar center in units of stellar radii,
             bounded between 0 and 1, along the x-axis.
-        u1,u2: float,
+        a1,a2: float,
             Linear and quadratic limb-darkening coefficients.
         Returns
         -------
         II : float, array-like
-            The integral at location x.
+            The integral at location x, of the same dimension as x.
     """ 
     # I have established that this returns the same answer as numerically
     # integrating the limb darkened flux disk in the y direction.
     U = 1-x**2
     a0 = 1-a1-a2
     return( jnp.sqrt(U) * (a0+a2-a2*x**2 - a2*U/3) + jnp.pi*a1/4 * U)
+
+
+@jit
+def circ_int_q_ld(a1,a2):
+    """This provides the disk-integrated flux of a limb-darkened disk. This acts as a 
+    normalization constant. Deriving it is not pretty but the result is.
+
+        Parameters
+        ----------
+        a1,a2: float,
+            Linear and quadratic limb-darkening coefficients.
+
+        Returns
+        -------
+        II : float
+            The disk-integral.
+    """ 
+    a0 = 1-a1-a2
+    return(2*jnp.pi * (a0/2 + a1/3 + a2/4))
+
+
+    
 
 
 
