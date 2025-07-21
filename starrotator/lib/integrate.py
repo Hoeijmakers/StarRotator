@@ -178,21 +178,22 @@ def sum_hidden_spectrum_v1(wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N=50,batched=Tr
             (so this is a 2D array if xp,yp are 1D).
     """
 
-@partial(jax.jit,static_argnames=['N','batched'])
-def sum_hidden_spectrum_v2(wl,fx,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=50,batched=True):
+
+
+
+
+
+@partial(jax.jit,static_argnames=['batched'])
+def sum_hidden_spectrum_v2(wl,fx,vel_grid_array,flux_grid_array,batched=True):
     """This builds the stellar spectrum that is hidden behind the planet by doppler-shifting 
         and interpolating the input spectrum, summing only over the range of coordinates that is
         obscured by the planet disk.
 
-        This version of the integration assumes a SIMPLE VELOCITY GRID (that means: without drr)
+        This version of the integration assumes a FREE VELOCITY GRID (that means: with drr)
         and a MU-INDEPENDENT (static) stellar spectrum. The only center-to-limb variation is 
-        modelled by broad-band limb darkening. This version of the integration is fastest because
-        it uses the axial symmetry of the disk, so it only computes the velocity of the disk along
-        the projected equator, and the limb darkening function is integrated analytically.
+        modelled by broad-band limb darkening. 
 
-        This is the fastest possible approximation.
-
-        This function integrates in a manner that is equivalent to sum_stellar_spectrum_v1.
+        This function integrates in a manner that is equivalent to sum_stellar_spectrum_v2.
 
         Parameters
         ----------
@@ -202,6 +203,59 @@ def sum_hidden_spectrum_v2(wl,fx,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N
         fx : array-like
             The stellar model fluxes corresponding to wl.
 
+        vel_grid : array-like
+            An array of 2D velocity grids of the stellar disk that are hidden behind the planet.
+            Generally this is a circular map in a square matrix.
+            Values outside of each disk (in the corners of the square) are assumed to be set to NaN,
+            as well as values that are outside of the stellar disk. Use the function 
+            create_hidden_grid_array() to make this out of known planet-star parameters.
+
+        flux_grid : array-like
+            An array of the 2D broad-band flux maps of the stellar disk. Should have the same
+            dimensions and axes as vel_grid.
+
+        batched : bool
+            Compute the integration phase-by-phase (True) or all at once (warning: very memory hungry).
+
+
+        Returns
+        -------
+        F : array
+            The flux axis of the summed spectrum corresponding to the input wavelength points, for each planet position
+            (so this is generally a 2D array). Note that the result is unnormalised and therefore depends on the
+            normalization of the flux grid array and of the input spectrum.
+    """
+
+    def scan_fn(carry, inputs):
+        vel_i, flux_i = inputs  # Each is a planetary flux grid.
+        sum_i = sum_stellar_spectrum_v2(wl,fx,vel_i,flux_i,batched=batched)
+        carry += 1
+        return carry, sum_i  # No output needs to be collected.
+
+    _, F_out = lax.scan(scan_fn, 0, (vel_grid_array.T, flux_grid_array.T))
+
+    #F_out_norm = F_out * dxR**2 / int_analytical 
+
+    return(F_out)
+
+
+
+
+
+@partial(jax.jit,static_argnames=['N'])
+def create_hidden_grid_array(xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=50):
+    """This builds arrays of the flux grid and velocity grid of the stellar disk that are
+        hidden behind the planet.
+
+        This version creates a FREE VELOCITY GRID (that means: with possible drr), and the 
+        possibility to add center-to-limb variation is modelled by broad-band limb darkening. 
+
+        The output are 3D arrays of flux and velocity grids, one for each phase of the planet,
+        with areas that are outside the planet or stellar disk set to NaN. These are designed
+        to be passed into sum_hidden_spectrum_v2.
+
+        Parameters
+        ----------
         xp : array-like
             The horizontal location of the planet, either as a float or as a 1D array.
 
@@ -224,29 +278,25 @@ def sum_hidden_spectrum_v2(wl,fx,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N
             Quadratic limb darkening coefficient.
 
         N : int
-            Number of grid-points onto which the planet is simulated. Note that the resolution of the planet is independent
-            of the resolution of the grid of the star. Note that as this calculation is batched over planet positions, cases where
-            you have many planet positions and high N will result in high memory load if batched is set to false.
-
-        batched : bool
-            Compute the integration phase-by-phase (True) or all at once (warning: very memory hungry).
+            Number of grid-points onto which the planet is simulated. Note that the resolution of 
+            the planet is independent of the resolution of the grid of the star. Also note that 
+            as this calculation is batched over planet positions, cases where you have many planet 
+            positions and high N will result in high memory load if batched is set to false.
 
 
         Returns
         -------
-        F : array
-            The flux axis of the summed spectrum corresponding to the input wavelength points, for each planet position
-            (so this is a 2D array if xp,yp are 1D).
+        flux_grid_array : array
+            3D array of flux grids that are hidden by the planet, meant as input for sum_hidden_spectrum_v2
+            
+        vel_grid_array : array
+            3D array of velocity grids that are hidden by the planet, meant as input for sum_hidden_spectrum_v2
+
+        differential : float
+            The size of the differential (dx*R) that may be used to renormalise the flux array, since it has an 
+            aritrary size compared to that of the stellar disk.
     """
 
-
-    #BECAUSE THIS FUNCTION DOES NOT HAVE THE SAME INPUTS AS THE SUM_STELLAR_SPECTRUM WITH WHICH IT IS CONGRUENT,
-    #I MAY NEED TO SPLIT THIS WHOLE MAKING A GRID-ARRAY FOR THE PLANET POSITIONS OFF INTO A SEPARATE FUNCTION...!
-    #WHAT IF THE USER WANTS TO SUM OVER A CUSTOM FLUX GRID? WITH SPOTS OR SMTH...? THEN THIS DOES NOT HAVE THE SAME
-    #FUNCTIONALITY AS V2, BUT ITS IN BETWEEN V1 AND V2...
-
-    #AND WHAT ABOUT NORMALIZATION? IS THIS NORMALIZED THE SAME WAY AS V2? NO, BECAUSE IT DEPENDS ON HOW THE USER
-    #NORMALISES THE FLUX GRID... THIS NEEDS TO BE STREAMLINED SO THAT IT MAKES SENSE!
     x = jnp.linspace(-1,1,N)
     dx = x[1]-x[0]
 
@@ -256,7 +306,7 @@ def sum_hidden_spectrum_v2(wl,fx,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N
     d = jnp.sqrt(x[None,:]**2 + x[:,None]**2)
     mask = jnp.where(d > 1,jnp.nan,d)*0.0+1.0
 
-    int_analytical = circ_int_q_ld(a1,a2)
+    # int_analytical = circ_int_q_ld(a1,a2)
 
     flux_disk_array  = calc_flux_stellar(x_array.T,y_array.T,a1,a2,norm=False) #This is really, really awesome. #Need to figure out how to scale these slices using the total integral of the LD profile.
     vel_disk_array  = calc_vel_stellar(x_array.T,y_array.T,i_stellar, vel_eq, diff_rot_rate)
@@ -265,19 +315,13 @@ def sum_hidden_spectrum_v2(wl,fx,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N
     flux_disk_array_masked = flux_disk_array*mask.T[:,:,None] #This crops out the circle that is the planet.
     vel_disk_array_masked = vel_disk_array*mask.T[:,:,None]
 
+    return(flux_disk_array_masked,vel_disk_array_masked,dxR)
 
 
-    def scan_fn(carry, inputs):
-        vel_i, flux_i = inputs  # Each is a planetary flux grid.
-        sum_i = sum_stellar_spectrum_v2(wl,fx,vel_i,flux_i,batched=True)
-        carry += 1
-        return carry, sum_i  # No output needs to be collected.
 
-    _, F_out = lax.scan(scan_fn, 0, (vel_disk_array_masked.T, flux_disk_array_masked.T))
 
-    F_out_norm = F_out * dxR**2 / int_analytical 
 
-    return(F_out_norm)
+
 
 
 
