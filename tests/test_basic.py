@@ -117,9 +117,25 @@ def test_analytical_limb_darkening():
     # filled in:
     assert(median_error_2 < 1e-9)
 
-    #The error between the column-wise vertial integration over a half disk times two, 
+    # The error between the column-wise vertial integration over a half disk times two, 
     # and the analytical disk-integral:
     assert(median_error_3 < 3e-5)
+
+
+
+    # Test that if the edges are avoided by a minimal amount, the indefinite integral version
+    # of the code does not hit singularities.
+    x = np.linspace(-1,1,200)*0.99999
+    I = vert_int_q_ld_bounded(x,0,np.sqrt(1-x**2)*0.99999,a1,a2)
+    assert(np.sum(np.isnan(I))==0)
+
+    # And that if the edges of x=-1 and x=1 are hit, there are precisely 2 nans.
+    x = np.linspace(-1,1,200)
+    I = vert_int_q_ld_bounded(x,0,np.sqrt(1-x**2)*0.99999,a1,a2)
+    assert(np.sum(np.isnan(I))==2)
+
+
+    
 
 def test_analytical_integration():
     from starrotator.lib.operations import circ_int_q_ld
