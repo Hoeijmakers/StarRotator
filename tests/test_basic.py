@@ -51,7 +51,7 @@ def test_integrators():
     from starrotator.lib.util import gaussian
     from starrotator.lib.vgrid import calc_vel_stellar, calc_flux_stellar
     from starrotator.lib.integrate import sum_stellar_spectrum_v1, sum_stellar_spectrum_v2
-    from starrotator.lib.operations import circ_int_q_ld
+
 
     Nwl = 5000
     wl = np.linspace(399,401,Nwl)
@@ -77,16 +77,102 @@ def test_integrators():
     # square of N. And I suspect that the 2D integrator is actually
     # the source of the inaccuracy, for low N.
 
+
+def test_analytical_limb_darkening():
+    from starrotator.lib.operations import vert_int_q_ld, vert_int_q_ld_bounded, circ_int_q_ld
+    from starrotator.lib.vgrid import calc_flux_stellar
+    import numpy as np
+    import matplotlib.pyplot as plt
+    N = 1000
+    x = np.linspace(-1,1,N)
+    dx = x[1]-x[0]
+    y = np.linspace(0,1,int(N/2))
+    dy = y[1]-y[0]
+
+    a1 = 0.2
+    a2 = 0.4
+
+    half_disk = calc_flux_stellar(x,y,a1,a2,norm=False)
+    I1 = np.nansum(half_disk,axis=0)*dy
+    I2 = vert_int_q_ld(x,a1,a2)
+    I3 = vert_int_q_ld_bounded(x,0.0,np.sqrt(1-x**2),a1,a2)
+    I4 = circ_int_q_ld(a1,a2)
+    # plt.plot(x,I1) # As long as these two do not agree there is some form of error or typo. Need to redo this from scratch or stop caring.
+    # plt.plot(x,I2,'--')
+    # plt.title('Wow!')
+    # plt.show()
+    median_error_1 = np.nanmedian(np.abs(I2-I1)/I2)
+    median_error_2 = np.nanmedian(np.abs(I3-I2)/I3)
+    median_error_3 = np.nanmedian(np.abs(I4-np.nansum(I2)*dx*2)/I4)
+    # print(median_error_1)
+    # print(median_error_2)
+    # print(median_error_3)
+
+    # The error between the analytical column-wise vertical integral and the numerical
+    # column-wise integral:
+    assert(median_error_1 < 2e-3)
+
+    # The error between the analytical column-wise vertical integral from y=0 to y=disk-edge
+    # and the analytical column-wise vertical integral with the indefinite integral explicitly
+    # filled in:
+    assert(median_error_2 < 1e-9)
+
+    #The error between the column-wise vertial integration over a half disk times two, 
+    # and the analytical disk-integral:
+    assert(median_error_3 < 3e-5)
+
+def test_analytical_integration():
+    from starrotator.lib.operations import circ_int_q_ld
+    import numpy as np
+    from starrotator.lib.vgrid import calc_flux_stellar
+    # This tests that the numerical integration of the limb darkened disk approaches
+    # the analytical result.
+    N = 100
+    x = np.linspace(-1,1,N)
+    y = x*1.0
+    a1,a2 = 0.2,0.3
     flux_disk_2 = calc_flux_stellar(x,y,a1,a2,norm=False)
     dx = x[1]-x[0]
     dy = dx*1.0
     int_numerical = np.nansum(flux_disk_2*dx*dy)
     int_theoretical = circ_int_q_ld(a1,a2)
     numerical_error = (int_numerical-int_theoretical) / int_theoretical
-
     assert(np.abs(numerical_error) < 0.003)
     # For N=100, the relative error on the total integral is 3e-3 and 
     # # this depends a bit on the limb darkening parameters.
+
+
+
+def test_hidden_flux():
+    import numpy as np
+    from starrotator.lib.integrate import create_hidden_grid_array, sum_hidden_spectrum_v2
+    from starrotator.lib.vgrid import calc_vel_stellar
+    from starrotator.lib.vgrid import calc_flux_stellar
+    import jax.numpy as jnp
+    import matplotlib.pyplot as plt
+    #This tests that a planet with a radius of 0.3 Rstar transiting a star without limb darkening
+    #creates a transit depth of 0.09.
+    N = 400
+    x = jnp.linspace(-1,1,N)
+    y = x*1.0
+    dx = x[1]-x[0]
+
+    xp = jnp.array([-0.3,-0.29,-0.28-0.27])
+    yp = xp*0.5
+
+
+    a1,a2 = 0.0,0.0
+    i_stellar,vel_eq,diff_rot_rate = 90.0,100.0,0.0
+    Rp = 0.3
+    wl = np.linspace(399,401,1000)
+    fx = np.ones_like(wl)
+
+    flux_disk_total = calc_flux_stellar(jnp.array(x),jnp.array(y),a1,a2,norm=False) *dx**2
+    flux_array,vel_array,dxR = create_hidden_grid_array(xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=200)
+    F_out = sum_hidden_spectrum_v2(wl,fx,vel_array,flux_array,batched=True) *dxR**2 / jnp.nansum(flux_disk_total)
+    mean_error_per_wl = np.mean(np.abs(F_out-0.09))   
+    assert(mean_error_per_wl < 1e-4)
+
 
 
 
