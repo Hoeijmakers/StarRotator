@@ -125,7 +125,7 @@ def doppler_shift(wl,fx,v):
             or handled: Edge values are repeated.
     """
     g = doppler_factor(v)
-    fx_shifted = jnp.interp(wl/g[:,None], wl, fx)
+    fx_shifted = jnp.interp(wl/g[None,:].T, wl, fx)
     return(fx_shifted)
 
 

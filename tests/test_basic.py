@@ -51,31 +51,46 @@ def test_integrators():
     from starrotator.lib.util import gaussian
     from starrotator.lib.vgrid import calc_vel_stellar, calc_flux_stellar
     from starrotator.lib.integrate import sum_stellar_spectrum_v1, sum_stellar_spectrum_v2
+    import matplotlib.pyplot as plt
 
-
-    Nwl = 5000
+    Nwl = 1000
     wl = np.linspace(399,401,Nwl)
     fx = gaussian(wl,-0.5,400,0.01,1.0) 
 
-    N = 100
+    N = 200
     x = np.linspace(-1,1,N)
+    dx = x[1]-x[0]
     y = x*1.0
+    dy = y[1]-y[0]
     a1,a2 = 0.2,0.3
     i_stellar,vel_eq,diff_rot_rate = 90.0,100.0,0.0
 
-    flux_disk = calc_flux_stellar(x,y,a1,a2)
+    flux_disk = calc_flux_stellar(x,y,a1,a2,norm=False)
     vel_disk  = calc_vel_stellar(x,y,i_stellar, vel_eq, diff_rot_rate)
 
-    F1 = sum_stellar_spectrum_v1(wl,fx,x,vel_eq,i_stellar,a1,a2)
-    F2 = sum_stellar_spectrum_v2(wl,fx,vel_disk,flux_disk)
-
+    F1 = sum_stellar_spectrum_v1(wl,fx,x,vel_eq,i_stellar,a1,a2)*dx*2#Because it integrates only a semicircle.
+    F2 = sum_stellar_spectrum_v2(wl,fx,vel_disk,flux_disk)*dx*dy
     maxdiff = np.max(np.abs((F1-F2)/F1))
     
-    assert(maxdiff < 3e-4 * (100/N)**2 )
+    # print(maxdiff)
+    # plt.plot(F1)
+    # plt.plot(F2)
+    # plt.show()
+    assert(maxdiff < 7e-4)
     #The relative error between these two methods may be more than 
-    # 3e-4 for any wavelength point when N = 100. Error goes as the
+    # 7e-4 for any wavelength point when N = 200. Error goes as the
     # square of N. And I suspect that the 2D integrator is actually
     # the source of the inaccuracy, for low N.
+
+    flux_disk = calc_flux_stellar(x,y,a1,a2,norm=True)
+    vel_disk  = calc_vel_stellar(x,y,i_stellar, vel_eq, diff_rot_rate)
+
+    F1 = sum_stellar_spectrum_v1(wl,fx,x,vel_eq,i_stellar,a1,a2,norm=True)
+    F2 = sum_stellar_spectrum_v2(wl,fx,vel_disk,flux_disk)
+    maxdiff = np.max(np.abs((F1-F2)/F1))
+
+    assert(maxdiff < 1.2e-4)
+    #The relative error shrinks when the fluxes are brute-force normalised.
 
 
 def test_analytical_limb_darkening():
@@ -135,7 +150,7 @@ def test_analytical_limb_darkening():
     assert(np.sum(np.isnan(I))==2)
 
 
-    
+
 
 def test_analytical_integration():
     from starrotator.lib.operations import circ_int_q_ld

@@ -155,7 +155,7 @@ def calc_flux_stellar(x,y,u1,u2,norm=True):
 
         norm : bool
             If set to true, the flux map is divided by its sum, normalising the sum to 1.0
-            This meant to be physically relevant in case the full disk is considered; but may not
+            This is meant to be physically relevant in case the full disk is considered; but may not
             always be desired (e.g. when comparing absolute flux values of parts of the disk). 
 
     Returns
