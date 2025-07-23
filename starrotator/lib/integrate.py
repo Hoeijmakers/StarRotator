@@ -3,14 +3,14 @@ from jax import jit, lax
 from jax import numpy as jnp
 from functools import partial
 from starrotator.lib.dynamics import doppler_shift
-from starrotator.lib.operations import vert_int_q_ld, circ_int_q_ld
+from starrotator.lib.operations import vert_int_q_ld, circ_int_q_ld, vert_int_q_ld_bounded
 from starrotator.lib.vgrid import calc_vel_stellar
 from starrotator.lib.vgrid import calc_flux_stellar
 
 
 
-@jit
-def sum_stellar_spectrum_v1(wl,fx,x,vel_eq,i_stellar,a1,a2):
+@partial(jax.jit,static_argnames=["norm"])
+def sum_stellar_spectrum_v1(wl,fx,x,vel_eq,i_stellar,a1,a2,norm=False):
     """This builds the stellar spectrum by doppler-shifting and interpolating the input spectrum.
         This version of the integration assumes a SIMPLE VELOCITY GRID (that means: without drr)
         and a MU-INDEPENDENT (static) stellar spectrum. The only center-to-limb variation is 
@@ -43,6 +43,9 @@ def sum_stellar_spectrum_v1(wl,fx,x,vel_eq,i_stellar,a1,a2):
         a2 : float
             Quadratic limb darkening coefficient.
 
+        norm : bool
+            If set to true, the weights are normalised such that all fluxes sum to 1.0
+
         Returns
         -------
         F : array
@@ -50,8 +53,13 @@ def sum_stellar_spectrum_v1(wl,fx,x,vel_eq,i_stellar,a1,a2):
     """
     v_axis = x*vel_eq*jnp.sin(jnp.radians(i_stellar)) # velocities along the y=0 axis.
     weights = vert_int_q_ld(x,a1,a2)
-    fx_shifted = doppler_shift(wl,fx,v_axis).T*weights/jnp.nansum(weights)
-    F_out = jnp.nansum(fx_shifted,axis=1)
+
+    fx_shifted = doppler_shift(wl,fx,v_axis).T*weights
+
+    if norm:
+        F_out = jnp.nansum(fx_shifted,axis=1)/jnp.nansum(weights)
+    else:
+        F_out = jnp.nansum(fx_shifted,axis=1)
     return(F_out)
 
 
@@ -124,8 +132,8 @@ def sum_stellar_spectrum_v2(wl,fx,vel_grid,flux_grid,batched=True):
 # the change in xp,yp but that can be addressed by either:
 # -writing the function such that accepts an fx-array and a mu-array. The switching logic may make this hard to jit.
 # -calling this function in a jitted loop or vmap over different fx-es, corresponding to the mu's the planet traverses.
-@partial(jax.jit,static_argnames=['N','batched'])
-def sum_hidden_spectrum_v1(wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N=50,batched=True):
+@partial(jax.jit,static_argnames=['N'])
+def sum_hidden_spectrum_v1(wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N=100):
     """This builds the stellar spectrum that is hidden behind the planet by doppler-shifting 
         and interpolating the input spectrum, summing only over the range of coordinates that is
         obscured by the planet disk.
@@ -154,6 +162,9 @@ def sum_hidden_spectrum_v1(wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N=50,batched=Tr
         yp : array-like
             The vertical location of the planet, either as a float or as a 1D array.
 
+        Rp : float
+            The radois of the planet in units of stellar radii.
+
         vel_eq : float
             The equatorial velocity of the star in km/s.
 
@@ -167,7 +178,7 @@ def sum_hidden_spectrum_v1(wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N=50,batched=Tr
             Quadratic limb darkening coefficient.
 
         N : int
-            Number of grid-points onto which the planet is simulated. Note that the resolution of the planet is independent
+            Number of grid-points in the x direction onto which the planet is simulated. Note that the resolution of the planet is independent
             of the resolution of the grid of the star. Note that as this calculation is batched over planet positions, cases where
             you have many planet positions and high N will result in high memory load if batched is set to false.
 
@@ -175,10 +186,27 @@ def sum_hidden_spectrum_v1(wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N=50,batched=Tr
         -------
         F : array
             The flux axis of the summed spectrum corresponding to the input wavelength points, for each planet position
-            (so this is a 2D array if xp,yp are 1D).
+            (so this is a 2D array as xp,yp are 1D).
+
+        differential : float
+            The size of the differential (dx*R) that may be used to renormalise the flux array, since it has an 
+            aritrary size compared to that of the stellar disk.
     """
-
-
+    x = jnp.linspace(-1,1,N)
+    dxR = (x[1]-x[0])*Rp
+    x_array = x*Rp + xp[:,None]
+    y_max = yp[:,None] + jnp.sqrt(1-x**2)*Rp
+    y_min = yp[:,None] - jnp.sqrt(1-x**2)*Rp
+    y_star_max = jnp.sqrt(1-x_array**2)*0.999999
+    y_star_min = -jnp.sqrt(1-x_array**2)*0.999999
+    y_final_max = jnp.clip(y_max,y_star_min,y_star_max)
+    y_final_min = jnp.clip(y_min,y_star_min,y_star_max)
+    v_axes = x_array*vel_eq*jnp.sin(jnp.radians(i_stellar)) # velocities along the y=0 axis.
+    weights = vert_int_q_ld_bounded(x_array,y_final_min,y_final_max,a1,a2)
+    fx_shifted = doppler_shift(wl,fx,v_axes).T*weights # /jnp.nansum(weights)
+    F_out = jnp.nansum(fx_shifted,axis=2).T
+    return(F_out,dxR)
+    # NEED TO CHECK HERE WHY THIS DOESNT NORMALISE CORRECTLY
 
 
 
@@ -316,6 +344,10 @@ def create_hidden_grid_array(xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=50)
     vel_disk_array_masked = vel_disk_array*mask.T[:,:,None]
 
     return(flux_disk_array_masked,vel_disk_array_masked,dxR)
+
+
+
+#Next continue to make v1, analytical integral.
 
 
 
