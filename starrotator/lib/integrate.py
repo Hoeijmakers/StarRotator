@@ -50,6 +50,8 @@ def sum_stellar_spectrum_v1(wl,fx,vel_eq,i_stellar,a1,a2,N=400,norm=False):
         -------
         F : array
             The flux axis of the summed spectrum corresponding to the input wavelength points.
+            Note that the flux is multiplied by the differential dx, so that the integral is 
+            insensitive to N.
     """
     x = jnp.linspace(-1,1,N)
     dx = x[1]-x[0]
@@ -150,6 +152,7 @@ def sum_hidden_spectrum_v1(wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N=100):
 
         This function integrates in a manner that is equivalent to sum_stellar_spectrum_v1.
 
+
         Parameters
         ----------
         wl : array-like
@@ -188,9 +191,10 @@ def sum_hidden_spectrum_v1(wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N=100):
         -------
         F : array
             The flux axis of the summed spectrum corresponding to the input wavelength points, for each planet position
-            (so this is a 2D array as xp,yp are 1D). This is scaled to an arbitrary number, but this scaling corresponds
+            (so this is a 2D array as xp,yp are 1D). This integrates to an arbitrary number, but this scaling corresponds
             to the scaling of the full disk. Normalisation is therefore achieved by dividing by the integral of the full
-            disk, that depends only on a1 and a2.
+            disk, that depends only on a1 and a2. Note that as part of this process, the flux is multiplied by the
+            differential dx*R, so that the integral is insensitive to N.
     """
     x = jnp.linspace(-1,1,N)
     dxR = (x[1]-x[0])*Rp

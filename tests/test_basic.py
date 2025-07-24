@@ -68,7 +68,7 @@ def test_integrators():
     flux_disk = calc_flux_stellar(x,y,a1,a2,norm=False)
     vel_disk  = calc_vel_stellar(x,y,i_stellar, vel_eq, diff_rot_rate)
 
-    F1 = sum_stellar_spectrum_v1(wl,fx,x,vel_eq,i_stellar,a1,a2)*dx*2#Because it integrates only a semicircle.
+    F1 = sum_stellar_spectrum_v1(wl,fx,vel_eq,i_stellar,a1,a2,N=N,norm=False)
     F2 = sum_stellar_spectrum_v2(wl,fx,vel_disk,flux_disk)*dx*dy
     maxdiff = np.max(np.abs((F1-F2)/F1))
     
@@ -85,7 +85,7 @@ def test_integrators():
     flux_disk = calc_flux_stellar(x,y,a1,a2,norm=True)
     vel_disk  = calc_vel_stellar(x,y,i_stellar, vel_eq, diff_rot_rate)
 
-    F1 = sum_stellar_spectrum_v1(wl,fx,x,vel_eq,i_stellar,a1,a2,norm=True)
+    F1 = sum_stellar_spectrum_v1(wl,fx,vel_eq,i_stellar,a1,a2,N=400,norm=True)
     F2 = sum_stellar_spectrum_v2(wl,fx,vel_disk,flux_disk)
     maxdiff = np.max(np.abs((F1-F2)/F1))
 
@@ -216,7 +216,7 @@ def test_hidden_flux():
     assert(mean_error_per_wl < 1e-4)
 
 
-    #Final testing: 
+    #Final testing to ensure that v1 and v2 produce essentially the same output: 
     xp = jnp.array([-0.2,0.0,0.2])
     yp = xp*0.0
 
@@ -231,8 +231,7 @@ def test_hidden_flux():
 
     mean_error = np.mean((F_in_v1[0]-F_in_v2[0])/F_in_v1[0])
     assert(mean_error < 6e-4)
-    # plt.plot(wl,(F_in_v1[0]-F_in_v2[0])/F_in_v1[0])
-    # plt.show()
+
 
 
 
