@@ -6,7 +6,7 @@ authors = [
   { name="Jens Hoeijmakers", email="jens.hoeijmakers@fysik.lu.se" }
 ]
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 
 dependencies = [
   "numpy",

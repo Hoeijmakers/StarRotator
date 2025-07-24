@@ -9,8 +9,8 @@ from starrotator.lib.vgrid import calc_flux_stellar
 
 
 
-@partial(jax.jit,static_argnames=["norm"])
-def sum_stellar_spectrum_v1(wl,fx,x,vel_eq,i_stellar,a1,a2,norm=False):
+@partial(jax.jit,static_argnames=["N","norm"])
+def sum_stellar_spectrum_v1(wl,fx,vel_eq,i_stellar,a1,a2,N=400,norm=False):
     """This builds the stellar spectrum by doppler-shifting and interpolating the input spectrum.
         This version of the integration assumes a SIMPLE VELOCITY GRID (that means: without drr)
         and a MU-INDEPENDENT (static) stellar spectrum. The only center-to-limb variation is 
@@ -51,6 +51,8 @@ def sum_stellar_spectrum_v1(wl,fx,x,vel_eq,i_stellar,a1,a2,norm=False):
         F : array
             The flux axis of the summed spectrum corresponding to the input wavelength points.
     """
+    x = jnp.linspace(-1,1,N)
+    dx = x[1]-x[0]
     v_axis = x*vel_eq*jnp.sin(jnp.radians(i_stellar)) # velocities along the y=0 axis.
     weights = vert_int_q_ld(x,a1,a2)
 
@@ -59,8 +61,8 @@ def sum_stellar_spectrum_v1(wl,fx,x,vel_eq,i_stellar,a1,a2,norm=False):
     if norm:
         F_out = jnp.nansum(fx_shifted,axis=1)/jnp.nansum(weights)
     else:
-        F_out = jnp.nansum(fx_shifted,axis=1)
-    return(F_out)
+        F_out = jnp.nansum(fx_shifted,axis=1)*2*dx
+    return(F_out)#Factor of 2 because this is calculating a semi-circle.
 
 
 
@@ -186,11 +188,9 @@ def sum_hidden_spectrum_v1(wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N=100):
         -------
         F : array
             The flux axis of the summed spectrum corresponding to the input wavelength points, for each planet position
-            (so this is a 2D array as xp,yp are 1D).
-
-        differential : float
-            The size of the differential (dx*R) that may be used to renormalise the flux array, since it has an 
-            aritrary size compared to that of the stellar disk.
+            (so this is a 2D array as xp,yp are 1D). This is scaled to an arbitrary number, but this scaling corresponds
+            to the scaling of the full disk. Normalisation is therefore achieved by dividing by the integral of the full
+            disk, that depends only on a1 and a2.
     """
     x = jnp.linspace(-1,1,N)
     dxR = (x[1]-x[0])*Rp
@@ -204,9 +204,8 @@ def sum_hidden_spectrum_v1(wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N=100):
     v_axes = x_array*vel_eq*jnp.sin(jnp.radians(i_stellar)) # velocities along the y=0 axis.
     weights = vert_int_q_ld_bounded(x_array,y_final_min,y_final_max,a1,a2)
     fx_shifted = doppler_shift(wl,fx,v_axes).T*weights # /jnp.nansum(weights)
-    F_out = jnp.nansum(fx_shifted,axis=2).T
-    return(F_out,dxR)
-    # NEED TO CHECK HERE WHY THIS DOESNT NORMALISE CORRECTLY
+    F_out = jnp.nansum(fx_shifted,axis=2).T * dxR #Multiply with the differential for normalization.
+    return(F_out)
 
 
 
@@ -346,8 +345,6 @@ def create_hidden_grid_array(xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=50)
     return(flux_disk_array_masked,vel_disk_array_masked,dxR)
 
 
-
-#Next continue to make v1, analytical integral.
 
 
 

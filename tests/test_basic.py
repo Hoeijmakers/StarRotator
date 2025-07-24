@@ -93,6 +93,9 @@ def test_integrators():
     #The relative error shrinks when the fluxes are brute-force normalised.
 
 
+
+
+
 def test_analytical_limb_darkening():
     from starrotator.lib.operations import vert_int_q_ld, vert_int_q_ld_bounded, circ_int_q_ld
     from starrotator.lib.vgrid import calc_flux_stellar
@@ -149,6 +152,14 @@ def test_analytical_limb_darkening():
     I = vert_int_q_ld_bounded(x,0,np.sqrt(1-x**2)*0.99999,a1,a2)
     assert(np.sum(np.isnan(I))==2)
 
+    # Test that the analytical full-circle integration is normalised the same way as the 
+    # edge-bounded indefinite-integral version.
+    X = np.linspace(-1,1,800)*0.99999
+    dX = X[1]-X[0]
+    I1 = circ_int_q_ld(0.0,0.0)
+    I2 = np.sum(vert_int_q_ld_bounded(X,-np.sqrt(1-X**2)*0.99999,np.sqrt(1-X**2)*0.99999,0,0)*dX)
+    assert(np.abs(I1-I2)/I1 < 1e-4)
+
 
 
 
@@ -176,7 +187,7 @@ def test_analytical_integration():
 
 def test_hidden_flux():
     import numpy as np
-    from starrotator.lib.integrate import create_hidden_grid_array, sum_hidden_spectrum_v2
+    from starrotator.lib.integrate import create_hidden_grid_array, sum_hidden_spectrum_v2, sum_stellar_spectrum_v1, sum_hidden_spectrum_v1
     from starrotator.lib.vgrid import calc_vel_stellar
     from starrotator.lib.vgrid import calc_flux_stellar
     import jax.numpy as jnp
@@ -205,9 +216,23 @@ def test_hidden_flux():
     assert(mean_error_per_wl < 1e-4)
 
 
+    #Final testing: 
+    xp = jnp.array([-0.2,0.0,0.2])
+    yp = xp*0.0
 
+    F_in_v1 = sum_hidden_spectrum_v1(wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N=500)
 
+    x = jnp.linspace(-1,1,500)
+    y = x*1.0
+    dx = x[1]-x[0]
 
+    flux_grid_array,vel_grid_array,dxR = create_hidden_grid_array(xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=300)
+    F_in_v2 = sum_hidden_spectrum_v2(wl,fx,vel_grid_array,flux_grid_array,batched=True) *dxR**2 
+
+    mean_error = np.mean((F_in_v1[0]-F_in_v2[0])/F_in_v1[0])
+    assert(mean_error < 6e-4)
+    # plt.plot(wl,(F_in_v1[0]-F_in_v2[0])/F_in_v1[0])
+    # plt.show()
 
 
 
