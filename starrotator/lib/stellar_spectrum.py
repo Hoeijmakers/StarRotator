@@ -25,25 +25,18 @@ def get_spectrum(T,logg,Z,a):
             The names of the files containing the wavelength and flux axes of
             the requested spectrum.
         """
-    import requests
     import shutil
     import urllib.request as request
     from contextlib import closing
-    import sys
     import os.path
-    import lib.test as test
+    import sys
+    from starrotator.lib.util import vartest, get_cache_dir, dir_exists, file_exists
 
     #First run standard tests on the input
-    test.typetest(T,[int,float],varname='T in get_spectrum')
-    test.typetest(logg,[int,float],varname='logg in get_spectrum')
-    test.typetest(Z,[int,float],varname='metallicity in get_spectrum')
-    test.typetest(a,[int,float],varname='alpha in get_spectrum')
-    test.nantest(T,varname='T in get_spectrum')
-    test.nantest(logg,varname='logg in get_spectrum')
-    test.nantest(Z,varname='Z in get_spectrum')
-    test.nantest(a,varname='a in get_spectrum')
-    test.notnegativetest(T,varname='T in get_spectrum')
-
+    vartest(T,varname='T in get_spectrum',types = [int,float],nonans=True,notnegative=True)
+    vartest(logg,varname='logg in get_spectrum',types = [int,float],nonans=True,notnegative=True)
+    vartest(Z,varname='metallicity (Z) in get_spectrum',types = [int,float],nonans=True)
+    vartest(a,varname='alpha in get_spectrum',types = [int,float],nonans=True)    
 
     #This is where phoenix spectra are located.
     root = 'ftp://phoenix.astro.physik.uni-goettingen.de/HiResFITS/'
@@ -64,33 +57,35 @@ def get_spectrum(T,logg,Z,a):
         t_string = '0'+t_string
     g_string = '-'+'{:.2f}'.format(float(logg))
 
-
     #These are URLS for the input files.
     waveurl = root+'WAVE_PHOENIX-ACES-AGSS-COND-2011.fits'
     specurl = root+'PHOENIX-ACES-AGSS-COND-2011/Z'+z_string+a_string+'/lte'+t_string+g_string+z_string+a_string+'.PHOENIX-ACES-AGSS-COND-2011-HiRes.fits'
 
-    #These are the output filenames, they will also be returned so that the wrapper
-    #of this function can take them in.
-    wavename = 'data/PHOENIX/WAVE.fits'
+    cache_dir = get_cache_dir()/'PHOENIX'
+    if cache_dir.exists() == False:
+        cache_dir.mkdir(parents=True, exist_ok=True)
+    dir_exists(cache_dir)
 
-    if os.path.isdir('data/PHOENIX/') == False:
-        os.makedirs('data/PHOENIX/')
-
-
-    specname = 'data/PHOENIX/lte'+t_string+g_string+z_string+a_string+'.PHOENIX-ACES-AGSS-COND-2011-HiRes.fits'
+    #These are the locations of the expected PHOENIX data.
+    wavename = cache_dir/'WAVE.fits'
+    specname = cache_dir/('lte'+t_string+g_string+z_string+a_string+'.PHOENIX-ACES-AGSS-COND-2011-HiRes.fits')
 
     #If it doesn't already exists, we download them, otherwise, we just pass them on:
-    if os.path.exists(wavename) == False:
+    if wavename.exists() == False:
+        print(f'--- Downloading {str(wavename)} to {str(cache_dir)}')
         with closing(request.urlopen(waveurl)) as r:
             with open(wavename, 'wb') as f:
                 shutil.copyfileobj(r, f)
-    if os.path.exists(specname) == False:
-        print(specurl)
+    if specname.exists() == False:
+        print(f'--- Downloading {str(specname)} to {str(cache_dir)}')
         with closing(request.urlopen(specurl)) as r:
             with open(specname, 'wb') as f:
                 shutil.copyfileobj(r, f)
-    return(wavename,specname)
 
+    file_exists(wavename)
+    file_exists(specname)
+    return(wavename,specname)
+    # CONTINUE HERE NEXT TIME.
 
 def read_spectrum(T,logg,metallicity=0.0,alpha=0.0):
     """Wrapper for the function get_spectrum() above, that checks that the input
