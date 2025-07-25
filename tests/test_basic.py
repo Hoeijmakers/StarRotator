@@ -237,6 +237,10 @@ def test_cache():
     """This tests the handling of cache configuration and creation."""
     import starrotator.lib.util as ut
 
+    # Define a temporary testing config file to not overwrite existing configs.
+    ut.CONFIG_FILE = ut.CONFIG_DIR / "config_testing.json"
+
+
     # Test that a default cache path can be defined and that nothing exists there.
     P = ut.get_default_cache_dir()
     # assert(P.exists() == False) # This would fail if starrotator is not freshly installed.
@@ -268,10 +272,12 @@ def test_cache():
     P3 = ut.get_cache_dir()
     assert(str(P3) == str(P))
 
-    
 
-
-
+    # Test that set_cache_dir works to update the config file.
+    ut.set_cache_dir('void')
+    config = ut.load_config()
+    assert("cache_dir" in config)
+    assert(config["cache_dir"] == 'void')
 
 
 

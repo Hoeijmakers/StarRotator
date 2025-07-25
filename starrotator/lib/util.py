@@ -246,7 +246,6 @@ def load_config() -> dict:
     """Load config.json that points to the cache location. If it doesn't exist,
       or can't be read, a warning will be printed and the default cache 
       location will be assumed."""
-    
     if not CONFIG_FILE.exists():
         print(f"Warning: No {CONFIG_FILE} exists. Proceeding with default cache location at {str(get_default_cache_dir())}.")
         print('To remove this warning while still using the default cache, create a default config file by running:')
