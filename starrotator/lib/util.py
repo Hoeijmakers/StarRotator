@@ -35,10 +35,10 @@ def check_integrity_input(input_dict,additional_keywords=[]):
 
 
 
-def vartest(var,varname='',nan=False,pos=False,notnegative=False,types=[],dims=[]):
+def vartest(var,varname='',nonans=False,pos=False,notnegative=False,types=[],dims=[]):
     """This is a shorthand containing the tests below to be able to test input on multiple
     criteria at once."""
-    if nan:
+    if nonans:
         nantest(var,varname)
     if pos:
         postest(var,varname)
@@ -70,22 +70,24 @@ def notnegativetest(a,varname=''):
         raise ValueError('Variable %s is negative.' % varname)
 
 def file_exists(file,varname=''):
-    """This program tests if a file exists, and prints an error otherwise."""
-    from os import path
-    import sys
-    typetest(file,str,varname='file in test.file_exists')
-    if path.isfile(file) != True:
-        print('Error: File %s does not exist.' % varname)
-        sys.exit()
+    """This program tests if a path exists, and raises an error otherwise."""
+    from pathlib import Path
+    typetest(file,[str,Path],varname='file in test.file_exists')
+
+    if Path(file).exists() != True:
+        raise FileNotFoundError(f'{varname} does not exist.')
+    if Path(file).is_file() != True:
+        raise FileNotFoundError(f'{varname} is not a file.')
 
 def dir_exists(dir,varname=''):
     """This program tests if a directory exists, and prints an error otherwise."""
-    from os import path
+    from pathlib import Path
     import sys
-    typetest(dir,str,varname='dir in test.dir_exists')
-    if path.isdir(dir) != True:
-        print('Error: Directory %s does not exist.' % varname)
-        sys.exit()
+    typetest(dir,[str,Path],varname='dir in test.dir_exists')
+    if Path(dir).exists() != True:
+        raise FileNotFoundError(f'{varname} does not exist.')
+    if Path(dir).is_dir() != True:
+        raise FileNotFoundError(f'{varname} is not a directory.')
 
 def typetest(var,vartype,varname=''):
     """This program tests the type of var which has the name varname against
@@ -172,37 +174,6 @@ def gaussian(x,A,mu,sig,cont=0.0):
     and standard deviation sig. Will need to expand it with a version that has
     a polynomial continuum in the same way that IDL does it."""
     return A * jnp.exp(-0.5*(x - mu)/sig*(x - mu)/sig)+cont
-
-
-
-
-
-
-
-
-def create_cache_dir(user_defined_path = None):
-    from pathlib import Path
-    from platformdirs import user_cache_dir
-
-
-    if user_defined_path is None:
-        APP_NAME = "StarRotator"
-        APP_AUTHOR = "YourName"  # or organization
-
-        CACHE_DIR = Path(user_cache_dir(APP_NAME, APP_AUTHOR))
-    else: 
-        CACHE_DIR = Path(user_defined_path)
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
-
-    print(f"--- Created cache directory at: {CACHE_DIR}")
-
-
-# def get_cache_dir() -> Path:
-#     return CACHE_DIR
-
-# def clear_cache():
-#     for file in CACHE_DIR.glob("*"):
-#         file.unlink()
 
 
 

@@ -236,8 +236,10 @@ def test_hidden_flux():
 def test_cache():
     """This tests the handling of cache configuration and creation."""
     import starrotator.lib.util as ut
-
+    import copy
+    from pathlib import Path
     # Define a temporary testing config file to not overwrite existing configs.
+    current_configfile = copy.deepcopy(ut.CONFIG_FILE)
     ut.CONFIG_FILE = ut.CONFIG_DIR / "config_testing.json"
 
 
@@ -279,7 +281,9 @@ def test_cache():
     assert("cache_dir" in config)
     assert(config["cache_dir"] == 'void')
 
-
+    # Remove garbage.
+    Path(ut.CONFIG_FILE).unlink()
+    ut.CONFIG_FILE = copy.deepcopy(current_configfile)
 
 
 
