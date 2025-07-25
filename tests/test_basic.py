@@ -233,6 +233,48 @@ def test_hidden_flux():
     assert(mean_error < 6e-4)
 
 
+def test_cache():
+    """This tests the handling of cache configuration and creation."""
+    import starrotator.lib.util as ut
+
+    # Test that a default cache path can be defined and that nothing exists there.
+    P = ut.get_default_cache_dir()
+    # assert(P.exists() == False) # This would fail if starrotator is not freshly installed.
+
+    # Test that load_config (which tries to read a config file that does not exist)
+    # returns the default cache path.
+    config = ut.load_config()
+    assert("cache_dir" in config)
+    assert(config["cache_dir"] == str(P))
+
+    # Test that get_cache_dir does the same thing, in absence of a config file it returns
+    # the default cache dir and makes it.
+    P2 = ut.get_cache_dir()
+    assert(str(P) == str(P2))
+    assert(P.exists()==True)
+
+
+    # Thest that a dummy config file can be created. Permission errors are caught and should not make the test fail.
+    ut.save_config({'cache_dir' : 'void'}) 
+    config = ut.load_config()
+    assert("cache_dir" in config)
+    assert(config["cache_dir"] == 'void')
+
+    ut.save_default_config()
+    config = ut.load_config()
+    assert("cache_dir" in config)
+    assert(config["cache_dir"] == str(P))
+
+    P3 = ut.get_cache_dir()
+    assert(str(P3) == str(P))
+
+    
+
+
+
+
+
+
 
 
 

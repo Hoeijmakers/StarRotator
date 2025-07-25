@@ -172,3 +172,135 @@ def gaussian(x,A,mu,sig,cont=0.0):
     and standard deviation sig. Will need to expand it with a version that has
     a polynomial continuum in the same way that IDL does it."""
     return A * jnp.exp(-0.5*(x - mu)/sig*(x - mu)/sig)+cont
+
+
+
+
+
+
+
+
+def create_cache_dir(user_defined_path = None):
+    from pathlib import Path
+    from platformdirs import user_cache_dir
+
+
+    if user_defined_path is None:
+        APP_NAME = "StarRotator"
+        APP_AUTHOR = "YourName"  # or organization
+
+        CACHE_DIR = Path(user_cache_dir(APP_NAME, APP_AUTHOR))
+    else: 
+        CACHE_DIR = Path(user_defined_path)
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+    print(f"--- Created cache directory at: {CACHE_DIR}")
+
+
+# def get_cache_dir() -> Path:
+#     return CACHE_DIR
+
+# def clear_cache():
+#     for file in CACHE_DIR.glob("*"):
+#         file.unlink()
+
+
+
+
+
+import json
+from pathlib import Path
+import platformdirs
+
+# Harcoded paths that are mostly OS independent:
+CONFIG_DIR = Path.home() / ".starrotator"
+CONFIG_FILE = CONFIG_DIR / "config.json"
+
+def get_default_cache_dir() -> Path:
+    """Returns the default cache location (AppData folder or equivalent)."""
+    return Path(platformdirs.user_cache_dir("StarRotator","Hoeijmakers"))
+
+
+def save_default_config() -> None:
+    save_config({'cache_dir' :  str(get_default_cache_dir())})
+
+def save_config(config: dict) -> None:
+    """Saves a config.json to the home directory. In the rare cases that this is not allowed,
+    the non-existence of a config.json will be handled by the other cache functions in a default way."""
+    typetest(config,dict,varname='config in util.save_config()')
+
+    if "cache_dir" not in config:
+        raise ValueError("config variable in util.save_config() requires a key 'cache_dir'")
+    
+    try: 
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        with open(CONFIG_FILE, "w") as f:
+            json.dump(config, f, indent=4)
+        print(f'--- Created/overwrote a config.json file at {CONFIG_FILE}')
+    except PermissionError:
+        print(f"Warning: Cannot write to {CONFIG_FILE}. All cache actions will proceed with default cache location at {str(get_default_cache_dir())}.")
+        print(f"To alleviate this warning and enable usage of a custom cache, provide access to {str(CONFIG_DIR)}.")
+
+
+def load_config() -> dict:
+    """Load config.json that points to the cache location. If it doesn't exist,
+      or can't be read, a warning will be printed and the default cache 
+      location will be assumed."""
+    
+    if not CONFIG_FILE.exists():
+        print(f"Warning: No {CONFIG_FILE} exists. Proceeding with default cache location at {str(get_default_cache_dir())}.")
+        print('To remove this warning while still using the default cache, create a default config file by running:')
+        print('>>> from starrotator.lib.util import save_default_config')
+        print('>>> save_default_config()')
+
+    else:
+        try:
+            with open(CONFIG_FILE, "r") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, PermissionError):
+            print(f"Warning: {CONFIG_FILE} exists but cannot be read or decoded.")
+            print(f"Using default cache location at {str(get_default_cache_dir())}.")
+    # If we can't read or file doesn't exist, return the default cache location:
+    return({"cache_dir": str(get_default_cache_dir())})
+
+
+def set_cache_dir(new_path: str):
+    """Update the cache directory in the config file with a user-defined path. 
+    If the config file does not exist, it is created."""
+    config = load_config()
+    config["cache_dir"] = str(Path(new_path).expanduser())
+    save_config(config)
+    print(f"--- Cache directory updated to: {config['cache_dir']}")
+
+def make_cache_dir_if_not_exists(cache_dir: Path):
+        cache_dir = Path(cache_dir)
+        try:
+            cache_dir.mkdir(parents=True, exist_ok=True)  # Create if missing
+        except:
+            print(f"Warning: Cannot create a cache directory at {str(cache_dir)}.")
+            print(f"This means that functionality that relies on PHOENIX models will be unavailable.")
+            print(f"To alleviate this, make sure that a cache can be created in the default location {str(get_default_cache_dir())}")
+            print(f"Or provide a custom cache location using >>> util.set_cache_dir('your/custom/path/to/a/directory')")
+
+def get_cache_dir() -> Path:
+    """Get current cache directory from the config.json file"""
+    config = load_config()
+    cache_dir = Path(config["cache_dir"])
+    make_cache_dir_if_not_exists(cache_dir)
+    return cache_dir
+
+
+
+
+
+# def clear_cache():
+#     """Delete all files in the cache directory."""
+#     cache_dir = get_cache_dir()
+#     for file in cache_dir.glob("*"):
+#         try:
+#             file.unlink()
+#         except IsADirectoryError:
+#             for subfile in file.glob("*"):
+#                 subfile.unlink()
+#             file.rmdir()
+#     print("[StarRotator] Cache cleared.")
