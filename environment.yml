@@ -10,6 +10,7 @@ dependencies:
   - requests
   - pytest
   - pytest-cov
+  - platformdirs
   - sphinx
   - sphinx-autodoc-typehints
   - sphinx-rtd-theme

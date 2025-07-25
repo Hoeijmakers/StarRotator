@@ -15,6 +15,9 @@ dependencies = [
   "scipy",
   "requests",
   "pysme-astro",
+  "jax[cpu]",
+  "platformdirs",
+  "jaxoplanet"
 ]
 
 [build-system]
