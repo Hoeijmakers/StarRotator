@@ -28,8 +28,6 @@ def get_spectrum(T,logg,Z,a):
     import shutil
     import urllib.request as request
     from contextlib import closing
-    import os.path
-    import sys
     from starrotator.lib.util import vartest, get_cache_dir, dir_exists, file_exists
 
     #First run standard tests on the input
@@ -72,12 +70,12 @@ def get_spectrum(T,logg,Z,a):
 
     #If it doesn't already exists, we download them, otherwise, we just pass them on:
     if wavename.exists() == False:
-        print(f'--- Downloading {str(wavename)} to {str(cache_dir)}')
+        print(f'--- Downloading wavelength axis to {str(cache_dir)}')
         with closing(request.urlopen(waveurl)) as r:
             with open(wavename, 'wb') as f:
                 shutil.copyfileobj(r, f)
     if specname.exists() == False:
-        print(f'--- Downloading {str(specname)} to {str(cache_dir)}')
+        print(f'--- Downloading spectrum to {str(cache_dir)}')
         with closing(request.urlopen(specurl)) as r:
             with open(specname, 'wb') as f:
                 shutil.copyfileobj(r, f)
@@ -85,9 +83,10 @@ def get_spectrum(T,logg,Z,a):
     file_exists(wavename)
     file_exists(specname)
     return(wavename,specname)
-    # CONTINUE HERE NEXT TIME.
 
-def read_spectrum(T,logg,metallicity=0.0,alpha=0.0):
+
+# TO ADD HERE: AUTOMATIC CRAWLING OF THE PHOENIX FTP SERVER TO CHECK FOR ALLOWED FILES!
+def load_PHOENIX(T,logg,metallicity=0.0,alpha=0.0):
     """Wrapper for the function get_spectrum() above, that checks that the input
         T, log(g), metallicity and alpha are in accordance with what is provided by
         PHOENIX (as of November 1st, 2019), and passes them on to get_spectrum().
@@ -112,32 +111,27 @@ def read_spectrum(T,logg,metallicity=0.0,alpha=0.0):
 
         Returns
         -------
-        wl,f : np.array(),np.array()
-            The wavelength (nm) and flux (erg/s/cm^2/cm) axes of the requested
-            spectrum.
+        wl : array
+            The wavelength axis of the PHOENIX spectrum in nm.
+        fx : array
+            The corresponding flux axis in erg/s/cm^2/cm.
         """
     import numpy as np
-    import sys
     import astropy.io.fits as fits
-    import lib.test as test
+    from starrotator.lib.util import vartest
     phoenix_factor = np.pi#This is a factor to correct the PHOENIX spectra to produce the correctly calibrated output flux.
     #If you compare PHOENIX to other models, a factor of 3 seems to be missing. Brett Morris encountered this problem when trying
     #to use PHOENIX to predict the received flux of real sources, to construct an ETC. He also needed a factor of 3, which he
     #interpreted as a missing factor of pi. So pi it is, until something else is deemed better (or until PHOENIX updates
     #their grid).
+    #Note that this is unlikely to matter as starrotator deals with relative spectra or even normalised spectra anyway.
 
 
     #First run standard tests on the input:
-    test.typetest(T,[int,float],varname='T in read_spectrum')
-    test.typetest(logg,[int,float],varname='logg in read_spectrum')
-    test.typetest(metallicity,[int,float],varname='metallicity in read_spectrum')
-    test.typetest(alpha,[int,float],varname='alpha in read_spectrum')
-    test.nantest(T,varname='T in get_spectrum')
-    test.nantest(logg,varname='logg in get_spectrum')
-    test.nantest(metallicity,varname='Z in get_spectrum')
-    test.nantest(alpha,varname='a in get_spectrum')
-    test.notnegativetest(T,varname='T in get_spectrum')
-
+    vartest(T,varname='T in read_spectrum',types = [int,float], nonans=True, notnegative=True)
+    vartest(logg,varname='log(g) in read_spectrum',types = [int,float], nonans=True)
+    vartest(metallicity,varname='Z in read_spectrum',types = [int,float], nonans=True)
+    vartest(alpha,varname='alpha in read_spectrum',types = [int,float], nonans=True)
 
     #These contain the acceptable values.
     T_a = np.concatenate((np.arange(2300,7100,100),np.arange(7200,12200,200)))
@@ -148,14 +142,15 @@ def read_spectrum(T,logg,metallicity=0.0,alpha=0.0):
     #Check that the input is contained in them:
     if T in T_a and metallicity in FeH_a and alpha in alpha_a and logg in logg_a:
         if (metallicity < -3 or metallicity > 0.0) and alpha !=0:
-            print('Error: Alpha element enhancement != 0 only available for -3.0<[Fe/H]<0.0')
-            sys.exit()
+            raise ValueError('Error: Alpha element enhancement != 0 only ' \
+            'available for -3.0<[Fe/H]<0.0')
         #If so, retrieve the spectra:
         wavename,specname=get_spectrum(T,logg,metallicity,alpha)
         f = fits.getdata(specname)
         w = fits.getdata(wavename)
         return(w/10.0,f/phoenix_factor)#Implicit unit conversion here.
     else:
+        print('')
         print('Error: Provided combination of T, log(g), Fe/H and a/M is out of bounds.')
         print('T = %s, log(g) = %s, Fe/H = %s, a/M = %s' % (T,logg,metallicity,alpha))
         print('The following values are accepted:')
@@ -168,7 +163,8 @@ def read_spectrum(T,logg,metallicity=0.0,alpha=0.0):
         print('a/M:')
         print(alpha_a)
         print('Alpha element enhancement != 0 only available for -3.0<[Fe/H]<0.0')
-        sys.exit()
+        print('')
+        raise ValueError('')
 
 
 def get_spectrum_pysme(wave_start, wave_end, T, logg, Z, linelist = '', mu=[], abund = {}, grid = ''):
