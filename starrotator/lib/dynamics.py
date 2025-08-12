@@ -174,7 +174,7 @@ def orbit_euclidian(phase, a = 5.0, m = 0.0, P = 4.0, e = 0.0, omega = 0.0,
     Returns
     -------
     x : float, array-like, same as phase
-        The planet's x-position in units of solar radii.
+        The planet's x, y and z-positions in units of solar radii.
 
     """
     from jaxoplanet.orbits import keplerian
@@ -198,6 +198,6 @@ def orbit_euclidian(phase, a = 5.0, m = 0.0, P = 4.0, e = 0.0, omega = 0.0,
     planet = system.bodies[0]
 
     x,y,z = planet.position(phase * P) # in Rsol.
-    return(x,y,z)
+    return(x,y,z*-1) #Invert z so that negative directions are towards the observer.
 
 

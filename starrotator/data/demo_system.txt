@@ -4,6 +4,7 @@ omega           0.0
 inclination     86.79
 obliquity       -84.8
 RpRs            0.08228
+Rstar           2.362
 P          	1.4811235
 veq            	114000.0
 stelinc       	90.0

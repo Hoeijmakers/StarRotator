@@ -19,6 +19,7 @@ def test_imports():
     import starrotator.lib.vgrid as vgrid
     import starrotator.lib.integrate_depr
     import starrotator.lib.util as util
+    import starrotator.lib.dynamics as dynamics
     from starrotator.lib.util import gaussian
     import astropy.io.fits as fits
     import astropy.units as u
@@ -286,6 +287,9 @@ def test_cache():
     ut.CONFIG_FILE = copy.deepcopy(current_configfile)
 
 
+
+
+
 def test_orbit():
     """This tests Keplerian orbits computed using Jaxoplanet."""
     import numpy as np
@@ -296,7 +300,13 @@ def test_orbit():
     assert num_error < 1e-6
     assert np.abs(np.max(x-7.5)) < 1e-4
 
-    
+
+
+def test_default_computation():
+    from starrotator import StarRotator
+    KELT9 = StarRotator(500,502,100)
+    assert KELT9.status == 'success'
+
 
 
 #This breaks until integration, dynamics and new ways of calling these, are refactored. 
