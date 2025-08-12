@@ -286,6 +286,17 @@ def test_cache():
     ut.CONFIG_FILE = copy.deepcopy(current_configfile)
 
 
+def test_orbit():
+    """This tests Keplerian orbits computed using Jaxoplanet."""
+    import numpy as np
+    from starrotator.lib.dynamics import orbit_euclidian
+    phase = np.linspace(-0.5,0.5,1000)
+    x,y,z = orbit_euclidian(phase, a = 5.0, m = 0.0, P = 4.0, e = 0.5, omega = 0.0,i=90.0)
+    num_error = np.mean(np.abs(y))
+    assert num_error < 1e-6
+    assert np.abs(np.max(x-7.5)) < 1e-4
+
+    
 
 
 #This breaks until integration, dynamics and new ways of calling these, are refactored. 

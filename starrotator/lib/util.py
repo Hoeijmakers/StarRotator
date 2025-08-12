@@ -182,10 +182,28 @@ def gaussian(x,A,mu,sig,cont=0.0):
 import json
 from pathlib import Path
 import platformdirs
+import astropy.units as u
+from astropy.constants import (G as quantity_G, c as quantity_c, 
+                               M_sun as quantity_M_sun,
+                               R_sun as quantity_R_sun
+                            )
+
+
+#Hardcoded natural constants in cgs:
+G = quantity_G.cgs.value
+c = quantity_c.cgs.value
+M_sun = quantity_M_sun.cgs.value
+R_sun = quantity_R_sun.cgs.value
+d_in_seconds =  (1 * u.d).cgs.value
+rad_in_deg = (1 * u.rad).to('degree').value
+
+
 
 # Harcoded paths that are mostly OS independent:
 CONFIG_DIR = Path.home() / ".starrotator"
 CONFIG_FILE = CONFIG_DIR / "config.json"
+
+
 
 def get_default_cache_dir() -> Path:
     """Returns the default cache location (AppData folder or equivalent)."""
