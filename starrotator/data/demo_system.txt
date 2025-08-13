@@ -6,7 +6,7 @@ obliquity       -84.8
 RpRs            0.08228
 Rstar           2.362
 P          	1.4811235
-veq            	114000.0
+veq            	114.0
 stelinc       	90.0
 drr             0.0
 T            	10000.0

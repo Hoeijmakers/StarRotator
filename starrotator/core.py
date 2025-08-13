@@ -35,7 +35,7 @@ from starrotator.lib.integrate import sum_hidden_spectrum_v2, sum_stellar_spectr
 
 
 class StarRotator(object):
-    def __init__(self,wave_start,wave_end,grid_size,system_path=None,
+    def __init__(self,wave_start,wave_end,grid_size,grid_planet_size=None,system_path=None,
     obs_path=None,input={},linelist_path=''):
         """
             Welcome to StarRotator.
@@ -51,9 +51,12 @@ class StarRotator(object):
             wave_end : float
                 Ending Wavelength range in nm in vacuum.
             grid_size: int
-                Half-width of number of grid cells. Set to values greater than 200
+                Number of grid cells to make up the stellar disk. Set to values greater than 400
                 to limit numerical errors, or less if you are trying things out and just
                 want speed.
+            grid_planet_size: None, int
+                Number of grid cells to make up the planet disk. If set to None this is set to be
+                equal to one quarter of the grid size of the star.
             system_path : str
                 Path to parameter file defining the system. This file should contain the following keywords
                 and values on separate lines, and the default values are as follows:
@@ -148,6 +151,10 @@ class StarRotator(object):
         self.wave_start=float(wave_start)
         self.wave_end=float(wave_end)
         self.grid_size=int(grid_size)
+        if grid_planet_size is not None:
+            self.grid_planet_size = int(grid_planet_size) # Making this accessible to the user if needed.
+        else:
+            self.grid_planet_size = int(grid_size/4)
         self.linelist_path = linelist_path
         self.input = input
         self.system_path = system_path
@@ -171,7 +178,6 @@ class StarRotator(object):
 
 
         self.compute_spectrum()
-        self.status = 'success'
 
     def read_system(self,system_path=None,obs_path=None,input={}):
         """Reads in the stellar, planet and observation parameters from file; performing
@@ -218,6 +224,7 @@ class StarRotator(object):
                 single-key dictionaries of the form ["{X:6.4}","{Y:6.3}"] etc.
                 linelist_path (str, path to VALD-style line-list for pysme to use)
         """
+        self.status = 'start reading input'
         if len(input)==0:#If we read input from config files
             input = util.read_into_dictionary(system_path)
             util.check_integrity_input(input)
@@ -301,7 +308,7 @@ class StarRotator(object):
 
         if self.mus != 0:
             self.mus = np.sqrt(0.5 * (2 * np.arange(self.mus) + 1) / self.mus)
-
+        self.status = 'success reading input'
 
     #Define a set of wrappers to avoid having to refer to self all the time.
     def compute_grids(self,x,y,i_stellar,vel_eq,diff_rot_rate,a1,a2):
@@ -312,12 +319,14 @@ class StarRotator(object):
         F_out_v1 =  sum_stellar_spectrum_v1(wl,fx,vel_eq,i_stellar,a1,a2,N=N1,norm=False)
         F_in_v1 = sum_hidden_spectrum_v1(wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N=N2)
         return(F_out_v1,F_in_v1)
-    def calc_v2(self,wl,fx,x,y,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,vel_grid,flux_grid,batched=True,N=300):
+    def calc_v2(self,wl,fx,x,y,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,vel_grid,flux_grid,batched=True,N2=200):
         dx = x[1]-x[0]
         dy = y[1]-y[0]
         F_out_v2 = sum_stellar_spectrum_v2(wl,fx,vel_grid,flux_grid,batched=batched)*dx*dy
-        flux_grid_array,vel_grid_array,dxR = create_hidden_grid_array(xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=N)
+        flux_grid_array,vel_grid_array,dxR = create_hidden_grid_array(xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=N2)
         F_in_v2 = sum_hidden_spectrum_v2(wl,fx,vel_grid_array,flux_grid_array,batched=batched) *dxR**2 
+        F_out_v2.block_until_ready()
+        F_in_v2.block_until_ready()
         return(F_out_v2,F_in_v2)
     #End of wrappers.
 
@@ -333,7 +342,7 @@ class StarRotator(object):
         ----------
         None
         """
-
+        self.status = 'start computing spectra'
         #Two arrays for the x and y axes
         self.x = jnp.linspace(-1,1,self.grid_size) #in units of stellar radius
         self.y = jnp.linspace(-1,1,self.grid_size)
@@ -352,9 +361,11 @@ class StarRotator(object):
             if self.model.lower() == 'phoenix':
                 print('--- Reading spectrum from PHOENIX')
                 print(f'-----T={self.T}K, log(g)={self.logg}, Z={self.Z}.')
-                wl,fx = spectrum.load_PHOENIX(self.T,
+                wl_wide,fx_wide = spectrum.load_PHOENIX(self.T,
                                                self.logg,
                                                metallicity=self.Z)
+                wl = wl_wide[(wl_wide > self.wave_start) & (wl_wide < self.wave_end)]
+                fx = fx_wide[(wl_wide > self.wave_start) & (wl_wide < self.wave_end)]
             elif self.model.lower() in ['pysme','sme']:
                 print('--- Generating spectrum using pySME')
                 print(f'-----T={self.T}K, log(g)={self.logg}, Z={self.Z}.')
@@ -379,22 +390,55 @@ class StarRotator(object):
                                                 omega = self.omega,
                                                 i=self.orbinc
                                                 )
-        #Convert the output from solar radii to stellar radii:
+        # Convert the output from solar radii to stellar radii:
         self.xp,self.yp,self.zp = xp/self.Rstar, yp/self.Rstar, zp/self.Rstar
-        
+
+
+
+        # Now we do the integration, switching between modes as input requires.
+        if self.drr == 0 and fx.ndim == 1:
+            # print('Calculating v1')
+            self.stellar_spectrum, self.Fp = self.calc_v1(wl,fx,
+                                            self.xp,self.yp,
+                                            self.Rp_Rs,
+                                            self.velStar,
+                                            self.stelinc,
+                                            self.u1,self.u2,
+                                            N1=self.grid_size,
+                                            N2=self.grid_planet_size
+                                            )
+        elif self.drr != 0 and fx.ndim == 1:
+            # print('Calculating v2')
+            self.stellar_spectrum, self.Fp = self.calc_v2(wl,fx,
+                                          self.x,self.y,
+                                          self.xp,self.yp,
+                                          self.Rp_Rs,
+                                          self.velStar,
+                                          self.stelinc,
+                                          self.drr,
+                                          self.u1,self.u2,
+                                          self.vel_grid,self.flux_grid,
+                                          batched=True,
+                                          N2=self.grid_planet_size
+                                          )
+            
+        else:
+            raise Exception("Multi-dimensional stellar spectrum (mu dependence) is not supported yet.")
+        self.status = 'success computing spectra'
+        # F_out = np.zeros((self.Nexp,len(F)))
+        # F_planet = np.zeros((self.Nexp,len(F)))        
 
         # CONTINUE HERE NEXT TIME:
         # That concludes the computation.
         # Operation of pysme comes after that.
         # Also need to make a decision regarding control over the wavelength axis.
         # A start and a stop wavelength is a bit silly. 
-        # Need a target (data) wavelength grid onto which the result is (to be) binned-interpolated.
+        # Need a target (data) wavelength grid onto which the result is (to be) binned-interpolated. This can be done using shone.opacity.bin_opacity().
         # And an under-the-hood model wavelength grid. That can be the PHOENIX grid simply,
         # But for pySME it has to be set to something custom I suppose. And the choice very likely matters for computation time.
         # Then documentation.
 
-        # F_out = np.zeros((self.Nexp,len(F)))
-        # F_planet = np.zeros((self.Nexp,len(F)))
+
         # flux_out = []
         # mask_out = []
         # print('--- Building local spectrum')

@@ -305,7 +305,11 @@ def test_orbit():
 def test_default_computation():
     from starrotator import StarRotator
     KELT9 = StarRotator(500,502,100)
-    assert KELT9.status == 'success'
+    assert KELT9.status == 'success computing spectra'
+    KELT9.drr = 0.1
+    KELT9.status = ''
+    KELT9.compute_spectrum()
+    assert KELT9.status == 'success computing spectra'
 
 
 
