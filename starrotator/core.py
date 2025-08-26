@@ -176,7 +176,8 @@ class StarRotator(object):
             ut.save_default_config()#This contains a path to a default
             #location where app or cache data is expected.
 
-
+        self.get_stellar_spectrum()
+        self.compute_orbit()
         self.compute_spectrum()
 
     def read_system(self,system_path=None,obs_path=None,input={}):
@@ -310,53 +311,33 @@ class StarRotator(object):
             self.mus = np.sqrt(0.5 * (2 * np.arange(self.mus) + 1) / self.mus)
         self.status = 'success reading input'
 
-    #Define a set of wrappers to avoid having to refer to self all the time.
-    def compute_grids(self,x,y,i_stellar,vel_eq,diff_rot_rate,a1,a2):
-        vel_grid  = calc_vel_stellar(x,y,i_stellar, vel_eq, diff_rot_rate)
-        flux_grid  = calc_flux_stellar(x,y,a1,a2,norm=False)
-        return(flux_grid,vel_grid)
-    def calc_v1(self,wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N1=400,N2=200):
-        F_out_v1 =  sum_stellar_spectrum_v1(wl,fx,vel_eq,i_stellar,a1,a2,N=N1,norm=False)
-        F_in_v1 = sum_hidden_spectrum_v1(wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N=N2)
-        return(F_out_v1,F_in_v1)
-    def calc_v2(self,wl,fx,x,y,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,vel_grid,flux_grid,batched=True,N2=200):
-        dx = x[1]-x[0]
-        dy = y[1]-y[0]
-        F_out_v2 = sum_stellar_spectrum_v2(wl,fx,vel_grid,flux_grid,batched=batched)*dx*dy
-        flux_grid_array,vel_grid_array,dxR = create_hidden_grid_array(xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=N2)
-        F_in_v2 = sum_hidden_spectrum_v2(wl,fx,vel_grid_array,flux_grid_array,batched=batched) *dxR**2 
-        F_out_v2.block_until_ready()
-        F_in_v2.block_until_ready()
-        return(F_out_v2,F_in_v2)
-    #End of wrappers.
 
-
-
-    def compute_spectrum(self):
-        """This wraps the main computation, switching between modes of integration
-        depending on the input. The simulation output and other variables are raised 
-        to class-wide attributes. Note that jitting is not done at this level, but all
-        computations under the hood are jitted.
-
-        Parameters
-        ----------
-        None
+    def compute_orbit(self):
         """
-        self.status = 'start computing spectra'
-        #Two arrays for the x and y axes
-        self.x = jnp.linspace(-1,1,self.grid_size) #in units of stellar radius
-        self.y = jnp.linspace(-1,1,self.grid_size)
+        A wrapper for calling jaxoplanet Keplerian solver.
+        Output is maintained as class attributes.
+        """
+        xp, yp, zp = dynamics.orbit_euclidian(self.phases, 
+                                                a = self.sma_Rs * self.Rstar, 
+                                                m = self.mp, 
+                                                P = self.orb_p, 
+                                                e = self.ecc, 
+                                                omega = self.omega,
+                                                i=self.orbinc
+                                                )
+        # Convert the output from solar radii to stellar radii:
+        self.xp,self.yp,self.zp = xp/self.Rstar, yp/self.Rstar, zp/self.Rstar
 
 
-        if self.model == "pySME":
-            self.flux_grid,self.vel_grid = self.compute_grids(
-                self.x,self.y,self.stelinc,self.velStar,self.drr,0.0,0.0)#If pySME: override LD.
-        else:
-            self.flux_grid,self.vel_grid = self.compute_grids(
-                self.x,self.y,self.stelinc,self.velStar,self.drr,self.u1,self.u2)
 
+    def get_stellar_spectrum(self):
+        """
+        Obtaining the unbraodened spectrum using one of StarRotator's 
+        #default methos: PHOENIX or pySME.
+        The input stored in the class attributes control a logic to 
+        switch between PHOENIX (mus=0) and pySME.
+        """
 
-        #Switch between PHOENIX (mus=0) and pySME.
         if isinstance(self.mus,np.ndarray) != True:
             if self.model.lower() == 'phoenix':
                 print('--- Reading spectrum from PHOENIX')
@@ -382,23 +363,56 @@ class StarRotator(object):
             self.wl_in = wl*1.0
             self.fx_in = fx*1.0
 
-        xp, yp, zp = dynamics.orbit_euclidian(self.phases, 
-                                                a = self.sma_Rs * self.Rstar, 
-                                                m = self.mp, 
-                                                P = self.orb_p, 
-                                                e = self.ecc, 
-                                                omega = self.omega,
-                                                i=self.orbinc
-                                                )
-        # Convert the output from solar radii to stellar radii:
-        self.xp,self.yp,self.zp = xp/self.Rstar, yp/self.Rstar, zp/self.Rstar
+    #Define a set of wrappers to avoid having to refer to self all the time in compute_spectrum().
+    def compute_grids(self,x,y,i_stellar,vel_eq,diff_rot_rate,a1,a2):
+        vel_grid  = calc_vel_stellar(x,y,i_stellar, vel_eq, diff_rot_rate)
+        flux_grid  = calc_flux_stellar(x,y,a1,a2,norm=False)
+        return(flux_grid,vel_grid)
+    def calc_v1(self,wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N1=400,N2=200):
+        F_out_v1 =  sum_stellar_spectrum_v1(wl,fx,vel_eq,i_stellar,a1,a2,N=N1,norm=False)
+        F_in_v1 = sum_hidden_spectrum_v1(wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N=N2)
+        return(F_out_v1,F_in_v1)
+    def calc_v2(self,wl,fx,x,y,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,vel_grid,flux_grid,batched=True,N2=200):
+        dx = x[1]-x[0]
+        dy = y[1]-y[0]
+        F_out_v2 = sum_stellar_spectrum_v2(wl,fx,vel_grid,flux_grid,batched=batched)*dx*dy
+        flux_grid_array,vel_grid_array,dxR = create_hidden_grid_array(xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=N2)
+        F_in_v2 = sum_hidden_spectrum_v2(wl,fx,vel_grid_array,flux_grid_array,batched=batched) *dxR**2 
+        F_out_v2.block_until_ready()
+        F_in_v2.block_until_ready()
+        return(F_out_v2,F_in_v2)
+    #End of wrappers.
 
+    def compute_spectrum(self):
+        """This wraps the main computation, switching between modes of 
+        integration depending on the input that is stored in the set of class 
+        attributes. The simulation output and other variables are raised 
+        to class-wide attributes. Note that jitting is not done at this 
+        level, but all computations under the hood are jitted.
+
+        Parameters
+        ----------
+        None
+        """
+        self.status = 'start computing spectra'
+        #Two arrays for the x and y axes
+        self.x = jnp.linspace(-1,1,self.grid_size) #in units of stellar radius
+        self.y = jnp.linspace(-1,1,self.grid_size)
+
+
+        if self.model == "pySME":
+            self.flux_grid,self.vel_grid = self.compute_grids(
+                self.x,self.y,self.stelinc,self.velStar,self.drr,0.0,0.0)#If pySME: override LD.
+        else:
+            self.flux_grid,self.vel_grid = self.compute_grids(
+                self.x,self.y,self.stelinc,self.velStar,self.drr,self.u1,self.u2)
 
 
         # Now we do the integration, switching between modes as input requires.
-        if self.drr == 0 and fx.ndim == 1:
+        if self.drr == 0 and self.fx_in.ndim == 1:
             # print('Calculating v1')
-            self.stellar_spectrum, self.Fp = self.calc_v1(wl,fx,
+            self.stellar_spectrum, self.Fp = self.calc_v1(self.wl_in,
+                                            self.fx_in,
                                             self.xp,self.yp,
                                             self.Rp_Rs,
                                             self.velStar,
@@ -407,20 +421,21 @@ class StarRotator(object):
                                             N1=self.grid_size,
                                             N2=self.grid_planet_size
                                             )
-        elif self.drr != 0 and fx.ndim == 1:
+        elif self.drr != 0 and self.fx_in.ndim == 1:
             # print('Calculating v2')
-            self.stellar_spectrum, self.Fp = self.calc_v2(wl,fx,
-                                          self.x,self.y,
-                                          self.xp,self.yp,
-                                          self.Rp_Rs,
-                                          self.velStar,
-                                          self.stelinc,
-                                          self.drr,
-                                          self.u1,self.u2,
-                                          self.vel_grid,self.flux_grid,
-                                          batched=True,
-                                          N2=self.grid_planet_size
-                                          )
+            self.stellar_spectrum, self.Fp = self.calc_v2(self.wl_in,
+                                            self.fx_in,
+                                            self.x,self.y,
+                                            self.xp,self.yp,
+                                            self.Rp_Rs,
+                                            self.velStar,
+                                            self.stelinc,
+                                            self.drr,
+                                            self.u1,self.u2,
+                                            self.vel_grid,self.flux_grid,
+                                            batched=True,
+                                            N2=self.grid_planet_size
+                                            )
             
         else:
             raise Exception("Multi-dimensional stellar spectrum (mu dependence) is not supported yet.")
