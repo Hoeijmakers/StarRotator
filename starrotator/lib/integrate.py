@@ -1,4 +1,5 @@
 import jax
+import numpy as np
 from jax import jit, lax
 from jax import numpy as jnp
 from functools import partial
@@ -28,14 +29,11 @@ def sum_stellar_spectrum_v1(wl,fx,vel_eq,i_stellar,a1,a2,N=400,norm=False):
         fx : array-like
             The stellar model fluxes corresponding to wl.
 
-        x : array-like
-            The horizontal grid axis. Equivalent to x,y in the 2D grid computation of the other integration versions.
-
         vel_eq : float
             The equatorial velocity of the star in km/s.
 
         i_stellar : float
-            The inclination of the stellar spin axis in degrees.
+            The inclination of the stellar spin axis in degrees. 0 is pole-on.
 
         a1 : float
             Linear limb darkening coefficient.
@@ -66,6 +64,117 @@ def sum_stellar_spectrum_v1(wl,fx,vel_eq,i_stellar,a1,a2,N=400,norm=False):
         F_out = jnp.nansum(fx_shifted,axis=1)*2*dx
     return(F_out)#Factor of 2 because this is calculating a semi-circle.
 
+
+
+
+#NOTE THAT THIS IS STILL POORLY DESIGNED. WL_ARRAY, FX_ARRAY, AND MU SHOULD REALISTICALLY NOT BE TRACED 
+#VARIABLES! Though maybe it doesn't hurt if they are...
+
+#I verified that the following returns the same answer (pi) when inputting a spectrum that is flat at 1.0, and independent of mu,
+#as sum_stellar_spectrum_v1 with limb darkening equal to 0. 
+@partial(jax.jit,static_argnames=["N","norm"])
+def sum_stellar_spectrum_v1_mu(wl,fx_array,vel_eq,i_stellar,mu,N=400,norm=False):
+    """This builds the stellar spectrum by doppler-shifting and interpolating an array of input
+        spectra, corresponding to an array of mu angles.
+        This version of the integration assumes a SIMPLE VELOCITY GRID (that means: without drr)
+        but a MU-VARYING stellar spectrum. The computation therefore implicitly includes 
+        center-to-limb variation, but also limb darkening: The continuum of the mu-dependent
+        spectra is responsible for this. This version of the integration is fastest because
+        it uses the axial symmetry of the disk, so it only computes the velocity of the disk along
+        the projected equator, and weighs the mu-dependent spectra by their number of occurrences
+        in each column of the disk. 
+
+        This is the fastest possible approximation.
+
+        Parameters
+        ----------
+        wl : array-like
+            One-dimensional array of the stellar model wavelengths, corresponding to the flux values in fx_array.
+
+        fx_array : array-like
+            Two-dimensional array of the stellar model fluxes corresponding to wl, at different mu angles.
+
+        vel_eq : float
+            The equatorial velocity of the star in km/s.
+
+        i_stellar : float
+            The inclination of the stellar spin axis in degrees. 0 is pole-on.
+
+        mus : array-like
+            The array of mu-values corresponding to the array of spectra.
+
+        norm : bool
+            If set to true, the weights are normalised such that all fluxes sum to 1.0
+
+        Returns
+        -------
+        F : array
+            The flux axis of the summed spectrum corresponding to the input wavelength points.
+            Note that the flux is multiplied by the differential dx, so that the integral is 
+            insensitive to N.
+
+        Notes
+        -----
+        In this function, the input spectra are broadcast to a shape of n_wl times N times n_mu_angles.
+        If you have 1e5 wavelength points, 400 gridpoints and 10 mu angles, that's 3.6 GB.
+        So do not choose too many mu angles or wavelength points, or you will overflow your RAM, and there
+        is no explicit guard against that.
+
+    """
+    x = jnp.linspace(-1,1,N)
+    dx = x[1]-x[0]
+    v_axis = x*vel_eq*jnp.sin(jnp.radians(i_stellar)) # velocities along the y=0 axis.
+
+
+    doppler_shift_batch = jax.vmap(doppler_shift, in_axes=(None, 0, None))
+
+    fx_array_shifted = doppler_shift_batch(wl,fx_array,v_axis)
+    #Note that if this function is called repeatedly with different shapes, this will trigger jax recompilations. 
+    #Also note that the output can be big: For 100,000 wavelength points, 200 velocities and 10 mu angles, this could be 1.6GB in memory.
+
+    #Now follows the main logic of this computation.
+    #We create a map of bins of mu across the stellar disk.
+    #This is constructed for each column (in x) along the y-axis of the grid.
+    #So for each location at x, we determine which mu angles exist from the equator
+    #up to the disk edge. Each mu-bin that exists in a column has a value mu_i.
+    #Each of these mu-bins is thus associated with a spectrum fx_i.
+    #The weight at which each of these spectra is added, is the area of that piece of surface.
+    #That is dx * ymax-ymin.
+    #So that's all we need to do. Calculate for each fx_i in which bins they occur on the disk,
+    #and then add them. The only reason this looks a bit convolved is because we're summing over a disk
+    #using square arrays, well here we go.
+
+    #We first need to bin up the mu array to find bin edges in mu-space.
+    mu_centers = (mu[0:-1]+mu[1:])/2
+    mumin = jnp.concatenate([jnp.array([0]), mu_centers])
+    mumax = jnp.concatenate([mu_centers,     jnp.array([1])])
+
+
+    #We then compute the arrays of y-edges associated with these mu edges.
+    #This comes from mu^2 = x^2+y^2, leading to y = sqrt(mu^2 - x^2).
+    ymin = jnp.sqrt(jnp.clip(mumin[None,:]**2 - x[:, None]**2,0,None))
+    ymax = jnp.sqrt(jnp.clip(mumax[None,:]**2 - x[:, None]**2,0,None))
+    #This is where the magic happens, because the output of the below is a 
+    #2D array for the minimum and maximum edges: N_mu times N_x.
+    #For each x, it tells you what the y-values are of the edges of the mu-bins.
+    #This is easiest to understand for x=0 (center of the disk up):
+    #As you travel up in from y=0 to y=1, you start at the first mu-angle, until you
+    #reach the y-coordinate of the first mu angle. Then you transition into the second mu-value, etc.
+    #until y=1 and you have reached the top of the disk.
+    #This is also true for x>0, but now, the starting value is non-zero mu. Meaning mu-bins disappear
+    #as you travel outward in the x-direction. At x close to 1, most mu values don't occur anymore in the column
+    #above you. This is automatically handled by the clip statement: For a mu bin that is not in the column at x=/=0,
+    #ymin and ymax are both zero. So the area of this piece will be (ymax-ymin)*dx = 0. 
+    # This also works for partial bins: If ymin gets clipped but not ymax. Lovely!
+
+    W = (ymax-ymin) *dx
+    
+    # print(np.shape(fx_array_shifted))
+    # print(np.shape(W.T))
+    fx_weighted = W.T * np.transpose(fx_array_shifted,(2,0,1))
+    fx_sum = jnp.sum(fx_weighted,axis=(1,2))
+
+    return(fx_sum*2)#Factor of 2 because this has been assuming a semi-circle.
 
 
 
