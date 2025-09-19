@@ -376,7 +376,7 @@ class StarRotator(object):
         dx = x[1]-x[0]
         dy = y[1]-y[0]
         F_out_v2 = sum_stellar_spectrum_v2(wl,fx,vel_grid,flux_grid,batched=batched)*dx*dy
-        flux_grid_array,vel_grid_array,dxR = create_hidden_grid_array(xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=N2)
+        flux_grid_array,vel_grid_array,mu_array,dxR = create_hidden_grid_array(xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=N2)
         F_in_v2 = sum_hidden_spectrum_v2(wl,fx,vel_grid_array,flux_grid_array,batched=batched) *dxR**2 
         F_out_v2.block_until_ready()
         F_in_v2.block_until_ready()
@@ -444,6 +444,8 @@ class StarRotator(object):
         # F_planet = np.zeros((self.Nexp,len(F)))        
 
         # CONTINUE HERE NEXT TIME:
+        # compute_stellar_spectrum_1B in integrate.py for mu-dependence.
+
         # That concludes the computation.
         # Operation of pysme comes after that.
         # Also need to make a decision regarding control over the wavelength axis.

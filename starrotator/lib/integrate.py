@@ -443,19 +443,17 @@ def create_hidden_grid_array(xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=50)
     x_array = x*Rp + xp[:,None] # Rescaling the grid to only encompass the planet (much finer than star typically)
     y_array = x*Rp + yp[:,None] # Note that we do a circle in a square so y=x.
     dxR = dx*Rp # Rescaling the size of the differential.
-    d = jnp.sqrt(x[None,:]**2 + x[:,None]**2)
-    mask = jnp.where(d > 1,jnp.nan,d)*0.0+1.0
+    mu = jnp.sqrt(x[None,:]**2 + x[:,None]**2) #Yes, this is the same mu as pySME mu jsyk (cos(theta)).
+    mask = jnp.where(mu > 1,jnp.nan,mu)*0.0+1.0
 
-    # int_analytical = circ_int_q_ld(a1,a2)
-
-    flux_disk_array  = calc_flux_stellar(x_array.T,y_array.T,a1,a2,norm=False) #This is really, really awesome. #Need to figure out how to scale these slices using the total integral of the LD profile.
+    flux_disk_array  = calc_flux_stellar(x_array.T,y_array.T,a1,a2,norm=False) #This is really, really awesome.
     vel_disk_array  = calc_vel_stellar(x_array.T,y_array.T,i_stellar, vel_eq, diff_rot_rate)
 
 
     flux_disk_array_masked = flux_disk_array*mask.T[:,:,None] #This crops out the circle that is the planet.
     vel_disk_array_masked = vel_disk_array*mask.T[:,:,None]
-
-    return(flux_disk_array_masked,vel_disk_array_masked,dxR)
+    mu_array_masked = mu*1.0
+    return(flux_disk_array_masked,vel_disk_array_masked,mu_array_masked,dxR)
 
 
 

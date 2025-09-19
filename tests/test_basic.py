@@ -13,7 +13,7 @@ def test_imports():
     import urllib.request as request
     from contextlib import closing
     import os.path
-    import starrotator.lib.test as test
+    # import starrotator.lib.test as test
     import starrotator.lib.operations as ops
     import starrotator.lib.stellar_spectrum
     import starrotator.lib.vgrid as vgrid
@@ -52,7 +52,6 @@ def test_integrators():
     from starrotator.lib.util import gaussian
     from starrotator.lib.vgrid import calc_vel_stellar, calc_flux_stellar
     from starrotator.lib.integrate import sum_stellar_spectrum_v1, sum_stellar_spectrum_v2
-    import matplotlib.pyplot as plt
 
     Nwl = 1000
     wl = np.linspace(399,401,Nwl)
@@ -101,7 +100,7 @@ def test_analytical_limb_darkening():
     from starrotator.lib.operations import vert_int_q_ld, vert_int_q_ld_bounded, circ_int_q_ld
     from starrotator.lib.vgrid import calc_flux_stellar
     import numpy as np
-    import matplotlib.pyplot as plt
+    # import matplotlib.pyplot as plt
     N = 1000
     x = np.linspace(-1,1,N)
     dx = x[1]-x[0]
@@ -231,7 +230,7 @@ def test_hidden_flux():
     fx = np.ones_like(wl)
 
     flux_disk_total = calc_flux_stellar(jnp.array(x),jnp.array(y),a1,a2,norm=False) *dx**2
-    flux_array,vel_array,dxR = create_hidden_grid_array(xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=200)
+    flux_array,vel_array,mu_array,dxR = create_hidden_grid_array(xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=200)
     F_out = sum_hidden_spectrum_v2(wl,fx,vel_array,flux_array,batched=True) *dxR**2 / jnp.nansum(flux_disk_total)
     mean_error_per_wl = np.mean(np.abs(F_out-0.09))   
     assert(mean_error_per_wl < 1e-4)
@@ -247,7 +246,7 @@ def test_hidden_flux():
     y = x*1.0
     dx = x[1]-x[0]
 
-    flux_grid_array,vel_grid_array,dxR = create_hidden_grid_array(xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=300)
+    flux_grid_array,vel_grid_array,mu_array,dxR = create_hidden_grid_array(xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=300)
     F_in_v2 = sum_hidden_spectrum_v2(wl,fx,vel_grid_array,flux_grid_array,batched=True) *dxR**2 
 
     mean_error = np.mean((F_in_v1[0]-F_in_v2[0])/F_in_v1[0])
