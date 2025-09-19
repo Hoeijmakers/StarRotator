@@ -72,8 +72,8 @@ def sum_stellar_spectrum_v1(wl,fx,vel_eq,i_stellar,a1,a2,N=400,norm=False):
 
 #I verified that the following returns the same answer (pi) when inputting a spectrum that is flat at 1.0, and independent of mu,
 #as sum_stellar_spectrum_v1 with limb darkening equal to 0. 
-@partial(jax.jit,static_argnames=["N","norm"])
-def sum_stellar_spectrum_v1_mu(wl,fx_array,vel_eq,i_stellar,mu,N=400,norm=False):
+@partial(jax.jit,static_argnames=["N"])
+def sum_stellar_spectrum_v1_mu(wl,fx_array,vel_eq,i_stellar,mu,N=400):
     """This builds the stellar spectrum by doppler-shifting and interpolating an array of input
         spectra, corresponding to an array of mu angles.
         This version of the integration assumes a SIMPLE VELOCITY GRID (that means: without drr)
