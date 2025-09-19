@@ -184,7 +184,7 @@ def test_analytical_integration():
     # # this depends a bit on the limb darkening parameters.
 
 
-def test_mu_integration():
+def test_mu_integration_v1():
     from starrotator.lib.integrate import sum_stellar_spectrum_v1_mu, sum_stellar_spectrum_v1
     import numpy as np
     import jax.numpy as jnp
@@ -195,7 +195,7 @@ def test_mu_integration():
 
     fx = wl*0.0+1.0
     fx = gaussian(wl,-0.5,jnp.mean(wl),0.02,cont=1.0)
-    fx_array = wl[None,:]*0.0+fx#+ mu[:,None]
+    fx_array = wl[None,:]*0.0+ mu[:,None]*0.0+fx
 
     vsini= 100
     fx_sum = sum_stellar_spectrum_v1_mu(wl,fx_array,vsini,90.0,mu,N=201)
