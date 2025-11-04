@@ -369,8 +369,13 @@ def interp_fx_array(mu_array,fx_array,mu_value):
     It handles edge cases (so if the target value is outside the range
     of the my values provided, it edge clips as it should).
     It also allows for broadcasting, so you can get many
-    interpolated spectra returned. Note that this will cause a
-    jax recompile (shape change).
+    interpolated spectra returned. Note that changing the number of mu angles
+    will cause a jax recompile (shape change), but this is not a likely
+    scenario inside a retrieval because the number of mu angles is an
+    initial user choice. I imagine that this function can be hot-rodded
+    to interpolate over other types of things (e.g. temperature_array instead
+    of mu). It doesn't matter for recompilation as long as the number of 
+    interpolates is fixed throughout a loop/retrieval.
     """
     l1,l2 = find_mu_interval(mu_array,mu_value)
     t = mu_interp_weight(mu_array,l1,l2,mu_value)
@@ -429,15 +434,14 @@ def sum_hidden_spectrum_v1_mu(wl,fx_array,xp,yp,Rp,vel_eq,i_stellar,mu,N=100,sma
 
         small_planet : bool
             Make a small-planet approximation (true) or not (false). In the small-planet approximation, the mu-variation across the planetary disk is neglected, and a single mu
-            angle (at planet center) is assumed. The spectrum is interpolated from the two nearest mu angles for which spectra are provided.
+            angle (at planet center) is assumed. The spectrum is interpolated from the two nearest mu angles for which spectra are provided (so any planet motion does result in a 
+            change in the spectrum).
 
         Returns
         -------
         F : array
             The flux axis of the summed spectrum corresponding to the input wavelength points, for each planet position
-            (so this is a 2D array as xp,yp are 1D). This integrates to an arbitrary number, but this scaling corresponds
-            to the scaling of the full disk. Normalisation is therefore achieved by dividing by the integral of the full
-            disk, that depends only on a1 and a2. Note that as part of this process, the flux is multiplied by the
+            (so this is a 2D array as xp,yp are 1D). Note that as part of this process, the flux is multiplied by the
             differential dx*R, so that the integral is insensitive to N.
     """
 

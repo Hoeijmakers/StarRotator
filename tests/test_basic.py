@@ -182,6 +182,8 @@ def test_analytical_integration():
     assert(np.abs(numerical_error) < 0.003)
     # For N=100, the relative error on the total integral is 3e-3 and 
     # # this depends a bit on the limb darkening parameters.
+    # The passing of this test indicates that the analytical computation is correct,
+    # and should be used - no need to do numerical integration in the v1 case.
 
 
 def test_mu_integration_v1():
@@ -205,6 +207,7 @@ def test_mu_integration_v1():
     assert max_rel_error < 1e-6
 
 
+
 def test_hidden_flux():
     import numpy as np
     from starrotator.lib.integrate import create_hidden_grid_array, sum_hidden_spectrum_v2, sum_stellar_spectrum_v1, sum_hidden_spectrum_v1
@@ -219,7 +222,7 @@ def test_hidden_flux():
     y = x*1.0
     dx = x[1]-x[0]
 
-    xp = jnp.array([-0.3,-0.29,-0.28-0.27])
+    xp = jnp.array([-0.3,-0.29,-0.28,-0.27])
     yp = xp*0.5
 
 
@@ -251,6 +254,90 @@ def test_hidden_flux():
 
     mean_error = np.mean((F_in_v1[0]-F_in_v2[0])/F_in_v1[0])
     assert(mean_error < 6e-4)
+
+
+def test_mu_interpolation():
+    """This tests that the interpolation of a spectrum between two mu angles works as intended."""
+    import numpy as np
+    from starrotator.lib.integrate import interp_fx_array
+    from starrotator.lib.vgrid import calc_vel_stellar
+    from starrotator.lib.vgrid import calc_flux_stellar
+    import jax.numpy as jnp
+    import matplotlib.pyplot as plt
+    from starrotator.lib.util import gaussian
+    import sys
+    wl = np.linspace(500,505,1001)
+    mu = jnp.array([0.0,0.5,1.0]) # Choose 3 mu angles, 0, half and full.
+    fx = wl*0.0+1.0
+    fx = gaussian(wl,-0.5,jnp.mean(wl),0.07,cont=0.0)
+
+
+    fx_array = wl[None,:]*0.0+ mu[:,None]*fx + 1.0 # Scale the linedepth by the mu angle. So the linedepth increases linearly.
+
+    mu_to_test = jnp.array([0.0,0.25,0.5,0.75,1.0,1.2])
+
+    fx_interpolated = interp_fx_array(mu,fx_array,mu_to_test) #Interpolate at a range of values:
+    #0 should return a line with depth 0.0
+    #0.25 should return a line with depth 25% of that of fx, etc.
+    #1.2 maxes out, so it should return a line depth of 100% of fx. Not extrapolate or fail.
+
+    linedepth_in = np.min(fx)
+    linedepths = np.min(fx_interpolated-1.0,axis=1)
+
+    for i in range(len(mu_to_test)):
+        depth_error = linedepths[i] - linedepth_in * mu_to_test[i]
+        if 0.0<=mu_to_test[i]<=1.0:
+            assert(depth_error < 1e-6)
+        if mu_to_test[i]>1:
+            assert(depth_error-(mu_to_test[i]-1.0) < 1e-6)
+
+
+
+
+def test_hidden_flux_mu_v1():
+    import numpy as np
+    from starrotator.lib.integrate import create_hidden_grid_array, sum_hidden_spectrum_v2, sum_stellar_spectrum_v1, sum_hidden_spectrum_v1, sum_hidden_spectrum_v1_mu
+    from starrotator.lib.vgrid import calc_vel_stellar
+    from starrotator.lib.vgrid import calc_flux_stellar
+    import jax.numpy as jnp
+    import matplotlib.pyplot as plt
+    from starrotator.lib.util import gaussian
+    import sys
+    # This tests that the mu-dependent hidden-flux works, and returns the same answer as mu-independent, if all spectra are the same.
+    # It also tests that the transit depth of a planet with R=0.1 is 1%.
+    wl = np.linspace(500,505,1000)
+    mu = jnp.linspace(0,1,20)
+
+    fx = wl*0.0+1.0
+    fx = gaussian(wl,-0.5,jnp.mean(wl),0.02,cont=1.0)
+    fx_array = wl[None,:]*0.0+ mu[:,None]*0.0+fx #All spectra are the same.
+
+
+    a1,a2 = 0.0,0.0
+    i_stellar,vel_eq,diff_rot_rate = 90.0,100.0,0.0
+    Rp = 0.1
+
+    N = 300
+    x = jnp.linspace(-1,1,N)
+    y = x*1.0
+    dx = x[1]-x[0]
+
+    xp = jnp.array([-0.3,-0.29,-0.28,-0.27,0.0,0.1,0.15,0.2,0.6])
+    yp = xp*0.0 + 0.2
+
+    F_in_v1 = sum_hidden_spectrum_v1(wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N=N)
+    F_in_v2 = sum_hidden_spectrum_v1_mu(wl,fx_array,xp,yp,Rp,vel_eq,i_stellar,mu,N=N,small_planet=True)
+
+    # plt.plot(F_in_v1[0])
+    # plt.plot(F_in_v2[0])
+    # plt.plot(F_in_v1[4])
+    # plt.plot(F_in_v2[4])
+    # plt.show()
+
+    for i in range(len(xp)):
+        mean_error = np.mean(np.abs(F_in_v1[i]-F_in_v2[i])/F_in_v1[i])
+        assert(mean_error < 1e-8)
+
 
 
 def test_cache():
