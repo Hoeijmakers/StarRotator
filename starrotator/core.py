@@ -231,10 +231,14 @@ class StarRotator(object):
             util.check_integrity_input(input)
 
             phases = [] #These are in orbital phase.
-            obsparams = open(obs_path,'r').read().splitlines()
-            for i in obsparams:
-                phases.append(float(i.split()[0]))
-            self.phases = np.array(phases)
+
+            if obs_path is not None:
+                obsparams = open(obs_path,'r').read().splitlines()
+                for i in obsparams:
+                    phases.append(float(i.split()[0]))
+                self.phases = np.array(phases)
+            else:
+                raise Exception('Obs_path needs to be set if input dictionary is not.')
         else:
             util.check_integrity_input(input,['phases'])
             self.phases = np.array(input['phases'])
@@ -369,15 +373,12 @@ class StarRotator(object):
         flux_grid  = calc_flux_stellar(x,y,a1,a2,norm=False)
         return(flux_grid,vel_grid)
     def calc_v1(self,wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N1=400,N2=200):
-        F_out_v1 =  sum_stellar_spectrum_v1(wl,fx,vel_eq,i_stellar,a1,a2,N=N1,norm=False)
+        F_out_v1 =  sum_stellar_spectrum_v1(wl,fx,vel_eq,i_stellar,a1,a2,N=N1)
         F_in_v1 = sum_hidden_spectrum_v1(wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N=N2)
         return(F_out_v1,F_in_v1)
-    def calc_v2(self,wl,fx,x,y,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,vel_grid,flux_grid,batched=True,N2=200):
-        dx = x[1]-x[0]
-        dy = y[1]-y[0]
-        F_out_v2 = sum_stellar_spectrum_v2(wl,fx,vel_grid,flux_grid,batched=batched)*dx*dy
-        flux_grid_array,vel_grid_array,mu_array,dxR = create_hidden_grid_array(xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=N2)
-        F_in_v2 = sum_hidden_spectrum_v2(wl,fx,vel_grid_array,flux_grid_array,batched=batched) *dxR**2 
+    def calc_v2(self,wl,fx,x,y,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,batched=True,N2=200):
+        F_out_v2 = sum_stellar_spectrum_v2(wl,fx,vel_eq,i_stellar,a1,a2,diff_rot_rate,N=N2,batched=batched)
+        F_in_v2 = sum_hidden_spectrum_v2(wl,fx,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=N2,batched=batched) 
         F_out_v2.block_until_ready()
         F_in_v2.block_until_ready()
         return(F_out_v2,F_in_v2)
@@ -432,7 +433,6 @@ class StarRotator(object):
                                             self.stelinc,
                                             self.drr,
                                             self.u1,self.u2,
-                                            self.vel_grid,self.flux_grid,
                                             batched=True,
                                             N2=self.grid_planet_size
                                             )
@@ -444,16 +444,21 @@ class StarRotator(object):
         # F_planet = np.zeros((self.Nexp,len(F)))        
 
         # CONTINUE HERE NEXT TIME:
-        # compute_stellar_spectrum_1B in integrate.py for mu-dependence.
+        # Fix normalizations and uniformity of calling v1, v2, v1_mu, v2_mu.
+        # Add brute-force integration with no tricks, and free velocity and flux grids as input. That is v3. A spectrum index-map (that enables mu, or other variation in the spectrum).
+        # Complete the workflow with pySME to create the fx_array input.
+        # Create a working KELT-9 example.
+        # Then do the wavelength stuff below.
 
-        # That concludes the computation.
-        # Operation of pysme comes after that.
         # Also need to make a decision regarding control over the wavelength axis.
         # A start and a stop wavelength is a bit silly. 
         # Need a target (data) wavelength grid onto which the result is (to be) binned-interpolated. This can be done using shone.opacity.bin_opacity().
         # And an under-the-hood model wavelength grid. That can be the PHOENIX grid simply,
         # But for pySME it has to be set to something custom I suppose. And the choice very likely matters for computation time.
         # Then documentation.
+
+        # TO DO LATER:
+        # Drop small-planet-approximation in integrate.py for mu-dependence in hidden-spectrum.
 
 
         # flux_out = []

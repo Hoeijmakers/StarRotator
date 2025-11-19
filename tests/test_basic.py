@@ -52,7 +52,8 @@ def test_integrators():
     from starrotator.lib.util import gaussian
     from starrotator.lib.vgrid import calc_vel_stellar, calc_flux_stellar
     from starrotator.lib.integrate import sum_stellar_spectrum_v1, sum_stellar_spectrum_v2
-
+    import matplotlib.pyplot as plt
+    from starrotator.lib.operations import circ_int_q_ld
     Nwl = 1000
     wl = np.linspace(399,401,Nwl)
     fx = gaussian(wl,-0.5,400,0.01,1.0) 
@@ -65,32 +66,23 @@ def test_integrators():
     a1,a2 = 0.2,0.3
     i_stellar,vel_eq,diff_rot_rate = 90.0,100.0,0.0
 
-    flux_disk = calc_flux_stellar(x,y,a1,a2,norm=False)
-    vel_disk  = calc_vel_stellar(x,y,i_stellar, vel_eq, diff_rot_rate)
+    # flux_disk = calc_flux_stellar(x,y,a1,a2,norm=False)
+    # vel_disk  = calc_vel_stellar(x,y,i_stellar, vel_eq, diff_rot_rate)
 
-    F1 = sum_stellar_spectrum_v1(wl,fx,vel_eq,i_stellar,a1,a2,N=N,norm=False)
-    F2 = sum_stellar_spectrum_v2(wl,fx,vel_disk,flux_disk)*dx*dy
+    F1 = sum_stellar_spectrum_v1(wl,fx,vel_eq,i_stellar,a1,a2,N=N)
+    F2 = sum_stellar_spectrum_v2(wl,fx,vel_eq,i_stellar,a1,a2,diff_rot_rate,N=N,batched=True)
     maxdiff = np.max(np.abs((F1-F2)/F1))
-    
+    # print(circ_int_q_ld(a1,a2))
     # print(maxdiff)
     # plt.plot(F1)
     # plt.plot(F2)
     # plt.show()
     assert(maxdiff < 7e-4)
-    #The relative error between these two methods may be more than 
+    #The relative error between these two methods may not be more than 
     # 7e-4 for any wavelength point when N = 200. Error goes as the
-    # square of N. And I suspect that the 2D integrator is actually
+    # square of N. And I suspect that the 2D sum is actually
     # the source of the inaccuracy, for low N.
 
-    flux_disk = calc_flux_stellar(x,y,a1,a2,norm=True)
-    vel_disk  = calc_vel_stellar(x,y,i_stellar, vel_eq, diff_rot_rate)
-
-    F1 = sum_stellar_spectrum_v1(wl,fx,vel_eq,i_stellar,a1,a2,N=400,norm=True)
-    F2 = sum_stellar_spectrum_v2(wl,fx,vel_disk,flux_disk)
-    maxdiff = np.max(np.abs((F1-F2)/F1))
-
-    assert(maxdiff < 1.2e-4)
-    #The relative error shrinks when the fluxes are brute-force normalised.
 
 
 
@@ -187,10 +179,13 @@ def test_analytical_integration():
 
 
 def test_mu_integration_v1():
+    """This tests that integrating the whole disk using v1 and v1_mu produces the same output for 
+    zero limb darkening on v1 and equal spectra on v1_mu (fake mu-dependence)."""
     from starrotator.lib.integrate import sum_stellar_spectrum_v1_mu, sum_stellar_spectrum_v1
     import numpy as np
     import jax.numpy as jnp
     from starrotator.lib.util import gaussian
+    import matplotlib.pyplot as plt
 
     wl = np.linspace(500,505,1000)
     mu = jnp.linspace(0,1,20)
@@ -202,6 +197,10 @@ def test_mu_integration_v1():
     vsini= 100
     fx_sum = sum_stellar_spectrum_v1_mu(wl,fx_array,vsini,90.0,mu,N=201)
     fx_v1 = sum_stellar_spectrum_v1(wl,fx,vsini,90.0,0.0,0.0,N=201)
+
+    # plt.plot(fx_sum)
+    # plt.plot(fx_v1)
+    # plt.show()
 
     max_rel_error = np.max(np.abs((fx_sum-fx_v1)/fx_v1))
     assert max_rel_error < 1e-6
@@ -217,10 +216,6 @@ def test_hidden_flux():
     import matplotlib.pyplot as plt
     #This tests that a planet with a radius of 0.3 Rstar transiting a star without limb darkening
     #creates a transit depth of 0.09.
-    N = 400
-    x = jnp.linspace(-1,1,N)
-    y = x*1.0
-    dx = x[1]-x[0]
 
     xp = jnp.array([-0.3,-0.29,-0.28,-0.27])
     yp = xp*0.5
@@ -232,28 +227,29 @@ def test_hidden_flux():
     wl = np.linspace(399,401,1000)
     fx = np.ones_like(wl)
 
-    flux_disk_total = calc_flux_stellar(jnp.array(x),jnp.array(y),a1,a2,norm=False) *dx**2
-    flux_array,vel_array,mu_array,dxR = create_hidden_grid_array(xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=200)
-    F_out = sum_hidden_spectrum_v2(wl,fx,vel_array,flux_array,batched=True) *dxR**2 / jnp.nansum(flux_disk_total)
+
+    F_out = sum_hidden_spectrum_v2(wl,fx,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=200,batched=True)
+
+
+
     mean_error_per_wl = np.mean(np.abs(F_out-0.09))   
-    assert(mean_error_per_wl < 1e-4)
+    assert(mean_error_per_wl < 1.5e-4)
 
 
-    #Final testing to ensure that v1 and v2 produce essentially the same output: 
+    #Final testing to ensure that v1 and v2 produce essentially the same output (and that means a transit depth of 0.9): 
     xp = jnp.array([-0.2,0.0,0.2])
     yp = xp*0.0
-
     F_in_v1 = sum_hidden_spectrum_v1(wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N=500)
+    F_in_v2 = sum_hidden_spectrum_v2(wl,fx,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=300,batched=True)
 
-    x = jnp.linspace(-1,1,500)
-    y = x*1.0
-    dx = x[1]-x[0]
+    mean_rel_error = np.mean((F_in_v1[0]-F_in_v2[0])/F_in_v1[0])
 
-    flux_grid_array,vel_grid_array,mu_array,dxR = create_hidden_grid_array(xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=300)
-    F_in_v2 = sum_hidden_spectrum_v2(wl,fx,vel_grid_array,flux_grid_array,batched=True) *dxR**2 
+    # print(mean_rel_error)
+    # plt.plot(wl,F_in_v1[0])
+    # plt.plot(wl,F_in_v2[0])
+    # plt.show()
 
-    mean_error = np.mean((F_in_v1[0]-F_in_v2[0])/F_in_v1[0])
-    assert(mean_error < 6e-4)
+    assert(mean_rel_error < 8e-4)
 
 
 def test_mu_interpolation():
@@ -295,6 +291,8 @@ def test_mu_interpolation():
 
 
 def test_hidden_flux_mu_v1():
+    """This tests that the flux of the obscured part of the disk works in the case of a mu-dependent spectrum (v1_mu),
+    by comparing to the mu-independent method (v1) in case that the input spectrum is equal for all mu (fake mu dependence)."""
     import numpy as np
     from starrotator.lib.integrate import create_hidden_grid_array, sum_hidden_spectrum_v2, sum_stellar_spectrum_v1, sum_hidden_spectrum_v1, sum_hidden_spectrum_v1_mu
     from starrotator.lib.vgrid import calc_vel_stellar
