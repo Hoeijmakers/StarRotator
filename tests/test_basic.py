@@ -209,7 +209,7 @@ def test_mu_integration_v1():
 
 def test_hidden_flux():
     import numpy as np
-    from starrotator.lib.integrate import create_hidden_grid_array, sum_hidden_spectrum_v2, sum_stellar_spectrum_v1, sum_hidden_spectrum_v1
+    from starrotator.lib.integrate import sum_hidden_spectrum_v2, sum_hidden_spectrum_v1
     from starrotator.lib.vgrid import calc_vel_stellar
     from starrotator.lib.vgrid import calc_flux_stellar
     import jax.numpy as jnp

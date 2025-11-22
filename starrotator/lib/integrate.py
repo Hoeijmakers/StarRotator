@@ -41,8 +41,8 @@ def sum_stellar_spectrum_v1(wl,fx,vel_eq,i_stellar,a1,a2,N=400):
         a2 : float
             Quadratic limb darkening coefficient.
 
-        norm : bool
-            If set to true, the weights are normalised such that all fluxes sum to 1.0
+        N : int
+            The size of the grid over which the integration is carried out. Larger values produce more accurate results.
 
         Returns
         -------
@@ -97,8 +97,6 @@ def sum_stellar_spectrum_v1_mu(wl,fx_array,vel_eq,i_stellar,mu,N=400):
         mu : array-like
             The array of mu-values corresponding to the array of spectra.
 
-        norm : bool
-            If set to true, the weights are normalised such that all fluxes sum to 1.0
 
         Returns
         -------
@@ -197,7 +195,10 @@ def sum_stellar_spectrum_v2(wl,fx,vel_eq,i_stellar,a1,a2,diff_rot_rate,N=200,bat
         probably no symmetry. This means that we need to interpolate the spectrum for all velocities and
         sum over the whole grid. We can do this fully vectorised, or batched (row-by-row in the grid) to 
         not load this huge array into memory. Full vectorization may be a tiny bit faster but may only really be useful on
-        big servers with sufficient RAM, so batching=True is the default.
+        big servers with sufficient RAM, so batched=True is the default.
+
+        This is one step short of full brute-force integration (freedom in the velocity field and in the flux field), so for this
+        function there exists no mu-version (no v2_mu). That would be v3.
 
         Parameters
         ----------
@@ -243,13 +244,29 @@ def sum_stellar_spectrum_v2(wl,fx,vel_eq,i_stellar,a1,a2,diff_rot_rate,N=200,bat
 
     
 
+@partial(jax.jit,static_argnames=["wl"])
+def sum_stellar_spectrum_v3(wl,fx_array,fx_map,v_map,weights=None):
+    """
+    Brute-force integration of a custom stellar disk.
+    
+    This takes a custom velocity map (could be generated with rigid rotation, drr or anything else) as well as an array of
+    spectra to be tiled onto the disk. The gridpoint locations of each spectrum in that list are mapped using the fx_map parameter.
+    The gridsize is specified by the sizes of v_map and fx_map.
+
+    """
+
+
+
+
+
+
 def sum_by_vel_and_flux_row(wl,fx,vel_grid,flux_grid,batched=True):
     """This chops up the problem of summing up to the integrated spectrum by 
     looping over rows of the disk's grid. This can be used with an arbitrary
     grid of fluxes (that scale the spectrum fx), and velocity grids (that doppler
     shift the spectrum fx). The only limitation is that wl,fx is constant over
     the stellar disk -- so this is one step short of a completely free 
-    brute-force integration."""
+    brute-force integration, and NOT compatible with mu-dependent spectra."""
     if batched: #We use lax.scan to sum over the grid row-by-row to reduce memory load.
         def scan_fn(carry, inputs):
             vel_row, flux_row = inputs  # Each is a row of len(y)

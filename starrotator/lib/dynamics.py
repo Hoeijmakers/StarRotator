@@ -105,28 +105,77 @@ def doppler_factor(v):
 def doppler_shift(wl,fx,v):
     """Doppler-shift a spectrum via linear interpolation.
 
-        Parameters
-        ----------
-        wl : array-like
-            The wavelength axis of the spectrum, 1D array.
-        fx : array-like
-            The corresponding flux axis, 1D array.
-        v : float, array-like
-            The radial velocity (positive = redshift) in km/s.
-            Multiple velocities can be provided in the same array.
+    Parameters
+    ----------
+    wl : array-like
+        The wavelength axis of the spectrum, 1D array.
+    fx : array-like
+        The corresponding flux axis, 1D array.
+    v : float, array-like
+        The radial velocity (positive = redshift) in km/s.
+        Multiple velocities can be provided in the same array.
 
 
-        Returns
-        -------
-        fx_shifted: array-like
-            The shifted spectrum evaluated on the original wavelength axis.
-            If multiple velocities are given, this is a 2D array matching the 
-            number of RVs to be shifted to. Note that edges are not extrapolated
-            or handled: Edge values are repeated.
+    Returns
+    -------
+    fx_shifted: array-like
+        The shifted spectrum evaluated on the original wavelength axis.
+        If multiple velocities are given, this is a 2D array matching the 
+        number of RVs to be shifted to. Note that edges are not extrapolated
+        or handled: Edge values are repeated.
     """
     g = doppler_factor(v)
     fx_shifted = jnp.interp(wl/g[None,:].T, wl, fx)
     return(fx_shifted)
+
+
+@jit
+def doppler_shift_direct(dlogl,fx,v):
+    """
+    Doppler-shift with explicit linear interpolation on a constant-dlog(lambda) grid.
+
+    Doppler-shifts a spectrum via index shifting. The flux spectrum needs to 
+    be defined on a wavelength array with a constant log-lambda step. In this case,
+    the velocity shift results in an element-wise shift that is independent of wavelength,
+    meaning that the sub-grid shift is the same in each element, removing the need for a 
+    generic interpolation step (the linear interpolation weights can be calculated once).
+
+    This function is therefore faster than the doppler-shift function above
+    (20x speedup with equivalent input measured).
+
+    Parameters
+    ----------
+    delta : float
+        The step-size in loglambda
+    fx : array-like
+        The corresponding flux axis, 1D array.
+    v : float, array-like
+        The radial velocity (positive = redshift) in km/s.
+        Multiple velocities can be provided in the same array.
+
+    Returns
+    -------
+    fx_int: array-like
+        The shifted spectrum evaluated on the original wavelength axis.
+        If multiple velocities are given, this is a 2D array matching the 
+        number of RVs to be shifted to. Note that edges are not extrapolated
+        or handled: Edge values are repeated.
+    """
+    nfx = fx.shape[0]
+    I0 = jnp.arange(nfx+1,dtype=jnp.int32) #An index array for fx.
+    v = jnp.atleast_1d(jnp.asarray(v))
+    g = doppler_factor(v)
+    D_i = -jnp.log(g)/dlogl #Number of indices to shift. Positive delta_i -> shift to the right in index space
+    #This is a decimal number. We are going to decompose the shift as the sum of an integer part plus a decimal part.
+    D_int = jnp.floor(D_i).astype(jnp.int32)
+    D_rest = D_i % 1
+    i_shifted_int = I0[None, :] + D_int[:, None] #These are the indices after shifting by an integer amount. Minus sign to shift to the right.
+    i_shifted_int_legal = jnp.clip(i_shifted_int,0,nfx-2)
+    fx_shifted = fx[i_shifted_int_legal].T
+    fx_int = fx_shifted[0:-1]*(1-D_rest) + fx_shifted[1:]*D_rest#The interpolation step.
+    return(fx_int.T)
+
+
 
 
 

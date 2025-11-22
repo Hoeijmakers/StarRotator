@@ -568,49 +568,56 @@ def circ_int_q_ld(a1,a2):
     return(2*jnp.pi * (a0/2 + a1/3 + a2/4))
 
 
-    
 
+def constant_velocity_grid(lam_min, lam_max, N):
+    """
+    Generate a log-uniform wavelength grid.
 
+    Parameters
+    ----------
+    lam_min : float
+        Starting wavelength (must be > 0).
+    lam_max : float
+        Ending wavelength (must be > 0 and > lam_min).
+    N : int
+        Number of wavelength points to generate.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def findgen(n,int=False):
-    """This is basically IDL's findgen function.
-    a = findgen(5) will return an array with 5 elements from 0 to 4:
-    [0,1,2,3,4]
+    Returns
+    -------
+    lam : (N,) jnp.ndarray
+        Wavelength array uniformly spaced in log(lambda).
+    dloglam : float
+        Constant spacing in log(lambda).
     """
     import numpy as np
-    if int:
-        return np.linspace(0,n-1,n).astype(int)
-    else:
-        return np.linspace(0,n-1,n)
+    lam_min = float(lam_min)
+    lam_max = float(lam_max)
+
+    if lam_min <= 0 or lam_max <= 0:
+        raise ValueError("Wavelengths must be positive for log spacing.")
+    if lam_max <= lam_min:
+        raise ValueError("lam_max must be greater than lam_min.")
+    if N < 2:
+        raise ValueError("N must be at least 2.")
+
+    # Uniform grid in log lambda
+    log_min = np.log(lam_min)
+    log_max = np.log(lam_max)
+
+    dloglam = (log_max - log_min) / (N - 1)
+    loglam = log_min + dloglam * jnp.arange(N)
+
+    lam = jnp.exp(loglam)
+    return lam, dloglam
 
 
 
 
 
-def gaussian(x,A,mu,sig,cont=0.0):
-    import numpy as np
-    """This produces a gaussian function on the grid x with amplitude A, mean mu
-    and standard deviation sig. Will need to expand it with a version that has
-    a polynomial continuum in the same way that IDL does it."""
-    return A * np.exp(-0.5*(x - mu)/sig*(x - mu)/sig)+cont
+
+
+
+
 
 def blur_spec(wl,spec,dv,truncsize = 20.0):
     """This function takes a spectrum, and blurs it using either a
