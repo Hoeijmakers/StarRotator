@@ -3,15 +3,17 @@ import numpy as np
 from jax import jit, lax
 from jax import numpy as jnp
 from functools import partial
-from starrotator.lib.dynamics import doppler_shift
+from starrotator.lib.dynamics import doppler_shift, doppler_shift_dlogl
 from starrotator.lib.operations import vert_int_q_ld, circ_int_q_ld, vert_int_q_ld_bounded
 from starrotator.lib.vgrid import calc_vel_stellar
 from starrotator.lib.vgrid import calc_flux_stellar
 
 
 
-@partial(jax.jit,static_argnames=["N"])
-def sum_stellar_spectrum_v1(wl,fx,vel_eq,i_stellar,a1,a2,N=400):
+
+
+@partial(jax.jit,static_argnames=["N","constant_dlogl"])
+def sum_stellar_spectrum_v1(wl,fx,vel_eq,i_stellar,a1,a2,N=400,constant_dlogl=False):
     """This builds the stellar spectrum by doppler-shifting and interpolating the input spectrum.
         This version of the integration assumes a SIMPLE VELOCITY GRID (that means: without drr)
         and a MU-INDEPENDENT (static) stellar spectrum. The only center-to-limb variation is 
@@ -44,6 +46,9 @@ def sum_stellar_spectrum_v1(wl,fx,vel_eq,i_stellar,a1,a2,N=400):
         N : int
             The size of the grid over which the integration is carried out. Larger values produce more accurate results.
 
+        constant_dlogl: bool
+            Whether or not to use fast doppler shifting. This requires that the wavelength axis is a float, not an array. 
+
         Returns
         -------
         F : array
@@ -56,7 +61,10 @@ def sum_stellar_spectrum_v1(wl,fx,vel_eq,i_stellar,a1,a2,N=400):
     v_axis = x*vel_eq*jnp.sin(jnp.radians(i_stellar)) # velocities along the y=0 axis.
     weights = vert_int_q_ld(x,a1,a2)
 
-    fx_shifted = doppler_shift(wl,fx,v_axis).T*weights
+    if constant_dlogl:
+        fx_shifted = doppler_shift_dlogl(wl,fx,v_axis).T*weights
+    else:
+        fx_shifted = doppler_shift(wl,fx,v_axis).T*weights
 
     total = circ_int_q_ld(a1,a2) #The analytical integral
     F_out = jnp.nansum(fx_shifted,axis=1)*2*dx#Factor of 2 because this is calculating a semi-circle.

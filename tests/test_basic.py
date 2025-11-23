@@ -405,6 +405,58 @@ def test_orbit():
     assert np.abs(np.max(x-7.5)) < 1e-4
 
 
+def test_fast_doppler():
+    from starrotator.lib.integrate import sum_stellar_spectrum_v1, sum_stellar_spectrum_v2, sum_stellar_spectrum_v1_mu, sum_hidden_spectrum_v2, sum_hidden_spectrum_v1, sum_hidden_spectrum_v1_mu
+    import timeit
+    import numpy as np
+    import jax.numpy as jnp
+    from starrotator.lib.util import gaussian
+    from starrotator.lib.dynamics import doppler_shift,doppler_factor,doppler_shift_dlogl
+    from starrotator.lib.operations import vert_int_q_ld, circ_int_q_ld, constant_velocity_grid
+
+    from jax import jit
+    import matplotlib.pyplot as plt    
+    xp = jnp.array([-0.3,-0.29,-0.28,-0.27])
+    yp = xp*0.5
+    a1,a2 = 0.0,0.0
+    i_stellar,vel_eq,diff_rot_rate = 90.0,100.0,0.0
+    Rp = 0.1
+    wlmin,wlmax,Nwl = 300,470,100000
+    wl = np.linspace(wlmin,wlmax,Nwl)
+    mu = jnp.linspace(0,1,10)
+    N = 300
+    fx = gaussian(wl,-0.5,jnp.mean(wl),0.02,cont=1.0)
+    fx_array = wl[None,:]*0.0+ mu[:,None]*0.0+fx
+    #Define a constant velocity wavelength grid as well of the same size and limits as the linear one:
+    wlc = np.mean(np.array([wlmin,wlmax]))
+    wl2,dlogl = constant_velocity_grid(wlmin,wlmax,Nwl)
+    fx2 = gaussian(wl2,-0.5,wlc,0.02,cont=1.0)
+    #R = l/dl = c/dv
+    b1,b2 = wl2[0:2],wl2[-2:]
+    dwl_start = b1[1]-b1[0]
+    dwl_end = b2[1]-b2[0]
+    dv_start,dv_end = 3e5*np.array([dwl_start,dwl_end])/np.array([np.mean(b1),np.mean(b2)])
+    x = jnp.linspace(-1,1,N)
+    dx = x[1]-x[0]
+    v_axis = x*vel_eq*jnp.sin(jnp.radians(i_stellar)) # velocities along the y=0 axis.
+    weights = vert_int_q_ld(x,a1,a2)
+
+    fx_shifted_1 = doppler_shift(wl2,fx2,v_axis)
+    fx_shifted_2 = doppler_shift_dlogl(dlogl,fx2,v_axis)
+    mean_difference = np.mean(fx_shifted_2[0]-fx_shifted_1[0])
+    assert(mean_difference < 1e-7)
+    mean_difference = np.mean(fx_shifted_2[-1]-fx_shifted_1[-1])
+    assert(mean_difference < 1e-7)
+
+    integrated_1 = sum_stellar_spectrum_v1(wl2,fx2,vel_eq,i_stellar,a1,a2,N=400,constant_dlogl=False).block_until_ready()
+    integrated_2 = sum_stellar_spectrum_v1(dlogl,fx2,vel_eq,i_stellar,a1,a2,N=400,constant_dlogl=True).block_until_ready()
+    mean_difference = np.mean(integrated_1 - integrated_2)
+    assert(mean_difference < 1e-7)
+
+
+    
+
+
 
 def test_default_computation():
     from starrotator import StarRotator

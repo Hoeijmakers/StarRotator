@@ -1,4 +1,4 @@
-from jax import jit
+from jax import jit, lax
 from jax import numpy as jnp
 from jaxoplanet.orbits import keplerian
 from starrotator.lib.constants import rad_in_deg, R_sun, d_in_seconds, c as c_light
@@ -101,9 +101,15 @@ def doppler_factor(v):
 
 
 
+
+
+
 @jit
 def doppler_shift(wl,fx,v):
-    """Doppler-shift a spectrum via linear interpolation.
+    """Doppler-shift a spectrum via linear interpolation. 
+    
+    This is the simplest,
+    most generic and default doppler shifting function.
 
     Parameters
     ----------
@@ -130,7 +136,7 @@ def doppler_shift(wl,fx,v):
 
 
 @jit
-def doppler_shift_direct(dlogl,fx,v):
+def doppler_shift_dlogl(dlogl,fx,v):
     """
     Doppler-shift with explicit linear interpolation on a constant-dlog(lambda) grid.
 
