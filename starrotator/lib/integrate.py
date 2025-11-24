@@ -46,8 +46,9 @@ def sum_stellar_spectrum_v1(wl,fx,vel_eq,i_stellar,a1,a2,N=400,constant_dlogl=Fa
         N : int
             The size of the grid over which the integration is carried out. Larger values produce more accurate results.
 
-        constant_dlogl: bool
-            Whether or not to use fast doppler shifting. This requires that the wavelength axis is a float, not an array. 
+        constant_dlogl : bool
+            Whether or not to use fast doppler shifting. This requires that the wavelength axis is a float, set to the
+            constant value of dloglambda (and not an explicit wavelength array). 
 
         Returns
         -------
@@ -73,8 +74,8 @@ def sum_stellar_spectrum_v1(wl,fx,vel_eq,i_stellar,a1,a2,N=400,constant_dlogl=Fa
 
 
 
-@partial(jax.jit,static_argnames=["N"])
-def sum_stellar_spectrum_v1_mu(wl,fx_array,vel_eq,i_stellar,mu,N=400):
+@partial(jax.jit,static_argnames=["N",'constant_dlogl'])
+def sum_stellar_spectrum_v1_mu(wl,fx_array,vel_eq,i_stellar,mu,N=400,constant_dlogl=False):
     """This builds the stellar spectrum by doppler-shifting and interpolating an array of input
         spectra, corresponding to an array of mu angles.
         This version of the integration assumes a SIMPLE VELOCITY GRID (that means: without drr)
@@ -105,6 +106,13 @@ def sum_stellar_spectrum_v1_mu(wl,fx_array,vel_eq,i_stellar,mu,N=400):
         mu : array-like
             The array of mu-values corresponding to the array of spectra.
 
+        N : int
+            The size of the grid over which the integration is carried out. Larger values produce more accurate results.
+
+        constant_dlogl : bool
+            Whether or not to use fast doppler shifting. This requires that the wavelength axis is a float, set to the
+            constant value of dloglambda (and not an explicit wavelength array). 
+
 
         Returns
         -------
@@ -128,10 +136,15 @@ def sum_stellar_spectrum_v1_mu(wl,fx_array,vel_eq,i_stellar,mu,N=400):
     v_axis = x*vel_eq*jnp.sin(jnp.radians(i_stellar)) # velocities along the y=0 axis.
 
 
-    doppler_shift_batch = jax.vmap(doppler_shift, in_axes=(None, 0, None)) # Here is some of the magic.
+    if constant_dlogl:
+        doppler_shift_batch = jax.vmap(doppler_shift_dlogl, in_axes=(None, 0, None))
+    else:
+        doppler_shift_batch = jax.vmap(doppler_shift, in_axes=(None, 0, None))
     #This creates a function doppler_shift_batch that is a vectorised execution of the doppler_shift
     #function, looping over axis 0 of the second input, which is fx_array. So each row of fx_array
     #gets doppler shifted by v_axis.
+
+    #doppler_shift_batch = jax.vmap(doppler_shift, in_axes=(None, 0, None)) # Here is some of the magic.
 
     fx_array_shifted = doppler_shift_batch(wl,fx_array,v_axis)
     #So the output will have dimensions len(v) * len(fx_array) * len(wl) whereas the shape of the output
