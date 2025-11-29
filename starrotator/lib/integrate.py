@@ -204,8 +204,8 @@ def sum_stellar_spectrum_v1_mu(wl,fx_array,vel_eq,i_stellar,mu,N=400,constant_dl
 
 
 
-@partial(jax.jit,static_argnames=['N','batched'])
-def sum_stellar_spectrum_v2(wl,fx,vel_eq,i_stellar,a1,a2,diff_rot_rate,N=200,batched=True):
+@partial(jax.jit,static_argnames=['N','batched','constant_dlogl'])
+def sum_stellar_spectrum_v2(wl,fx,vel_eq,i_stellar,a1,a2,diff_rot_rate,N=200,batched=True,constant_dlogl=False):
 # def sum_stellar_spectrum_v2(wl,fx,vel_grid,flux_grid,batched=True):
     """This builds the stellar spectrum by doppler-shifting and interpolating the input spectrum.
         This version of the integration assumes a FREE VELOCITY GRID (that means: with drr)
@@ -249,6 +249,10 @@ def sum_stellar_spectrum_v2(wl,fx,vel_eq,i_stellar,a1,a2,diff_rot_rate,N=200,bat
         batched : bool
             Compute the sum row-by-row or entirely at once (warning: very memory hungry).
 
+        constant_dlogl : bool
+            Whether or not to use fast doppler shifting. This requires that the wavelength axis is a float, set to the
+            constant value of dloglambda (and not an explicit wavelength array). 
+
         Returns
         -------
         fx : array
@@ -260,12 +264,12 @@ def sum_stellar_spectrum_v2(wl,fx,vel_eq,i_stellar,a1,a2,diff_rot_rate,N=200,bat
     vel_grid  = calc_vel_stellar(x,x,i_stellar, vel_eq, diff_rot_rate)
     
     total = circ_int_q_ld(a1,a2) #The analytical integral
-    F_out = sum_by_vel_and_flux_row(wl,fx,vel_grid,flux_grid,batched=True)
+    F_out = sum_by_vel_and_flux_row(wl,fx,vel_grid,flux_grid,batched=True,constant_dlogl=constant_dlogl)
     return(F_out*dx**2 / total)
 
     
 
-@partial(jax.jit,static_argnames=["wl"])
+@jit
 def sum_stellar_spectrum_v3(wl,fx_array,fx_map,v_map,weights=None):
     """
     Brute-force integration of a custom stellar disk.
@@ -280,18 +284,32 @@ def sum_stellar_spectrum_v3(wl,fx_array,fx_map,v_map,weights=None):
 
 
 
-
-def sum_by_vel_and_flux_row(wl,fx,vel_grid,flux_grid,batched=True):
-    """This chops up the problem of summing up to the integrated spectrum by 
+@partial(jax.jit,static_argnames=["batched","constant_dlogl"])
+def sum_by_vel_and_flux_row(wl,fx,vel_grid,flux_grid,batched=True,constant_dlogl=False):
+    """
+    Batched lax.scan implementation of full-grid summing.
+    
+    This chops up the problem of summing up to the integrated spectrum by 
     looping over rows of the disk's grid. This can be used with an arbitrary
     grid of fluxes (that scale the spectrum fx), and velocity grids (that doppler
     shift the spectrum fx). The only limitation is that wl,fx is constant over
     the stellar disk -- so this is one step short of a completely free 
-    brute-force integration, and NOT compatible with mu-dependent spectra."""
+    brute-force integration, and NOT compatible with mu-dependent spectra.
+    
+    This choice of batching has one drawback, and that is that the user cannot control
+    batch-size. But arrays of size Nwl x N should in realistic cases not be too large
+    for memory anyway; unless a bizarre number of wavelength points is used, or unless
+    you are running this on a raspberry pi.
+    
+    """
     if batched: #We use lax.scan to sum over the grid row-by-row to reduce memory load.
         def scan_fn(carry, inputs):
             vel_row, flux_row = inputs  # Each is a row of len(y)
-            fx_shifted = doppler_shift(wl, fx, vel_row).T * flux_row  # shape (len(wl), len(y))
+            if constant_dlogl:
+                fx_shifted = doppler_shift_dlogl(wl,fx,vel_row).T * flux_row
+            else:
+                fx_shifted = doppler_shift(wl,fx,vel_row).T * flux_row
+            # fx_shifted = doppler_shift(wl, fx, vel_row).T * flux_row  # shape (len(wl), len(y))
             partial_sum = jnp.nansum(fx_shifted, axis=1)  # shape (N_wl,)
             new_total = carry + partial_sum
             return new_total, None  # No output needs to be collected.
@@ -303,8 +321,13 @@ def sum_by_vel_and_flux_row(wl,fx,vel_grid,flux_grid,batched=True):
         F_out, _ = lax.scan(scan_fn, init_spectrum, (vel_grid, flux_grid))
     else: # If a LOT of memory is available, then we may not need to batch and do it directly.
         # This is very memory-hungry because the Nx n Ny x Nwl array gets done all at once.
-        # You very likely want to set batched=True instead....
-        fx_shifted = doppler_shift(wl,fx,jnp.ravel(vel_grid)).T*jnp.ravel(flux_grid)
+        # You very likely want to set batched=True instead, unless Nwl is small.
+        # fx_shifted = doppler_shift(wl,fx,jnp.ravel(vel_grid)).T*jnp.ravel(flux_grid)
+        if constant_dlogl:
+            fx_shifted = doppler_shift_dlogl(wl,fx,jnp.ravel(vel_grid)).T*jnp.ravel(flux_grid)
+        else:
+            fx_shifted = doppler_shift(wl,fx,jnp.ravel(vel_grid)).T*jnp.ravel(flux_grid)
+
         F_out = jnp.nansum(fx_shifted,axis=1)
     return(F_out)
     
@@ -319,8 +342,8 @@ def sum_by_vel_and_flux_row(wl,fx,vel_grid,flux_grid,batched=True):
 # the change in xp,yp but that can be addressed by either:
 # -writing the function such that accepts an fx-array and a mu-array.
 # -calling this function in a jitted loop or vmap over different fx-es, corresponding to the mu's the planet traverses.
-@partial(jax.jit,static_argnames=['N'])
-def sum_hidden_spectrum_v1(wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N=100):
+@partial(jax.jit,static_argnames=['N',"constant_dlogl"])
+def sum_hidden_spectrum_v1(wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N=100,constant_dlogl=False):
     """This builds the stellar spectrum that is hidden behind the planet by doppler-shifting 
         and interpolating the input spectrum, summing only over the range of coordinates that is
         obscured by the planet disk.
@@ -371,6 +394,10 @@ def sum_hidden_spectrum_v1(wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N=100):
             you have many planet positions and high N will result in high memory load. In case of overflowing RAM, you can always
             chunck the computation in wavelength yourself.
 
+        constant_dlogl : bool
+            Whether or not to use fast doppler shifting. This requires that the wavelength axis is a float, set to the
+            constant value of dloglambda (and not an explicit wavelength array). 
+
         Returns
         -------
         F : array
@@ -401,10 +428,15 @@ def sum_hidden_spectrum_v1(wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N=100):
     #Weights now has the same shape as x_array. x_array could be a 2D array, N_planet_phases x N_gridpoints.
     #For each planet phase, weights expresses the amount of surface area (from y_min to y_max) at each x-position (meaning: at each RV).
     #Thats why a dxR appears below, that is the differential.
-    fx_shifted = doppler_shift(wl,fx,v_axes).T*weights # This is a very big array isn't it? For large N this is large too?
-    F_out = jnp.nansum(fx_shifted,axis=2).T #Multiply with the differential for normalization.
+    if constant_dlogl:
+        fx_shifted = doppler_shift_dlogl(wl,fx,v_axes).T*weights
+    else:
+        fx_shifted = doppler_shift(wl,fx,v_axes).T*weights
+
+    #fx_shifted = doppler_shift(wl,fx,v_axes).T*weights # This is a very big array isn't it? For large N this is large too?
+    F_out = jnp.nansum(fx_shifted,axis=2).T 
     total = circ_int_q_ld(a1,a2)
-    return(F_out*dxR/total)
+    return(F_out*dxR/total)#Multiply with the differential for normalization.
 
 
 
@@ -453,8 +485,8 @@ def interp_fx_array(mu_array,fx_array,mu_value):
 
 
 
-@partial(jax.jit,static_argnames=['N','small_planet'])
-def sum_hidden_spectrum_v1_mu(wl,fx_array,xp,yp,Rp,vel_eq,i_stellar,mu,N=100,small_planet=True):
+@partial(jax.jit,static_argnames=['N','small_planet','constant_dlogl'])
+def sum_hidden_spectrum_v1_mu(wl,fx_array,xp,yp,Rp,vel_eq,i_stellar,mu,N=100,small_planet=True,constant_dlogl=False):
     """This builds the stellar spectrum that is hidden behind the planet by doppler-shifting 
         and interpolating the input spectrum, summing only over the range of coordinates that is
         obscured by the planet disk.
@@ -493,7 +525,6 @@ def sum_hidden_spectrum_v1_mu(wl,fx_array,xp,yp,Rp,vel_eq,i_stellar,mu,N=100,sma
 
         mu : array-like
             The array of mu-values corresponding to the array of spectra.
-            
 
         N : int
             Number of grid-points in the x direction onto which the planet is simulated. Note that the resolution of the planet is independent
@@ -504,6 +535,10 @@ def sum_hidden_spectrum_v1_mu(wl,fx_array,xp,yp,Rp,vel_eq,i_stellar,mu,N=100,sma
             Make a small-planet approximation (true) or not (false). In the small-planet approximation, the mu-variation across the planetary disk is neglected, and a single mu
             angle (at planet center) is assumed. The spectrum is interpolated from the two nearest mu angles for which spectra are provided (so any planet motion does result in a 
             change in the spectrum).
+
+        constant_dlogl : bool
+            Whether or not to use fast doppler shifting. This requires that the wavelength axis is a float, set to the
+            constant value of dloglambda (and not an explicit wavelength array). 
 
         Returns
         -------
@@ -535,8 +570,12 @@ def sum_hidden_spectrum_v1_mu(wl,fx_array,xp,yp,Rp,vel_eq,i_stellar,mu,N=100,sma
         # is at the mu of each planet location.
         fx_p = interp_fx_array(mu,fx_array,mup) # These are the interpolated planet spectra belonging to each xp,yp.
 
-
-        doppler_shift_batch = jax.vmap(doppler_shift, in_axes=(None, 0, 0)) # Here is some of the magic.
+        if constant_dlogl:
+            doppler_shift_batch = jax.vmap(doppler_shift_dlogl, in_axes=(None, 0, 0))
+        else:
+            doppler_shift_batch = jax.vmap(doppler_shift, in_axes=(None, 0, 0))
+        
+        #doppler_shift_batch = jax.vmap(doppler_shift, in_axes=(None, 0, 0)) # Here is some of the magic.
         # #This creates a function doppler_shift_batch that is a vectorised execution of the doppler_shift
         # #function, looping over axis 0 of the second input, which is fx_array. So each row of fx_array
         # #gets doppler shifted by v_axis.
@@ -546,7 +585,12 @@ def sum_hidden_spectrum_v1_mu(wl,fx_array,xp,yp,Rp,vel_eq,i_stellar,mu,N=100,sma
         #Actual normalization depends on the normalization of the mu-spectra, though.
         #This is just designed to normalize in case that the input spectrum is the same for all mu (no limb darkening).
         fx_shifted = doppler_shift_batch(wl,fx_p,v_axes).T * weights.T
+
+        # print(np.shape(doppler_shift_batch(wl,fx_p,v_axes)))
+        # print(np.shape(fx_shifted))
+
         F_out = jnp.nansum(fx_shifted,axis=1).T * dxR
+        # print(np.shape(F_out))
         return(F_out/total)
     else:
         raise Exception("NOT-SMALL PLANET IS NOT IMPLEMENTED YET.")
@@ -559,8 +603,8 @@ def sum_hidden_spectrum_v1_mu(wl,fx_array,xp,yp,Rp,vel_eq,i_stellar,mu,N=100,sma
 
 #sum_hidden_spectrum_v1(wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N=100)
 # def sum_hidden_spectrum_v2(wl,fx,vel_grid_array,flux_grid_array,N=100,batched=True):
-@partial(jax.jit,static_argnames=['N','batched'])
-def sum_hidden_spectrum_v2(wl,fx,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=100,batched=True):
+@partial(jax.jit,static_argnames=['N','batched','constant_dlogl'])
+def sum_hidden_spectrum_v2(wl,fx,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=100,batched=True,constant_dlogl=False):
     """This builds the stellar spectrum that is hidden behind the planet by doppler-shifting 
         and interpolating the input spectrum, summing only over the range of coordinates that is
         obscured by the planet disk.
@@ -609,6 +653,10 @@ def sum_hidden_spectrum_v2(wl,fx,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N
         batched : bool
             Compute the integration phase-by-phase (True) or all at once (warning: very memory hungry).
 
+        constant_dlogl : bool
+            Whether or not to use fast doppler shifting. This requires that the wavelength axis is a float, set to the
+            constant value of dloglambda (and not an explicit wavelength array). 
+
 
         Returns
         -------
@@ -626,7 +674,7 @@ def sum_hidden_spectrum_v2(wl,fx,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N
 
     def scan_fn(carry, inputs):
         vel_i, flux_i = inputs  # Each is a planetary flux grid.
-        sum_i = sum_by_vel_and_flux_row(wl,fx,vel_i,flux_i,batched=batched)
+        sum_i = sum_by_vel_and_flux_row(wl,fx,vel_i,flux_i,batched=batched,constant_dlogl=constant_dlogl)
         carry += 1
         return carry, sum_i  # No output needs to be collected.
 

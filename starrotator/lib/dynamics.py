@@ -106,10 +106,14 @@ def doppler_factor(v):
 
 @jit
 def doppler_shift(wl,fx,v):
-    """Doppler-shift a spectrum via linear interpolation. 
+    """
+    Doppler-shift a spectrum via linear interpolation. 
     
-    This is the simplest,
-    most generic and default doppler shifting function.
+    This is the simplest, most generic and therefore default doppler shifting function,
+    which accepts a wavelength grid that is not specially chosen.
+    Note that doppler shifting can be vastly sped up if the wavelength grid is
+    defined with a constant delta-loglambda, in which case use 
+    doppler_shift_dlog() below.
 
     Parameters
     ----------
@@ -169,8 +173,9 @@ def doppler_shift_dlogl(dlogl,fx,v):
     """
     nfx = fx.shape[0]
     I0 = jnp.arange(nfx+1,dtype=jnp.int32) #An index array for fx.
-    v = jnp.atleast_1d(jnp.asarray(v))
-    g = doppler_factor(v)
+    v = jnp.atleast_1d(jnp.asarray(v)) #To permit single-float input.
+    vshape = v.shape
+    g = doppler_factor(v).flatten() #If v was 2D, now it gets flattened.
     D_i = -jnp.log(g)/dlogl #Number of indices to shift. Positive delta_i -> shift to the right in index space
     #This is a decimal number. We are going to decompose the shift as the sum of an integer part plus a decimal part.
     D_int = jnp.floor(D_i).astype(jnp.int32)
@@ -179,7 +184,8 @@ def doppler_shift_dlogl(dlogl,fx,v):
     i_shifted_int_legal = jnp.clip(i_shifted_int,0,nfx-2)
     fx_shifted = fx[i_shifted_int_legal].T
     fx_int = fx_shifted[0:-1]*(1-D_rest) + fx_shifted[1:]*D_rest#The interpolation step.
-    return(fx_int.T)
+    fx_int_reshaped = fx_int.reshape(nfx,*vshape)#Reshaping back to original shape.
+    return(fx_int_reshaped.T)#A .T here to make output shape consistent with generic dopplershift function with n_v on the first axis.
 
 
 
