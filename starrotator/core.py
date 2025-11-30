@@ -35,117 +35,112 @@ from starrotator.lib.integrate import sum_hidden_spectrum_v2, sum_stellar_spectr
 
 
 class StarRotator(object):
-    def __init__(self,wave_start,wave_end,grid_size,grid_planet_size=None,system_path=None,
-    obs_path=None,input={},linelist_path=''):
+    def __init__(self,wave_start,wave_end,grid_size,
+                grid_planet_size=None,system_path=None,
+                obs_path=None,input={},linelist_path=''):
         """
-            Welcome to StarRotator.
-            ***********************
-            The StarRotator object contains the main functionality of StarRotator.
-            Upon initialization, the exoplanet system input is read from file, and the
-            model is computed. The parameters needed to initialise are listed below:
+        Welcome to StarRotator.
 
-            Parameters
-            ----------
-            wave_start : float
-                Start of modelled wavelength range in nm in vacuum.
-            wave_end : float
-                Ending Wavelength range in nm in vacuum.
-            grid_size: int
-                Number of grid cells to make up the stellar disk. Set to values greater than 400
-                to limit numerical errors, or less if you are trying things out and just
-                want speed.
-            grid_planet_size: None, int
-                Number of grid cells to make up the planet disk. If set to None this is set to be
-                equal to one quarter of the grid size of the star.
-            system_path : str
-                Path to parameter file defining the system. This file should contain the following keywords
-                and values on separate lines, and the default values are as follows:
-                    50000.0     v_eq
-                    90.0        stellar i
-                    0.0         Differential rotation parameter (alpha)
-                    5000.0      Stellar effective temperature (K)
-                    0.0         Fe/H
-                    4.5         logg
-                    0.93        Limb-darkening coefficient u1
-                    -0.23       Limb-darkening coefficient u2
-                    0           Number of mu angles to consider. For values higher than zero, StarRotator switches to SPECTRUM rather than PHOENIX.
-                    3.153       a/Rs
-                    0.0         e
-                    0.0         omega
-                    86.79       Orbital inclination
-                    85.0        Projected obliquity
-                    0.08228     Rp/Rs
-                    1.4811235   Orbital period
-                    57095.68572 Transit center time - 2400000.
-                    phases      mode, providing the interpretation of the timestamps of the observations:
+        The StarRotator object contains the main functionality of StarRotator.
+        Upon initialization, the exoplanet system input is read from file, and the
+        model is computed. Calling this class with the minimum required input
+        makes the model default to demo input parameters shipped together with this code.
+        Normal use cases habe the user provide input parameters, either via parameter
+        files (system_path and obs_path) or with a dictionary (input). In the case of
+        pySME usage (disk-resolved spectra), a path to a pySME-compatible linelist file
+        needs to be provided as well.
 
-                Note that if mode is set to pysme, the limb darkening parameters that the user provides are overridden.
-                If no system path is set, the input defaults to the demo data packaged along with the package.
+        Note that in PHOENIX mode, Starrotator will download PHOENIX spectra automatically
+        to a cache directorly, located in the default cache directory (access this path using
+        the print_intput method -- see below).
+
+        The calculation outputs the out-of-transit stellar spectrum, in-transit time-series,
+        the in-transit time-series normalised to the wavelength-mean
+
+
+        Parameters
+        ----------
+        wave_start : float
+            Start of modelled wavelength range in nm in vacuum.
+
+        wave_end : float
+            Ending Wavelength range in nm in vacuum.
+
+        grid_size: int
+            Number of grid cells to make up the stellar disk. Set to values greater than 400
+            to limit numerical errors, or less if you are trying things out and just
+            want speed.
+
+        grid_planet_size: None, int
+            Number of grid cells to make up the planet disk. If set to None this is set to be
+            equal to half of the grid size of the star.
+
+        system_path : str
+            Path to parameter file defining the system. This file should contain the following keywords
+            and values on separate lines, and the default values are as follows:
+            50000.0     v_eq
+            90.0        stellar i
+            0.0         Differential rotation parameter (alpha)
+            5000.0      Stellar effective temperature (K)
+            0.0         Fe/H
+            4.5         logg
+            0.93        Limb-darkening coefficient u1
+            -0.23       Limb-darkening coefficient u2
+            0           Number of mu angles to consider. For values higher than zero, StarRotator switches to SPECTRUM rather than PHOENIX.
+            3.153       a/Rs
+            0.0         e
+            0.0         omega
+            86.79       Orbital inclination
+            85.0        Projected obliquity
+            0.08228     Rp/Rs
+            1.4811235   Orbital period
+            57095.68572 Transit center time - 2400000.
+            phases      mode, providing the interpretation of the timestamps of the observations.
+            Note that if mode is set to pysme, the limb darkening parameters that the user provides are overridden.
+            If no system path is set, the input defaults to the demo data packaged along with the package.
             
-            obs_path: str
-                Path to the parameter file defining the timestamps of the observations.
-                Tthis file is assumed to contain a list of orbital phases. Note that if you are 
-                modelling observations of long exposure times, the output of StarRotator will be less accurate 
-                because the planet moves significantly during an exposures. This effect is greater for orbits 
-                aligned to the stellar equator (obliquity 0 degrees).
+        obs_path: str
+            Path to the parameter file defining the timestamps of the observations.
+            Tthis file is assumed to contain a list of orbital phases. Note that if you are 
+            modelling observations of long exposure times, the output of StarRotator will be less accurate 
+            because the planet moves significantly during an exposures. This effect is greater for orbits 
+            aligned to the stellar equator (obliquity 0 degrees).
 
-                By default, the following phases are provided in the demo file:
-                    -0.06
-                    -0.055
-                    -0.05
-                    -0.045
-                    -0.04
-                    -0.035
-                    -0.03
-                    -0.025
-                    -0.02
-                    -0.015
-                    -0.01
-                    -0.005
-                    0.0
-                    0.005
-                    0.01
-                    0.015
-                    0.02
-                    0.025
-                    0.03
-                    0.035
-                    0.04
-                    0.045
-                    0.05
-                    0.055
-                    0.06
-
-            linelist_path: str
-                Path to the VALD linelist used for generating a spectrum using pySME.
-                This can also be provided in the input dictionary (see below). 
+        linelist_path: str
+            Path to the VALD linelist used for generating a spectrum using pySME.
+            This can also be provided in the input dictionary (see below). 
                 
-            input : dict
-                A dictionary of the input parameters can be provided instead of input files.
-                If a dictionary and file paths are provided simultaneously, the dictionary overrides.    
+            
+        input : dict
+            A dictionary of the input parameters can be provided instead of input files.
+            If a dictionary and file paths are provided simultaneously, the dictionary overrides.    
 
-            Class methods
-            -------------
-            After initializing the class like a=StarRotator(588.0,592.0,200.0),
-            the following methods are available to manipulate the simulation after
-            it has been calculated the first time, or to plot the simulation output.
-            star.read_system() Reads in (new) exoplanet system files (see above).
-            star.compute_spectrum() recomputes the simulation.
-            star.plot_residuals() Produces a 2D plot of the residuals.
-            star.animate() Produces an animation of the transiting system. One frame
-            corresponding to each phase provided.
+            
+        Class methods
+        -------------
+        THIS IS OUTDATED
+        After initializing the class like a=StarRotator(588.0,592.0,200.0),
+        the following methods are available to manipulate the simulation after
+        it has been calculated the first time, or to plot the simulation output.
+        star.read_system() Reads in (new) exoplanet system files (see above).
+        star.compute_spectrum() recomputes the simulation.
+        star.plot_residuals() Produces a 2D plot of the residuals.
+        star.animate() Produces an animation of the transiting system. One frame
+        corresponding to each phase provided.
 
-            Output attributes
-            -----------------
-            After initializing the class like star = StarRotator(588.0,592.0,200.0),
-            the primary simulation output can be accessed as follows:
-            star.wl (wavelength array)
-            star.spectra (matrix of spectra, 2D np.array)
-            star.lightcurve (list of fluxes)
-            star.residual (residual after dividing out of transit spectra, 2D np.array)
-
+        
+        Output attributes
+        -----------------
+        THIS IS OUTDATED
+        After initializing the class like star = StarRotator(588.0,592.0,200.0),
+        the primary simulation output can be accessed as follows:
+        star.wl (wavelength array)
+        star.spectra (matrix of spectra, 2D np.array)
+        star.lightcurve (list of fluxes)
+        star.residual (residual after dividing out of transit spectra, 2D np.array)
 
         """
+
         import pdb
         self.status = 'initialised'
         self.wave_start=float(wave_start)
@@ -154,7 +149,7 @@ class StarRotator(object):
         if grid_planet_size is not None:
             self.grid_planet_size = int(grid_planet_size) # Making this accessible to the user if needed.
         else:
-            self.grid_planet_size = int(grid_size/4)
+            self.grid_planet_size = int(grid_size/2)
         self.linelist_path = linelist_path
         self.input = input
         self.system_path = system_path
@@ -176,6 +171,8 @@ class StarRotator(object):
             ut.save_default_config()#This contains a path to a default
             #location where app or cache data is expected.
 
+
+        #This is the primary cascade that gets run.
         self.get_stellar_spectrum()
         self.compute_orbit()
         self.compute_spectrum()
@@ -243,7 +240,7 @@ class StarRotator(object):
             util.check_integrity_input(input,['phases'])
             self.phases = np.array(input['phases'])
 
-
+        self.input = input #Raise to class to make available.
             
         self.velStar    = float(input['veq'])
         self.stelinc    = float(input['stelinc'])
@@ -316,6 +313,36 @@ class StarRotator(object):
         self.status = 'success reading input'
 
 
+    def print_input(self):
+        """
+        A function to print all StarRotator inputs / configurations that determine or
+        debug how this model instance will or has behaved. 
+        """
+
+        print('Paths:')
+        print(f'\tSystem path: \t {self.system_path}')
+        print(f'\tObs path: \t {self.obs_path}')
+
+        print('')
+        print('Input dictionary:')
+        for i in self.input:
+            print('\t'+i,'\t',self.input[i])
+
+        print('')
+        print('Phases:')
+        for i in self.phases:
+            print(f'\t{i}')
+
+        print('')
+        print('Mu:')
+        print('\t',self.mus)
+
+        print('')
+        print('Cache dir:')
+        print('t'+str(ut.get_cache_dir()))
+
+
+
     def compute_orbit(self):
         """
         A wrapper for calling jaxoplanet Keplerian solver.
@@ -342,8 +369,8 @@ class StarRotator(object):
         switch between PHOENIX (mus=0) and pySME.
         """
 
-        if isinstance(self.mus,np.ndarray) != True:
-            if self.model.lower() == 'phoenix':
+        if isinstance(self.mus,np.ndarray) != True: #If we have no mu-resolved case then...
+            if self.model.lower() == 'phoenix': #Either use PHOENIX
                 print('--- Reading spectrum from PHOENIX')
                 print(f'-----T={self.T}K, log(g)={self.logg}, Z={self.Z}.')
                 wl_wide,fx_wide = spectrum.load_PHOENIX(self.T,
@@ -351,7 +378,7 @@ class StarRotator(object):
                                                metallicity=self.Z)
                 wl = wl_wide[(wl_wide > self.wave_start) & (wl_wide < self.wave_end)]
                 fx = fx_wide[(wl_wide > self.wave_start) & (wl_wide < self.wave_end)]
-            elif self.model.lower() in ['pysme','sme']:
+            elif self.model.lower() in ['pysme','sme']: #Or use pySME
                 print('--- Generating spectrum using pySME')
                 print(f'-----T={self.T}K, log(g)={self.logg}, Z={self.Z}.')
                 wl, fx= spectrum.get_spectrum_pysme(self.wave_start, 
@@ -360,25 +387,43 @@ class StarRotator(object):
                                                     self.logg, 
                                                     self.Z, 
                                                     self.linelist_path, 
-                                                    grid = self.grid_model)
+                                                    grid = self.grid_model,
+                                                    abund = self.abund)
             else:
                 raise Exception('Invalid model spectrum chosen. Input either PHOENIX or pySME in '
                 'star.txt')
             self.wl_in = wl*1.0
             self.fx_in = fx*1.0
+        else: #Then we must be in pySME case
+            if self.model.lower() in ['pysme','sme']: #Or use pySME
+                print('--- Generating spectrum using pySME with mu-dependence')
+                print(f'-----T={self.T}K, log(g)={self.logg}, Z={self.Z}.')
+                wl, fx= spectrum.get_spectrum_pysme(self.wave_start, 
+                                                    self.wave_end, 
+                                                    self.T, 
+                                                    self.logg, 
+                                                    self.Z, 
+                                                    linelist = self.linelist_path, 
+                                                    mu = self.mus,
+                                                    grid = self.grid_model,
+                                                    abund = self.abund)
+                #THIS IS NOT FINISHED CONTINUE PASSING FX_ARRAY CORRECTLY
+
 
     #Define a set of wrappers to avoid having to refer to self all the time in compute_spectrum().
     def compute_grids(self,x,y,i_stellar,vel_eq,diff_rot_rate,a1,a2):
         vel_grid  = calc_vel_stellar(x,y,i_stellar, vel_eq, diff_rot_rate)
         flux_grid  = calc_flux_stellar(x,y,a1,a2,norm=False)
         return(flux_grid,vel_grid)
-    def calc_v1(self,wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N1=400,N2=200):
-        F_out_v1 =  sum_stellar_spectrum_v1(wl,fx,vel_eq,i_stellar,a1,a2,N=N1)
-        F_in_v1 = sum_hidden_spectrum_v1(wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N=N2)
+    def calc_v1(self,wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,Nstar=400,Nplanet=200):
+        F_out_v1 =  sum_stellar_spectrum_v1(wl,fx,vel_eq,i_stellar,a1,a2,N=Nstar)
+        F_in_v1 = sum_hidden_spectrum_v1(wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N=Nplanet)
+        F_out_v1.block_until_ready()
+        F_in_v1.block_until_ready()
         return(F_out_v1,F_in_v1)
-    def calc_v2(self,wl,fx,x,y,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,batched=True,N2=200):
-        F_out_v2 = sum_stellar_spectrum_v2(wl,fx,vel_eq,i_stellar,a1,a2,diff_rot_rate,N=N2,batched=batched)
-        F_in_v2 = sum_hidden_spectrum_v2(wl,fx,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=N2,batched=batched) 
+    def calc_v2(self,wl,fx,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,batched=True,Nstar=400,Nplanet=200):
+        F_out_v2 = sum_stellar_spectrum_v2(wl,fx,vel_eq,i_stellar,a1,a2,diff_rot_rate,N=Nstar,batched=batched)
+        F_in_v2 = sum_hidden_spectrum_v2(wl,fx,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=Nplanet,batched=batched) 
         F_out_v2.block_until_ready()
         F_in_v2.block_until_ready()
         return(F_out_v2,F_in_v2)
@@ -401,6 +446,9 @@ class StarRotator(object):
         self.y = jnp.linspace(-1,1,self.grid_size)
 
 
+        #These grids are not meant for computation (because under the hood, computation
+        #might use analytical tricks, meaning that these grids are not exactly the same
+        #as what is being calculated). Instead, these are for visualization purposes.
         if self.model == "pySME":
             self.flux_grid,self.vel_grid = self.compute_grids(
                 self.x,self.y,self.stelinc,self.velStar,self.drr,0.0,0.0)#If pySME: override LD.
@@ -411,7 +459,7 @@ class StarRotator(object):
 
         # Now we do the integration, switching between modes as input requires.
         if self.drr == 0 and self.fx_in.ndim == 1:
-            # print('Calculating v1')
+            print('Calculating v1')
             self.stellar_spectrum, self.Fp = self.calc_v1(self.wl_in,
                                             self.fx_in,
                                             self.xp,self.yp,
@@ -419,14 +467,13 @@ class StarRotator(object):
                                             self.velStar,
                                             self.stelinc,
                                             self.u1,self.u2,
-                                            N1=self.grid_size,
-                                            N2=self.grid_planet_size
+                                            Nstar=self.grid_size,
+                                            Nplanet=self.grid_planet_size
                                             )
         elif self.drr != 0 and self.fx_in.ndim == 1:
-            # print('Calculating v2')
+            print('Calculating v2')
             self.stellar_spectrum, self.Fp = self.calc_v2(self.wl_in,
                                             self.fx_in,
-                                            self.x,self.y,
                                             self.xp,self.yp,
                                             self.Rp_Rs,
                                             self.velStar,
@@ -434,31 +481,52 @@ class StarRotator(object):
                                             self.drr,
                                             self.u1,self.u2,
                                             batched=True,
-                                            N2=self.grid_planet_size
+                                            Nstar=self.grid_size,
+                                            Nplanet=self.grid_planet_size
                                             )
-            
-        else:
+        elif self.drr == 0. and self.fx_in.ndim > 1:
+            print('Calculating v1 -- mu')
             raise Exception("Multi-dimensional stellar spectrum (mu dependence) is not supported yet.")
+        else:
+            print('Calculating v2 -- mu')
+            raise Exception("Multi-dimensional stellar spectrum (mu dependence) is not supported yet.")
+        
+
+
+        self.fxt = self.stellar_spectrum-self.Fp
+        self.fxtn = (self.fxt.T / np.nanmedian(self.FxT,axis = 1)).T
+        self.residuals_abs = self.fxt/self.fxt[0] #Assumes that first spectrum is out of transit!!
+        self.residuals_norm = self.fxtn/self.fxtn[0] #These are really here just for convenience.
+
+        #If this point is reached, at least the functions ran through, so we change the satus message.
         self.status = 'success computing spectra'
-        # F_out = np.zeros((self.Nexp,len(F)))
-        # F_planet = np.zeros((self.Nexp,len(F)))        
+        #That does not, of course, mean that the calculation is correct/accurate, just that it finished.
+   
 
         # CONTINUE HERE NEXT TIME:
-        # Fix normalizations and uniformity of calling v1, v2, v1_mu, v2_mu.
-        # Add brute-force integration with no tricks, and free velocity and flux grids as input. That is v3. A spectrum index-map (that enables mu, or other variation in the spectrum).
-        # Complete the workflow with pySME to create the fx_array input.
+        # [DONE] Fix normalizations and uniformity of calling v1, v2, v1_mu.
+        # [DONE] Implement optional switching to fast doppler shifting method (switched by wavelength input, either array or float). Done for v1.
+        # [DONE] Complete the generation of output. 
+        # Complete the plotting of basic output.
+        # Complete / test the workflow with pySME to create the fx_array input and execute the mu-dependent calculations.
         # Create a working KELT-9 example.
-        # Then do the wavelength stuff below.
+        # Give wavelength control (see below).
 
-        # Also need to make a decision regarding control over the wavelength axis.
+        # Also need to make a decision regarding control over the wavelength axis:
         # A start and a stop wavelength is a bit silly. 
         # Need a target (data) wavelength grid onto which the result is (to be) binned-interpolated. This can be done using shone.opacity.bin_opacity().
-        # And an under-the-hood model wavelength grid. That can be the PHOENIX grid simply,
-        # But for pySME it has to be set to something custom I suppose. And the choice very likely matters for computation time.
-        # Then documentation.
+        # And an under-the-hood model wavelength grid. This should be dloglambda-constant, so that doppler shifting can be sped up.
+        # [DONE] Make fast doppler shifting
+        # Add constant-dlogl switching in all functions. See if it can be made default.
 
         # TO DO LATER:
+        # Fix installation instructions in Readme.
+        # Fix documentation. [setup is complete. need to start populating with sections. docstring autosummaries are off because most functions have docstings that are poorly formatted]
         # Drop small-planet-approximation in integrate.py for mu-dependence in hidden-spectrum.
+        # Add correction-polynomials for the integrals in the various functions v1,v2 to correct for the bias induced by the pixellation of the grid (approximating a circle with a grid of squares).
+        # Can be measured empirically but can probably also be evaluated analytically (though perhaps not in the pseudo-analytical limb darkening model -- or, I don't want to bother). 
+        # Add Retrieval workflow that makes use of the exposed functions (not the class object).
+        # Add brute-force integration with no tricks, and free velocity and flux grids as input. That is v3. A spectrum index-map (that enables mu, or other variation in the spectrum).
 
 
         # flux_out = []
