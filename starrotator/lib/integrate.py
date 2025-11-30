@@ -75,7 +75,7 @@ def sum_stellar_spectrum_v1(wl,fx,vel_eq,i_stellar,a1,a2,N=400,constant_dlogl=Fa
 
 
 @partial(jax.jit,static_argnames=["N",'constant_dlogl'])
-def sum_stellar_spectrum_v1_mu(wl,fx_array,vel_eq,i_stellar,mu,N=400,constant_dlogl=False):
+def sum_stellar_spectrum_v1_mu(wl,fx_array,vel_eq,i_stellar,mu_array,N=400,constant_dlogl=False):
     """This builds the stellar spectrum by doppler-shifting and interpolating an array of input
         spectra, corresponding to an array of mu angles.
         This version of the integration assumes a SIMPLE VELOCITY GRID (that means: without drr)
@@ -103,8 +103,10 @@ def sum_stellar_spectrum_v1_mu(wl,fx_array,vel_eq,i_stellar,mu,N=400,constant_dl
         i_stellar : float
             The inclination of the stellar spin axis in degrees. 0 is pole-on.
 
-        mu : array-like
-            The array of mu-values corresponding to the array of spectra.
+        mu_array : array-like
+            The array of mu-values corresponding to the array of spectra. Mu is defined as the cosine of the angle between the
+            viewing angle and the normal from the surface, meaning that it varies between 1 to 0 from the center to the edge.
+            Following mu = cos(theta), mu**2 + r**2 = R = 1. So mu = sqrt(1-r**2).
 
         N : int
             The size of the grid over which the integration is carried out. Larger values produce more accurate results.
@@ -168,30 +170,32 @@ def sum_stellar_spectrum_v1_mu(wl,fx_array,vel_eq,i_stellar,mu,N=400,constant_dl
     #and then add them. The only reason this looks a bit convolved is because we're summing over a disk
     #using square arrays, well here we go.
 
-    #We first need to bin up the mu array to find bin edges in mu-space.
-    mu_centers = (mu[0:-1]+mu[1:])/2
-    mumin = jnp.concatenate([jnp.array([0]), mu_centers])
-    mumax = jnp.concatenate([mu_centers,     jnp.array([1])])
+    #We first need to convert the mu array to values of r, and then bin it up to find bin edges in r-space:
+    r_array = jnp.sqrt(1 - mu_array**2)# Array in radial coordinate corresponding to mu angles.
+    r_centers = (r_array[0:-1]+r_array[1:])/2
+    rmin = jnp.concatenate([jnp.array([0]), r_centers])
+    rmax = jnp.concatenate([r_centers,     jnp.array([1])])
 
 
     #We then compute the arrays of y-edges associated with these mu edges.
     #This comes from mu^2 = x^2+y^2, leading to y = sqrt(mu^2 - x^2).
-    ymin = jnp.sqrt(jnp.clip(mumin[None,:]**2 - x[:, None]**2,0,None))
-    ymax = jnp.sqrt(jnp.clip(mumax[None,:]**2 - x[:, None]**2,0,None))
+    ymin = jnp.sqrt(jnp.clip(rmin[None,:]**2 - x[:, None]**2,0,None))
+    ymax = jnp.sqrt(jnp.clip(rmax[None,:]**2 - x[:, None]**2,0,None))
     #This is where the magic happens, because the output of the below is a 
     #2D array for the minimum and maximum edges: N_mu times N_x.
-    #For each x, it tells you what the y-values are of the edges of the mu-bins.
+    #For each x, it tells you what the y-values are of the edges of the r-bins.
     #This is easiest to understand for x=0 (center of the disk up):
-    #As you travel up in from y=0 to y=1, you start at the first mu-angle, until you
-    #reach the y-coordinate of the first mu angle. Then you transition into the second mu-value, etc.
+    #As you travel up in from y=0 to y=1, you start in first r-bin, until you
+    #reach the y-coordinate of the second r bin, etc.
     #until y=1 and you have reached the top of the disk.
-    #This is also true for x>0, but now, the starting value is non-zero mu. Meaning mu-bins disappear
-    #as you travel outward in the x-direction. At x close to 1, most mu values don't occur anymore in the column
-    #above you. This is automatically handled by the clip statement: For a mu bin that is not in the column at x=/=0,
+    #This is also true for x>0, but now, the starting value is non-zero r. Meaning r-bins disappear
+    #as you travel outward in the x-direction. At x close to 1, most r values don't occur anymore in the column
+    #above you. This is automatically handled by the clip statement: For an r bin that is not in the column at x=/=0,
     #ymin and ymax are both zero. So the area of this piece will be (ymax-ymin)*dx = 0. 
     # This also works for partial bins: If ymin gets clipped but not ymax. Lovely!
 
     W = (ymax-ymin) *dx
+
     
     total = circ_int_q_ld(0.0,0.0) #The analytical integral of a non-limb-darkened star.
     # print(np.shape(fx_array_shifted))
@@ -200,6 +204,26 @@ def sum_stellar_spectrum_v1_mu(wl,fx_array,vel_eq,i_stellar,mu,N=400,constant_dl
     fx_sum = jnp.sum(fx_weighted,axis=(1,2))
 
     return(fx_sum*2 / total)#Factor of 2 because this has been assuming a semi-circle.
+
+
+
+def integrate_fluxdisk_mu(mu_array,fx_array,N=400):
+
+    x = jnp.linspace(-1,1,N)
+    r_array = jnp.sqrt(1 - mu_array**2)# Array in radial coordinate corresponding to mu angles.
+    r_disk = np.sqrt(x[None,:]**2 + x[:,None]**2)
+    
+    flux_array = np.nanmean(fx_array,axis=1)[:,None]
+    flux_disk = interp_fx_array(r_array,flux_array,r_disk.flatten()).reshape(*np.shape(r_array))
+    flux_disk[r_disk>1] = np.nan
+    return(flux_disk)
+
+    
+
+
+
+
+
 
 
 
@@ -442,43 +466,43 @@ def sum_hidden_spectrum_v1(wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N=100,constant_
 
 
 @jit
-def find_mu_interval(mu_array, mu_value):
+def find_X_interval(X_array, X_value):
     # Find the index of the right boundary
-    l2 = jnp.searchsorted(mu_array, mu_value, side="right")
+    l2 = jnp.searchsorted(X_array, X_value, side="right")
     # Left boundary is one index before
     l1 = jnp.maximum(l2 - 1, 0)
     # Clip right_idx to avoid going out of bounds
-    l2 = jnp.minimum(l2, mu_array.shape[0] - 1)
+    l2 = jnp.minimum(l2, X_array.shape[0] - 1)
     return(l1, l2)
 
 @jit
-def mu_interp_weight(mu_array,l1,l2,mu_value):
+def X_interp_weight(X_array,l1,l2,X_value):
     # Get interval endpoints
-    mu_left = mu_array[l1]
-    mu_right = mu_array[l2]
+    X_left = X_array[l1]
+    X_right = X_array[l2]
     # Compute fractional distance, safe against divide-by-zero
-    t = (mu_value - mu_left) / (mu_right - mu_left + 1e-12)
+    t = (X_value - X_left) / (X_right - X_left + 1e-12)
     t = jnp.clip(t, 0.0, 1.0)  # avoid going outside [0,1]  
     return(t)
 
 @jit
-def interp_fx_array(mu_array,fx_array,mu_value):
+def interp_fx_array(r_array,fx_array,r_value):
     """
     This linearly interpolates the disk-resolved spectrum
-    given a value of mu.
+    given a value of r.
     It handles edge cases (so if the target value is outside the range
-    of the my values provided, it edge clips as it should).
+    of the r values provided, it edge clips as it should).
     It also allows for broadcasting, so you can get many
-    interpolated spectra returned. Note that changing the number of mu angles
+    interpolated spectra returned. Note that changing the number of r values
     will cause a jax recompile (shape change), but this is not a likely
     scenario inside a retrieval because the number of mu angles is an
-    initial user choice. I imagine that this function can be hot-rodded
+    initial user choice. I imagine that this function can be generalised
     to interpolate over other types of things (e.g. temperature_array instead
-    of mu). It doesn't matter for recompilation as long as the number of 
+    of r). It doesn't matter for recompilation as long as the number of 
     interpolates is fixed throughout a loop/retrieval.
     """
-    l1,l2 = find_mu_interval(mu_array,mu_value)
-    t = mu_interp_weight(mu_array,l1,l2,mu_value)
+    l1,l2 = find_X_interval(r_array,r_value)
+    t = X_interp_weight(r_array,l1,l2,r_value)
     fx_interpolated = (fx_array[l1].T*(1-t) + t*fx_array[l2].T).T
     return(fx_interpolated)
     
@@ -486,7 +510,7 @@ def interp_fx_array(mu_array,fx_array,mu_value):
 
 
 @partial(jax.jit,static_argnames=['N','small_planet','constant_dlogl'])
-def sum_hidden_spectrum_v1_mu(wl,fx_array,xp,yp,Rp,vel_eq,i_stellar,mu,N=100,small_planet=True,constant_dlogl=False):
+def sum_hidden_spectrum_v1_mu(wl,fx_array,xp,yp,Rp,vel_eq,i_stellar,mu_array,N=100,small_planet=True,constant_dlogl=False):
     """This builds the stellar spectrum that is hidden behind the planet by doppler-shifting 
         and interpolating the input spectrum, summing only over the range of coordinates that is
         obscured by the planet disk.
@@ -565,10 +589,13 @@ def sum_hidden_spectrum_v1_mu(wl,fx_array,xp,yp,Rp,vel_eq,i_stellar,mu,N=100,sma
         #dealing with mu-dependent spectra.
 
         # Continue here by calculating the mu's corresponding to the xp,yp positions.
-        mup = jnp.sqrt(xp**2+yp**2)
-        # Create an array of fx's that match that (by interpolating what the stellar spectrum)
-        # is at the mu of each planet location.
-        fx_p = interp_fx_array(mu,fx_array,mup) # These are the interpolated planet spectra belonging to each xp,yp.
+        r_p = jnp.sqrt(xp**2+yp**2)
+        r_array = jnp.sqrt(1 - mu_array**2)# Array in radial coordinate corresponding to mu angles.
+        # Create an array of fx's that match that (by interpolating what the stellar spectrum is
+        # at that position). Note the coordinate transformation between r and mu, as r is a more
+        # logical coordinate in this x-y space we're working in.
+
+        fx_p = interp_fx_array(r_array,fx_array,r_p) # These are the interpolated planet spectra belonging to each xp,yp.
 
         if constant_dlogl:
             doppler_shift_batch = jax.vmap(doppler_shift_dlogl, in_axes=(None, 0, 0))
