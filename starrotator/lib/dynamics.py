@@ -121,8 +121,10 @@ def doppler_shift(wl,fx,v):
         The wavelength axis of the spectrum, 1D array.
     fx : array-like
         The corresponding flux axis, 1D array.
-    v : float, array-like
+    v : array-like
         The radial velocity (positive = redshift) in km/s.
+        The shape of v should be at least a 1D array. So a single
+        number (e.g. v=10km/s) is passed as [10.].
         Multiple velocities can be provided in the same array.
 
 
@@ -130,9 +132,13 @@ def doppler_shift(wl,fx,v):
     -------
     fx_shifted: array-like
         The shifted spectrum evaluated on the original wavelength axis.
-        If multiple velocities are given, this is a 2D array matching the 
-        number of RVs to be shifted to. Note that edges are not extrapolated
-        or handled: Edge values are repeated.
+        If multiple velocities are given, this is a multi-dimensional 
+        array matching the number of RVs to be shifted to. If the array v is 
+        multidimensional, these dimensions emerge leading to the number of
+        wavelength points. So if fx has a len of 1,000, and v is a 3x3 matrix,
+        then the output is of shape 3x3x1000.
+        
+        Note that edges are not extrapolated or handled: Edge values are repeated.
     """
     g = doppler_factor(v)
     fx_shifted = jnp.interp(wl/g[None,:].T, wl, fx)
@@ -159,17 +165,24 @@ def doppler_shift_dlogl(dlogl,fx,v):
         The step-size in loglambda
     fx : array-like
         The corresponding flux axis, 1D array.
-    v : float, array-like
+    v : array-like
         The radial velocity (positive = redshift) in km/s.
+        The shape of v should be at least a 1D array. So a single
+        number (e.g. v=10km/s) is passed as [10.].
         Multiple velocities can be provided in the same array.
+
 
     Returns
     -------
-    fx_int: array-like
+    fx_shifted: array-like
         The shifted spectrum evaluated on the original wavelength axis.
-        If multiple velocities are given, this is a 2D array matching the 
-        number of RVs to be shifted to. Note that edges are not extrapolated
-        or handled: Edge values are repeated.
+        If multiple velocities are given, this is a multi-dimensional 
+        array matching the number of RVs to be shifted to. If the array v is 
+        multidimensional, these dimensions emerge leading to the number of
+        wavelength points. So if fx has a len of 1,000, and v is a 3x3 matrix,
+        then the output is of shape 3x3x1000.
+        
+        Note that edges are not extrapolated or handled: Edge values are repeated.
     """
     nfx = fx.shape[0]
     I0 = jnp.arange(nfx+1,dtype=jnp.int32) #An index array for fx.
