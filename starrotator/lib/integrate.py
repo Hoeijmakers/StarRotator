@@ -7,7 +7,7 @@ from starrotator.lib.dynamics import doppler_shift, doppler_shift_dlogl
 from starrotator.lib.operations import vert_int_q_ld, circ_int_q_ld, vert_int_q_ld_bounded
 from starrotator.lib.vgrid import calc_vel_stellar
 from starrotator.lib.vgrid import calc_flux_stellar
-
+import matplotlib.pyplot as plt
 
 
 
@@ -204,22 +204,6 @@ def sum_stellar_spectrum_v1_mu(wl,fx_array,vel_eq,i_stellar,mu_array,N=400,const
     fx_sum = jnp.sum(fx_weighted,axis=(1,2))
 
     return(fx_sum*2 / total)#Factor of 2 because this has been assuming a semi-circle.
-
-
-
-def integrate_fluxdisk_mu(mu_array,fx_array,N=400):
-
-    x = jnp.linspace(-1,1,N)
-    r_array = jnp.sqrt(1 - mu_array**2)# Array in radial coordinate corresponding to mu angles.
-    r_disk = np.sqrt(x[None,:]**2 + x[:,None]**2)
-    
-    flux_array = np.nanmean(fx_array,axis=1)[:,None]
-    flux_disk = interp_fx_array(r_array,flux_array,r_disk.flatten()).reshape(*np.shape(r_array))
-    flux_disk[r_disk>1] = np.nan
-    return(flux_disk)
-
-    
-
 
 
 
@@ -500,6 +484,8 @@ def interp_fx_array(r_array,fx_array,r_value):
     to interpolate over other types of things (e.g. temperature_array instead
     of r). It doesn't matter for recompilation as long as the number of 
     interpolates is fixed throughout a loop/retrieval.
+    
+    Note that r_array needs to be sorted in ascending order!
     """
     l1,l2 = find_X_interval(r_array,r_value)
     t = X_interp_weight(r_array,l1,l2,r_value)
@@ -557,25 +543,34 @@ def sum_hidden_spectrum_v1_mu(wl,fx_array,xp,yp,Rp,vel_eq,i_stellar,mu_array,N=1
 
         small_planet : bool
             Make a small-planet approximation (true) or not (false). In the small-planet approximation, the mu-variation across the planetary disk is neglected, and a single mu
-            angle (at planet center) is assumed. The spectrum is interpolated from the two nearest mu angles for which spectra are provided (so any planet motion does result in a 
-            change in the spectrum).
+            angle (at planet center) is assumed. The spectrum is interpolated from the two nearest mu angles for which spectra are provided (so any amount of planet motion does result in a 
+            change in the spectrum, and there is no chopping artefact that would result from a nearest-neighbour approach). This approximation effectively neglects the change in limb darkening
+            across the planetary disk, since this is assumed to be included in the mu-dependent description of fx_array. Note however that the small planet approximation does not
+            neglect the RV-variation across the planet disk.
 
         constant_dlogl : bool
-            Whether or not to use fast doppler shifting. This requires that the wavelength axis is a float, set to the
+            Whether or not to use fast doppler shifting by virtue of a constant log-lambda wavelength array. Setting this to True also requires that the wavelength axis is a float, set to the
             constant value of dloglambda (and not an explicit wavelength array). 
 
         Returns
         -------
         F : array
             The flux axis of the summed spectrum corresponding to the input wavelength points, for each planet position
-            (so this is a 2D array as xp,yp are 1D). Note that as part of this process, the flux is multiplied by the
-            differential dx*R, so that the integral is insensitive to N.
+            (so this is a 2D array as xp,yp are 1D, as N_xp times N_wl). Note that as part of this process, the flux is multiplied by the
+            differential dx*R, so that the value of the integral is insensitive to N.
     """
 
     if small_planet:
         x = jnp.linspace(-1,1,N)#This whole strategy is the same as sum_hidden_spectrum_v1 above.
         #We can even compute the weights in the same way. The only thing we need to do differently
-        #is determine which fx_spectrum is associated with which which mu angle.
+        #is determine which fx_spectrum is associated with which which mu angle, which is not done above
+        # because each fx_spectrum is the same in sum_hidden_spectrum_v1.
+        # In the small planet approximation we adopt the approximation that at each planet position, the 
+        # planet covers effectively one mu-value. The spectrum associated with this mu value is determined
+        # by interpolating the fx_array of mu-dependent spectra, so there is no nearest-neighbour chopping.
+        # Effectively, this assumes that the mu-dependent variation of the spectrum is negligible over
+        # the small area of the planet. However, we do not ignore the fact that the planet covers a range
+        # of radial velocities, even if small. Otherwise, a broadening effect would be missing.
         dxR = (x[1]-x[0])*Rp
         x_array = x*Rp + xp[:,None]
         y_max = yp[:,None] + jnp.sqrt(1-x**2)*Rp
@@ -585,42 +580,165 @@ def sum_hidden_spectrum_v1_mu(wl,fx_array,xp,yp,Rp,vel_eq,i_stellar,mu_array,N=1
         y_final_max = jnp.clip(y_max,y_star_min,y_star_max)
         y_final_min = jnp.clip(y_min,y_star_min,y_star_max)
         v_axes = x_array*vel_eq*jnp.sin(jnp.radians(i_stellar)) # velocities along the y=0 axis. Same shape as x_array.
-        weights = vert_int_q_ld_bounded(x_array,y_final_min,y_final_max,0.0,0.0) #No limb darkening since we are 
-        #dealing with mu-dependent spectra.
+        weights = vert_int_q_ld_bounded(x_array,y_final_min,y_final_max,0.0,0.0) #Flat weights (no limb darkening) 
+        # since we are dealing with mu-dependent spectra.
 
         # Continue here by calculating the mu's corresponding to the xp,yp positions.
-        r_p = jnp.sqrt(xp**2+yp**2)
-        r_array = jnp.sqrt(1 - mu_array**2)# Array in radial coordinate corresponding to mu angles.
+        # r_p = jnp.sqrt(xp**2+yp**2)
+        mu_p = jnp.sqrt(1 - xp**2-yp**2)
+        # r_array = jnp.sqrt(1 - mu_array**2)# Array in radial coordinate corresponding to mu angles.
         # Create an array of fx's that match that (by interpolating what the stellar spectrum is
         # at that position). Note the coordinate transformation between r and mu, as r is a more
         # logical coordinate in this x-y space we're working in.
 
-        fx_p = interp_fx_array(r_array,fx_array,r_p) # These are the interpolated planet spectra belonging to each xp,yp.
+        fx_p = interp_fx_array(mu_array,fx_array,mu_p) # These are the interpolated planet spectra belonging to each xp,yp.
+
+
+        # Here follows a whole lot of debugging plots to check that interpolation works.
+        # plt.figure(figsize=(10,6))
+        # plt.plot(mu_array,r_array)
+        # plt.show()
+        # print('Inferred radial values:',r_p)
+
+        # print('Mu and r pairs:')
+        # plt.figure(figsize=(10,6))
+        # for i in range(len(fx_array)):
+        #     print(mu_array[i],r_array[i])
+        #     muprint = np.round(mu_array[i],3)
+        #     rprint = np.round(r_array[i],3)
+        #     plt.plot(wl,fx_array[i],label=f'mu = {muprint:.3f}, r = {rprint:.3f}')
+        # plt.legend(frameon=False)
+        # plt.title('Mu-dependent spectra (input)')
+        # plt.show()
+
+        # plt.figure(figsize=(10,6))
+        # for i in range(len(r_p)):
+        #     plt.plot(wl,fx_p[i],label=f'r = {r_p[i]:.3f} mu = {mu_p[i]:.3f}')
+        # plt.legend(frameon=False)
+        # plt.title('Interpolated spectra')
+        # plt.show()
+
+
 
         if constant_dlogl:
             doppler_shift_batch = jax.vmap(doppler_shift_dlogl, in_axes=(None, 0, 0))
         else:
             doppler_shift_batch = jax.vmap(doppler_shift, in_axes=(None, 0, 0))
-        
-        #doppler_shift_batch = jax.vmap(doppler_shift, in_axes=(None, 0, 0)) # Here is some of the magic.
-        # #This creates a function doppler_shift_batch that is a vectorised execution of the doppler_shift
-        # #function, looping over axis 0 of the second input, which is fx_array. So each row of fx_array
-        # #gets doppler shifted by v_axis.
+        # This creates a function doppler_shift_batch that is a vectorised execution of the doppler_shift
+        # function. Looping is done over axis 0 of the second and third inputs, which are fx_array and v_axes.
+        # fx_array is an array of spectra corresponding to each x-y position on the disk.
+        # v_axes is an array of N v values corresponding to each x-y position on the disk.
+        # So this formulation of vmap with in_axes=(None, 0, 0) loops over each x-y position, shifting
+        # each spectrum in fx_array to its corresponding array of v values for that position x,y.
 
 
         total = circ_int_q_ld(0.0,0.0)
         #Actual normalization depends on the normalization of the mu-spectra, though.
         #This is just designed to normalize in case that the input spectrum is the same for all mu (no limb darkening).
-        fx_shifted = doppler_shift_batch(wl,fx_p,v_axes).T * weights.T
 
-        # print(np.shape(doppler_shift_batch(wl,fx_p,v_axes)))
-        # print(np.shape(fx_shifted))
+        # Again some debugging plots to check that batched doppler shifting works.
+        # fx_shifted = doppler_shift_batch(wl,fx_p,v_axes)
+        # i=1
+        # fig,ax = plt.subplots(1,2,figsize=(13,5))
+        # ax[0].plot(x_array[i],v_axes[i])
+        # ax[1].plot(wl,fx_shifted[i,0])
+        # ax[1].plot(wl,fx_shifted[i,99])
+        # ax[1].plot(wl,fx_shifted[i,199])
+        # ax[1].set_xlim(502.2,502.8)
+        # plt.show()
 
-        F_out = jnp.nansum(fx_shifted,axis=1).T * dxR
-        # print(np.shape(F_out))
+        # i=3
+        # fig,ax = plt.subplots(1,2,figsize=(13,5))
+        # ax[0].plot(x_array[i],v_axes[i])
+        # ax[1].plot(wl,fx_shifted[i,0])
+        # ax[1].plot(wl,fx_shifted[i,99])
+        # ax[1].plot(wl,fx_shifted[i,199])
+        # ax[1].set_xlim(502.2,502.8)
+        # plt.show()
+
+        # i=5
+        # fig,ax = plt.subplots(1,2,figsize=(13,5))
+        # ax[0].plot(x_array[i],v_axes[i])
+        # ax[1].plot(wl,fx_shifted[i,0])
+        # ax[1].plot(wl,fx_shifted[i,99])
+        # ax[1].plot(wl,fx_shifted[i,199])
+        # ax[1].set_xlim(502.2,502.8)
+        # plt.show()
+
+        # fig,ax = plt.subplots(1,4,figsize=(13,5))
+        # ax[0].plot(x_array[0],weights[0])
+        # ax[1].plot(x_array[1],weights[1])
+        # ax[2].plot(x_array[4],weights[4])
+        # ax[3].plot(x_array[5],weights[5])
+        # plt.plot()
+
+        # print('fx_p shape',fx_p.shape)
+        # print('v_axes shape',v_axes.shape)
+        # print('fx_shifted shape',fx_shifted.shape)
+        # print('Weights',np.shape(weights))
+        fx_shifted_transposed = np.transpose(doppler_shift_batch(wl,fx_p,v_axes),(2,0,1))
+        # print('fx_shifted transposed',fx_shifted_transposed.shape)
+        fx_shifted_weighted = fx_shifted_transposed * weights
+        # print('fx_shifted_weighted',fx_shifted_weighted.shape)
+
+
+        F_out = jnp.nansum(fx_shifted_weighted,axis=2).T * dxR
+        # print('fx_array_out',F_out.shape)
         return(F_out/total)
     else:
         raise Exception("NOT-SMALL PLANET IS NOT IMPLEMENTED YET.")
+
+
+
+
+
+
+
+#    #This is pasted from sum_stellar_spectrum_v1_mu from above.
+#    if constant_dlogl:
+#        doppler_shift_batch = jax.vmap(doppler_shift_dlogl, in_axes=(None, 0, None))
+#    else:
+#        doppler_shift_batch = jax.vmap(doppler_shift, in_axes=(None, 0, None))
+
+#    fx_array_shifted = doppler_shift_batch(wl,fx_array,v_axis)
+#    #So the output will have dimensions len(v) * len(fx_array) * len(wl) whereas the shape of the output
+#    # of a single call to doppler_shift would have dimensions len(v)*len(wl)).
+#
+
+#    #We first need to convert the mu array to values of r, and then bin it up to find bin edges in r-space:
+#    r_array = jnp.sqrt(1 - mu_array**2)# Array in radial coordinate corresponding to mu angles.
+#    r_centers = (r_array[0:-1]+r_array[1:])/2
+#    rmin = jnp.concatenate([jnp.array([0]), r_centers])
+#    rmax = jnp.concatenate([r_centers,     jnp.array([1])])
+#
+#
+#    #We then compute the arrays of y-edges associated with these mu edges.
+#    #This comes from mu^2 = x^2+y^2, leading to y = sqrt(mu^2 - x^2).
+#    ymin = jnp.sqrt(jnp.clip(rmin[None,:]**2 - x[:, None]**2,0,None))
+#    ymax = jnp.sqrt(jnp.clip(rmax[None,:]**2 - x[:, None]**2,0,None))
+#    #This is where the magic happens, because the output of the below is a 
+#    #2D array for the minimum and maximum edges: N_mu times N_x.
+#    #For each x, it tells you what the y-values are of the edges of the r-bins.
+#    #This is easiest to understand for x=0 (center of the disk up):
+#    #As you travel up in from y=0 to y=1, you start in first r-bin, until you
+#    #reach the y-coordinate of the second r bin, etc.
+#    #until y=1 and you have reached the top of the disk.
+#    #This is also true for x>0, but now, the starting value is non-zero r. Meaning r-bins disappear
+#    #as you travel outward in the x-direction. At x close to 1, most r values don't occur anymore in the column
+#    #above you. This is automatically handled by the clip statement: For an r bin that is not in the column at x=/=0,
+#    #ymin and ymax are both zero. So the area of this piece will be (ymax-ymin)*dx = 0. 
+#    # This also works for partial bins: If ymin gets clipped but not ymax. Lovely!
+#
+#    W = (ymax-ymin) *dx
+#
+#    
+#    total = circ_int_q_ld(0.0,0.0) #The analytical integral of a non-limb-darkened star.
+#    # print(np.shape(fx_array_shifted))
+#    # print(np.shape(W.T))
+#    fx_weighted = W.T * np.transpose(fx_array_shifted,(2,0,1))
+#    fx_sum = jnp.sum(fx_weighted,axis=(1,2))
+#
+#    return(fx_sum*2 / total)#Factor of 2 because this has been assuming a semi-circle.
 
 
 
