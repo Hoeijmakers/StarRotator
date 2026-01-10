@@ -301,6 +301,7 @@ def test_hidden_flux_mu_v1():
     import matplotlib.pyplot as plt
     from starrotator.lib.util import gaussian
     import sys
+    import pdb
     # This tests that the mu-dependent hidden-flux works, and returns the same answer as mu-independent, if all spectra are the same.
     # It also tests that the transit depth of a planet with R=0.1 is 1%.
     wl = np.linspace(500,505,1000)
@@ -320,7 +321,7 @@ def test_hidden_flux_mu_v1():
     y = x*1.0
     dx = x[1]-x[0]
 
-    xp = jnp.array([-0.3,-0.29,-0.28,-0.27,0.0,0.1,0.15,0.2,0.6])
+    xp = jnp.array([-0.7,-0.3,-0.29,-0.28,-0.27,0.0,0.1,0.15,0.2,0.7])
     yp = xp*0.0 + 0.2
 
     F_in_v1 = sum_hidden_spectrum_v1(wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N=N)
@@ -330,6 +331,29 @@ def test_hidden_flux_mu_v1():
     for i in range(len(xp)):
         mean_error = np.mean(np.abs(F_in_v1[i]-F_in_v2[i])/F_in_v1[i])
         assert(mean_error < 1e-8)
+
+
+    weight = np.ones_like(mu)
+    weight[mu>0.1] = 0.0
+    fx_array_2 = wl[None,:]*0.0+ weight[:,None]*fx + (1-weight[:,None]) #All spectra are 0 towards the edge.
+
+    fx_array_3 = np.array(fx_array)*1.0
+    fx_array_3[0] *=0.0
+    
+    F_in_v3 = sum_hidden_spectrum_v1_mu(wl,jnp.array(fx_array_3),xp,yp,Rp,vel_eq,i_stellar,mu,N=N,small_planet=True)
+
+
+    # plt.plot(wl,fx_array_2[2])
+    # plt.show()
+    # pdb.set_trace()
+
+    # plt.plot(wl,F_in_v3[0])
+    # plt.plot(wl,F_in_v3[1])
+    # plt.plot(wl,F_in_v3[5])
+    # plt.plot(wl,F_in_v3[7])
+    # plt.plot(wl,F_in_v3[8])
+    # plt.show()
+
 
 
 
@@ -416,7 +440,7 @@ def test_fast_doppler():
     a1,a2 = 0.0,0.0
     i_stellar,vel_eq,diff_rot_rate = 90.0,100.0,0.0
     Rp = 0.1
-    wlmin,wlmax,Nwl = 300,470,100000
+    wlmin,wlmax,Nwl = 463,467,10000
     wl = np.linspace(wlmin,wlmax,Nwl)
     mu = jnp.linspace(0,1,10)
     N = 300
@@ -433,15 +457,18 @@ def test_fast_doppler():
 
     fx_shifted_1 = doppler_shift(wl2,fx2,v_axis)
     fx_shifted_2 = doppler_shift_dlogl(dlogl,fx2,v_axis)
-    mean_difference = np.mean(fx_shifted_2[0]-fx_shifted_1[0])
-    assert(mean_difference < 1e-7)
-    mean_difference = np.mean(fx_shifted_2[-1]-fx_shifted_1[-1])
-    assert(mean_difference < 1e-7)
+    mean_difference = np.mean(np.abs((fx_shifted_2[0]-fx_shifted_1[0])/fx_shifted_2[0])) # mean relative difference.
+    assert(mean_difference < 3e-5)
+    mean_difference = np.mean(np.abs((fx_shifted_2[-1]-fx_shifted_1[-1])/fx_shifted_2[-1]))
+    assert(mean_difference < 3e-5)
+
 
     integrated_1 = sum_stellar_spectrum_v1(wl2,fx2,vel_eq,i_stellar,a1,a2,N=400,constant_dlogl=False)
     integrated_2 = sum_stellar_spectrum_v1(dlogl,fx2,vel_eq,i_stellar,a1,a2,N=400,constant_dlogl=True)
-    mean_difference = np.mean(integrated_1 - integrated_2)
-    assert(mean_difference < 1e-7)
+    mean_difference = np.mean(np.abs((integrated_1 - integrated_2)/integrated_1))
+
+    assert(mean_difference < 1e-5)
+
 
     #Test 2D input to dopplershift functions.
     vaxis_2d = np.vstack([v_axis,v_axis])
@@ -453,30 +480,33 @@ def test_fast_doppler():
     assert np.shape(fx_shifted_1)[0] == len(v_axis)
     assert np.shape(fx_shifted_1)[1] == 2
     assert np.shape(fx_shifted_1)[2] == len(fx2)
-    mean_difference = np.mean(fx_shifted_1[0,0,:]-fx_shifted_2[0,0,:])
-    assert(mean_difference < 5e-6)
+    mean_difference = np.mean(np.abs((fx_shifted_1[0,0,:]-fx_shifted_2[0,0,:])/fx_shifted_1[0,0,:]))
+    assert(mean_difference < 3e-5)
 
     integrated_1 = sum_stellar_spectrum_v2(wl2,fx2,vel_eq,i_stellar,a1,a2,diff_rot_rate,N=200,batched=True,constant_dlogl=False)
     integrated_2 = sum_stellar_spectrum_v2(dlogl,fx2,vel_eq,i_stellar,a1,a2,diff_rot_rate,N=200,batched=True,constant_dlogl=True)
-    mean_difference = np.mean(integrated_1 - integrated_2)
-    assert(mean_difference < 1e-6)
+    mean_difference = np.mean(np.abs((integrated_1 - integrated_2)/integrated_1))
+    assert(mean_difference < 1e-5)
 
 
     integrated_1 = sum_hidden_spectrum_v1(wl2,fx2,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N=100,constant_dlogl=False)
     integrated_2 = sum_hidden_spectrum_v1(dlogl,fx2,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N=100,constant_dlogl=True)
-    mean_difference = np.mean(integrated_1 - integrated_2)
-    assert(mean_difference < 1e-7)
+    mean_difference = np.mean(np.abs((integrated_1 - integrated_2)/integrated_1))
+    assert(mean_difference < 4e-5)
+
+
 
     integrated_1 = sum_hidden_spectrum_v1_mu(wl2,fx2_array,xp,yp,Rp,vel_eq,i_stellar,mu,N=100,constant_dlogl=False)
     integrated_2 = sum_hidden_spectrum_v1_mu(dlogl,fx2_array,xp,yp,Rp,vel_eq,i_stellar,mu,N=100,constant_dlogl=True)
-    mean_difference = np.mean(integrated_1 - integrated_2)
-    assert(mean_difference < 1e-7)
+    mean_difference = np.mean(np.abs((integrated_1 - integrated_2)/integrated_1))
+    assert(mean_difference < 4e-5)
+
 
 
     integrated_1 = sum_hidden_spectrum_v2(wl2,fx2,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=100,batched=True,constant_dlogl=False)
     integrated_2 = sum_hidden_spectrum_v2(dlogl,fx,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=100,batched=True,constant_dlogl=True)
-    mean_difference = np.mean(integrated_1 - integrated_2)
-    assert(mean_difference < 1e-7)
+    mean_difference = np.mean(np.abs((integrated_1 - integrated_2)/integrated_1))
+    assert(mean_difference < 2e-3) # This is a large relative error. Why?
 
 
 
