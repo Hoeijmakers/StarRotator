@@ -146,9 +146,9 @@ def load_PHOENIX(T,logg,metallicity=0.0,alpha=0.0):
             'available for -3.0<[Fe/H]<0.0')
         #If so, retrieve the spectra:
         wavename,specname=get_spectrum(T,logg,metallicity,alpha)
-        f = fits.getdata(specname)
-        w = fits.getdata(wavename)
-        return(w/10.0,f/phoenix_factor)#Implicit unit conversion here.
+        f = fits.getdata(specname)/phoenix_factor # type: ignore
+        w = fits.getdata(wavename)/10.0 # type: ignore #Implicit unit conversion here.
+        return(w,f)
     else:
         print('')
         print('Error: Provided combination of T, log(g), Fe/H and a/M is out of bounds.')
@@ -219,14 +219,14 @@ def get_spectrum_pysme(wave_start, wave_end, T, logg, Z, linelist = '', mu=[], a
     #initialise the pySME Object with values provided by the user
     sme = SME_Struct()
     sme.abund = Abund.solar()
-    sme.teff, sme.logg, sme.monh = T, logg, Z
-    sme.vsini = 0
+    sme.teff, sme.logg, sme.monh = T, logg, Z # type: ignore
+    sme.vsini = 0 # type: ignore
     sme.normalize_by_continuum = False
 
     # Change from default grid
     if grid:
-        sme.atmo.method = 'grid'
-        sme.atmo.source = grid
+        sme.atmo.method = 'grid' # type: ignore
+        sme.atmo.source = grid # type: ignore
 
     # Convert from nm to Angstrom
     wave_start *= 10
@@ -240,7 +240,7 @@ def get_spectrum_pysme(wave_start, wave_end, T, logg, Z, linelist = '', mu=[], a
         for i in range(len(abund)):
             sme.abund.update_pattern(updates=ast.literal_eval(abund[i]))
 
-    sme.wran = [[wave_start, wave_end]]
+    sme.wran = [[wave_start, wave_end]] # type: ignore
     vald = ValdFile(linelist)
     sme.linelist = vald
 
