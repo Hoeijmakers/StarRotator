@@ -317,9 +317,7 @@ def test_hidden_flux_mu_v1():
     Rp = 0.1
 
     N = 300
-    x = jnp.linspace(-1,1,N)
-    y = x*1.0
-    dx = x[1]-x[0]
+
 
     xp = jnp.array([-0.7,-0.3,-0.29,-0.28,-0.27,0.0,0.1,0.15,0.2,0.7])
     yp = xp*0.0 + 0.2
@@ -333,26 +331,84 @@ def test_hidden_flux_mu_v1():
         assert(mean_error < 1e-8)
 
 
-    weight = np.ones_like(mu)
-    weight[mu>0.1] = 0.0
-    fx_array_2 = wl[None,:]*0.0+ weight[:,None]*fx + (1-weight[:,None]) #All spectra are 0 towards the edge.
-
-    fx_array_3 = np.array(fx_array)*1.0
-    fx_array_3[0] *=0.0
-    
-    F_in_v3 = sum_hidden_spectrum_v1_mu(wl,jnp.array(fx_array_3),xp,yp,Rp,vel_eq,i_stellar,mu,N=N,small_planet=True)
 
 
-    # plt.plot(wl,fx_array_2[2])
+    # Testing a more complicated mu-dependence:
+
+    xp = jnp.array([-0.9,-0.45,0.0,0.45,0.9])
+    yp = xp*0.0
+
+ 
+
+    fx_array_2 = []
+    for i in range(len(mu)):
+        fx_array_2.append(gaussian(wl,-0.5*(1-mu[i]),jnp.mean(wl),0.02,cont=1.0+mu[i]))
+    fx_array_2=np.array(fx_array_2)
+
+
+    # plt.figure()
+    # for i in range(len(fx_array_2)):
+    #     plt.plot(wl,fx_array_2[i])
+    # plt.title('Input spectrum arrays.')
     # plt.show()
-    # pdb.set_trace()
 
-    # plt.plot(wl,F_in_v3[0])
-    # plt.plot(wl,F_in_v3[1])
-    # plt.plot(wl,F_in_v3[5])
-    # plt.plot(wl,F_in_v3[7])
-    # plt.plot(wl,F_in_v3[8])
+    F_in_v3 = sum_hidden_spectrum_v1_mu(wl,jnp.array(fx_array_2),xp,yp,Rp,vel_eq,i_stellar,mu,N=N,small_planet=True)
+
+
+    linedepths = F_in_v3[:,0] - jnp.min(F_in_v3,axis=1)
+    contlevel = F_in_v3[:,0]
+
+    assert(linedepths[0]>linedepths[1])
+    assert(linedepths[2] < 1e-7) # The central position is at disk center, meaning mu=1.0, meaning line amplitude zero.
+    assert(np.abs(linedepths[0]-linedepths[-1])<1e-5) # Symmetry.
+    assert(contlevel[2]/contlevel[0] - 2/(1+jnp.sqrt(1-xp[0]**2)) < 1e-4)
+    # plt.figure()
+    # for i in range(len(F_in_v4)):
+    #     plt.plot(wl,F_in_v4[i])
+    # plt.title('Hidden spectrum arrays.')
     # plt.show()
+
+    # Testing that xp and yp are interchangeable as far as mu is concerned:
+    xp = jnp.array([-0.9,-0.9/jnp.sqrt(2),0.0,0.0,0.9/jnp.sqrt(2),0.9])
+    yp = jnp.array([ 0.0,0.9/jnp.sqrt(2),0.9,-0.9,0.9/jnp.sqrt(2),0.0])
+
+    # rp = jnp.sqrt(xp**2+yp**2)
+    # print(rp)
+    # mup = jnp.sqrt(1-rp**2)
+    # print(mup)
+    F_in_v4 = sum_hidden_spectrum_v1_mu(wl,jnp.array(fx_array_2),xp,yp,Rp,vel_eq,i_stellar,mu,N=N,small_planet=True)
+    linedepths = F_in_v4[:,0] - jnp.min(F_in_v4,axis=1)
+    contlevel = F_in_v4[:,0]
+
+    # print(linedepths)
+    # print(contlevel)
+    assert(np.mean(np.abs(linedepths-linedepths[0])/linedepths[0]) < 1e-2)
+    assert(np.mean(np.abs(contlevel-contlevel[0])/contlevel[0]) < 1e-2)
+    # plt.figure()
+    # for i in range(len(F_in_v4)):
+    #     plt.plot(wl,F_in_v4[i])
+    # plt.title('Hidden spectrum arrays.')
+    # plt.show()
+
+
+    # Testing that travelling over the disk changes the velocity, or not:
+    xp = jnp.linspace(-1,1,10)
+    yp = xp*0.0
+    F_in_v5 = sum_hidden_spectrum_v1_mu(wl,jnp.array(fx_array_2),xp,yp,Rp,vel_eq,i_stellar,mu,N=N,small_planet=True)
+    linepos = jnp.argmin(F_in_v5,axis=1)
+    delta_index = linepos[1:]-linepos[0:-1]
+    assert(jnp.min(delta_index)>0) #Make sure that the line always moves to longer wavelengths.
+
+    # When transiting vertically:
+    yp = jnp.linspace(-1,1,10)
+    xp = yp*0.0
+    F_in_v5 = sum_hidden_spectrum_v1_mu(wl,jnp.array(fx_array_2),xp,yp,Rp,vel_eq,i_stellar,mu,N=N,small_planet=True)
+    linepos = jnp.argmin(F_in_v5,axis=1)
+    delta_index = linepos[1:]-linepos[0:-1]
+    assert(jnp.max(jnp.abs(delta_index))==0) #Make sure that the line is constant when moving parallel to the star's axis.
+
+
+
 
 
 
@@ -483,6 +539,7 @@ def test_fast_doppler():
     mean_difference = np.mean(np.abs((fx_shifted_1[0,0,:]-fx_shifted_2[0,0,:])/fx_shifted_1[0,0,:]))
     assert(mean_difference < 3e-5)
 
+
     integrated_1 = sum_stellar_spectrum_v2(wl2,fx2,vel_eq,i_stellar,a1,a2,diff_rot_rate,N=200,batched=True,constant_dlogl=False)
     integrated_2 = sum_stellar_spectrum_v2(dlogl,fx2,vel_eq,i_stellar,a1,a2,diff_rot_rate,N=200,batched=True,constant_dlogl=True)
     mean_difference = np.mean(np.abs((integrated_1 - integrated_2)/integrated_1))
@@ -495,12 +552,10 @@ def test_fast_doppler():
     assert(mean_difference < 4e-5)
 
 
-
     integrated_1 = sum_hidden_spectrum_v1_mu(wl2,fx2_array,xp,yp,Rp,vel_eq,i_stellar,mu,N=100,constant_dlogl=False)
     integrated_2 = sum_hidden_spectrum_v1_mu(dlogl,fx2_array,xp,yp,Rp,vel_eq,i_stellar,mu,N=100,constant_dlogl=True)
     mean_difference = np.mean(np.abs((integrated_1 - integrated_2)/integrated_1))
     assert(mean_difference < 4e-5)
-
 
 
     integrated_1 = sum_hidden_spectrum_v2(wl2,fx2,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=100,batched=True,constant_dlogl=False)
