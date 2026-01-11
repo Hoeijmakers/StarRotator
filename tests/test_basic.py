@@ -408,7 +408,14 @@ def test_hidden_flux_mu_v1():
     assert(jnp.max(jnp.abs(delta_index))==0) #Make sure that the line is constant when moving parallel to the star's axis.
 
 
-
+    N=1000
+    xp = jnp.array([-1,0.0])
+    yp = jnp.array([-1,0.0])
+    F_in_v6 = sum_hidden_spectrum_v1_mu(wl,jnp.array(fx_array_2),xp,yp,Rp,vel_eq,i_stellar,mu,N=N,small_planet=True)
+    assert(np.max(F_in_v6[0]) < 1e-9) # Outside of the disk, we are 0.0
+    # print(Rp**2)
+    # print(np.mean(np.abs(F_in_v6[1]-(2*Rp**2))/(2*Rp**2)))
+    assert(np.mean(np.abs(F_in_v6[1]-(2*Rp**2))/(2*Rp**2)) <  5e-5) # At disk center, we are 2x Rp**2 in transit depth.
 
 
 
