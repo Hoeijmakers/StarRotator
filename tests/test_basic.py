@@ -7,7 +7,6 @@ def test_imports():
     import matplotlib.pyplot as plt
     from matplotlib import cm, colors
     from mpl_toolkits.mplot3d import Axes3D
-    from scipy.special import sph_harm
     import requests
     import shutil
     import urllib.request as request
@@ -236,7 +235,7 @@ def test_hidden_flux():
     assert(mean_error_per_wl < 1.5e-4)
 
 
-    #Final testing to ensure that v1 and v2 produce essentially the same output (and that means a transit depth of 0.9): 
+    #Final testing to ensure that v1 and v2 produce essentially the same output (and that means a transit depth of 0.09): 
     xp = jnp.array([-0.2,0.0,0.2])
     yp = xp*0.0
     F_in_v1 = sum_hidden_spectrum_v1(wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N=500)
