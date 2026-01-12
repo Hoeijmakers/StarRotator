@@ -1,6 +1,6 @@
 ######################
 #authors: Jens Hoeijmakers, Julia Seidel, Madeline Lam, Bibiana Prinoth
-#Description: Calculates the stellar spectrum
+#Description: Calculates the stellar spectrum of a rotating star during a transit event.
 #
 #
 #####################
@@ -29,8 +29,8 @@ from starrotator.lib.operations import vert_int_q_ld, circ_int_q_ld, vert_int_q_
 from starrotator.lib.util import gaussian
 import starrotator.lib.util as ut
 from starrotator.lib.vgrid import calc_vel_stellar, calc_flux_stellar
-from starrotator.lib.integrate import sum_hidden_spectrum_v1, sum_stellar_spectrum_v1
-from starrotator.lib.integrate import sum_hidden_spectrum_v2, sum_stellar_spectrum_v2, create_hidden_grid_array
+from starrotator.lib.integrate import sum_hidden_spectrum_v1, sum_stellar_spectrum_v1, sum_hidden_spectrum_v1_mu, sum_stellar_spectrum_v1_mu
+from starrotator.lib.integrate import sum_hidden_spectrum_v2, sum_stellar_spectrum_v2
 #main body of code
 
 
@@ -158,6 +158,7 @@ class StarRotator(object):
             #Meaning, if no input is provided, default to the demo data.
             self.system_path = files("starrotator.data").joinpath("demo_system.txt")
             self.obs_path = files("starrotator.data").joinpath("demo_observations.txt")
+            self.linelist_path = files('starrotator.data').joinpath("demo_linelist.dat")
 
 
         self.read_system(system_path=self.system_path,obs_path=self.obs_path,input=self.input)
@@ -177,7 +178,7 @@ class StarRotator(object):
         self.compute_orbit()
         self.compute_spectrum()
 
-    def read_system(self,system_path=None,obs_path=None,input={}):
+    def read_system(self,system_path=None,obs_path=None,linelist_path=None,input={}):
         """Reads in the stellar, planet and observation parameters from file; performing
         tests on the input and raising the read variables to the class.
 
@@ -215,7 +216,7 @@ class StarRotator(object):
                 phases (numpy array, set to the orbital phase values of the time series)
 
 
-            Setting the input dictionary overrules the input parameter files.
+            Setting the input dictionary overrules all keyword-based input parameters.
             If the model is set to pySME, then the following parameters also need to be set:
                 grid_model (str, either atlas12.sav or marcs2012.sav are provided by default),
                 abund (list, empty by default) The elements are strings of definitions of
@@ -223,8 +224,9 @@ class StarRotator(object):
                 linelist_path (str, path to VALD-style line-list for pysme to use)
         """
         self.status = 'start reading input'
-        if len(input)==0:#If we read input from config files
+        if len(input)==0:#If we read input from config files, put them in a dictionary after all.
             input = util.read_into_dictionary(system_path)
+            input['linelist_path'] = linelist_path
             util.check_integrity_input(input)
 
             phases = [] #These are in orbital phase.
@@ -251,7 +253,7 @@ class StarRotator(object):
         self.u1         = float(input['u1'])
         self.u2         = float(input['u2'])
         self.R          = float(input['R'])
-        self.mus        = int(input['mus'])
+        self.N_mu        = int(input['N_mu'])
         self.model      = str(input['model'])
         self.sma_Rs     = float(input['sma_Rs'])
         self.Rstar      = float(input['Rstar'])
@@ -261,27 +263,44 @@ class StarRotator(object):
         self.pob        = float(input['obliquity'])#Obliquity.
         self.Rp_Rs      = float(input['RpRs'])
         self.orb_p      = float(input['P'])
+        self.constant_dlogl = False
+        self.small_planet = True
+
+        # Optional planet mass:
         if 'mp' not in input:
             self.mp = 0.0
         else:
             self.mp     = float(input['mp'])
 
+        # Set small planet approximation to True to default if we're in mu-resolved case:
+        if self.N_mu > 0:
+            if 'small_planet' not in input:
+                self.small_planet = True
+            else:
+                self.small_planet = bool(input['small_planet'])
+
+        # If pysme, check and set required pysme input:
         if self.model.lower() in ['pysme','sme']:
             also_req_keys = ['grid_model','abund','linelist_path']
+            # Set linelist path to demo if not provided in input dictionary.
+            if 'linelist_path' not in input:
+                input['linelist_path'] = files('starrotator.data').joinpath("demo_linelist.dat")
             util.check_integrity_input(input,also_req_keys)
-
-
             self.grid_model = str(input['grid_model'])
             self.abund      = input['abund']
             self.linelist_path = input['linelist_path']
             if not os.path.isfile(self.linelist_path):
                 raise Exception("pySME linelist_path does not point to an existing file.")
+            
+
+
 
 
 
 
         self.Nexp = len(self.phases)#Number of exposures.
         self.residual = None
+        self.wl_in = None
         self.blurred = 0
         try:
             util.vartest(self.wave_start,varname='wave_start in input',nonans=True,pos=True)
@@ -305,11 +324,14 @@ class StarRotator(object):
             util.vartest(self.omega,varname='Omega in input',nonans=True)
             util.vartest(self.drr,varname='Alpha (drr) in input',nonans=True)
             util.vartest(self.mp,varname='mp in input',nonans=True,notnegative=True)
+            util.vartest(self.N_mu,varname='N_mu in input',notnegative=True)
         except ValueError as err:
             print("Parser: ",err.args)
 
-        if self.mus != 0:
-            self.mus = np.sqrt(0.5 * (2 * np.arange(self.mus) + 1) / self.mus)
+
+        # Deal with mu input: Equidistant spacing in sqrt-space.
+        if self.N_mu != 0:
+            self.mu_array = np.sqrt(np.linspace(0,1,int(self.N_mu)))
         self.status = 'success reading input'
 
 
@@ -322,24 +344,44 @@ class StarRotator(object):
         print('Paths:')
         print(f'\tSystem path: \t {self.system_path}')
         print(f'\tObs path: \t {self.obs_path}')
+        print(f'\tLinelist path: \t {self.linelist_path}')
 
         print('')
         print('Input dictionary:')
         for i in self.input:
             print('\t'+i,'\t',self.input[i])
+            
+
+        print('')
+        print('Grid sizes:')
+        print('\t',f'Star: {self.grid_size}')
+        print('\t',f'Planet: {self.grid_planet_size}')
+
+        print('')
+        print('Wavelength:')
+        print('\t',f'Start: {self.wave_start}')
+        print('\t',f'End: {self.wave_end}')
+        if self.wl_in is not None:
+            print('\t',f'Min: {np.min(self.wl_in)}')
+            print('\t',f'Max: {np.max(self.wl_in)}')
+            print('\t',f'N: {len(self.wl_in)}')
 
         print('')
         print('Phases:')
+        print(f'\tN_phases: \t {len(self.phases)}')
         for i in self.phases:
             print(f'\t{i}')
 
         print('')
-        print('Mu:')
-        print('\t',self.mus)
+        print('N_mu angles:')
+        print('\t',self.N_mu)
+
+        print('')
+
 
         print('')
         print('Cache dir:')
-        print('t'+str(ut.get_cache_dir()))
+        print('\t'+str(ut.get_cache_dir()))
 
 
 
@@ -363,13 +405,13 @@ class StarRotator(object):
 
     def get_stellar_spectrum(self):
         """
-        Obtaining the unbraodened spectrum using one of StarRotator's 
-        #default methos: PHOENIX or pySME.
+        Obtaining the unbroadened spectrum using one of StarRotator's 
+        #default methods: PHOENIX or pySME.
         The input stored in the class attributes control a logic to 
         switch between PHOENIX (mus=0) and pySME.
         """
 
-        if isinstance(self.mus,np.ndarray) != True: #If we have no mu-resolved case then...
+        if self.N_mu == 0: #If we have no mu-resolved case then...
             if self.model.lower() == 'phoenix': #Either use PHOENIX
                 print('--- Reading spectrum from PHOENIX')
                 print(f'-----T={self.T}K, log(g)={self.logg}, Z={self.Z}.')
@@ -388,13 +430,14 @@ class StarRotator(object):
                                                     self.Z, 
                                                     self.linelist_path, 
                                                     grid = self.grid_model,
-                                                    abund = self.abund)
+                                                    abund = self.abund
+                                                    )
             else:
                 raise Exception('Invalid model spectrum chosen. Input either PHOENIX or pySME in '
                 'star.txt')
             self.wl_in = wl*1.0
             self.fx_in = fx*1.0
-        else: #Then we must be in pySME case
+        else: #If we do have the mu-resolved case, then we must be in pySME:
             if self.model.lower() in ['pysme','sme']: #Or use pySME
                 print('--- Generating spectrum using pySME with mu-dependence')
                 print(f'-----T={self.T}K, log(g)={self.logg}, Z={self.Z}.')
@@ -404,37 +447,56 @@ class StarRotator(object):
                                                     self.logg, 
                                                     self.Z, 
                                                     linelist = self.linelist_path, 
-                                                    mu = self.mus,
+                                                    mu = self.mu_array,
                                                     grid = self.grid_model,
-                                                    abund = self.abund)
-                #THIS IS NOT FINISHED CONTINUE PASSING FX_ARRAY CORRECTLY
+                                                    abund = self.abund
+                                                    )
+                self.wl_in = wl*1.0
+                self.fx_in = fx*1.0 # Note that this is now an array.
+            else:
+                raise Exception("With mu-dependence, model must be set to pysme.")
 
 
     #Define a set of wrappers to avoid having to refer to self all the time in compute_spectrum().
-    def compute_grids(self,x,y,i_stellar,vel_eq,diff_rot_rate,a1,a2):
+    #And to make the switching logic below look more clear.
+    #Each passes through the input to calculate both the out-of-transit stellar spectrum as well as the in-transit time-series.
+    #These wrapper functions wrap everything that needs to be done. If you're ever gong to try to dissect how to do 
+    #bits and pieces of this calculation in some flavour, this is where to start looking.
+    def compute_grids_v1_v2(self,x,y,i_stellar,vel_eq,diff_rot_rate,a1,a2):
+        # This needs to be moved into the main logic, and the dependency on x,y be fixed...
         vel_grid  = calc_vel_stellar(x,y,i_stellar, vel_eq, diff_rot_rate)
         flux_grid  = calc_flux_stellar(x,y,a1,a2,norm=False)
         return(flux_grid,vel_grid)
-    def calc_v1(self,wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,Nstar=400,Nplanet=200):
-        F_out_v1 =  sum_stellar_spectrum_v1(wl,fx,vel_eq,i_stellar,a1,a2,N=Nstar)
-        F_in_v1 = sum_hidden_spectrum_v1(wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N=Nplanet)
+    def calc_v1(self,wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,Nstar=400,Nplanet=200,constant_dlogl=False):
+        F_out_v1 =  sum_stellar_spectrum_v1(wl,fx,vel_eq,i_stellar,a1,a2,N=Nstar,constant_dlogl=constant_dlogl)
+        F_in_v1 = sum_hidden_spectrum_v1(wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N=Nplanet,constant_dlogl=constant_dlogl)
         F_out_v1.block_until_ready()
         F_in_v1.block_until_ready()
         return(F_out_v1,F_in_v1)
-    def calc_v2(self,wl,fx,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,batched=True,Nstar=400,Nplanet=200):
-        F_out_v2 = sum_stellar_spectrum_v2(wl,fx,vel_eq,i_stellar,a1,a2,diff_rot_rate,N=Nstar,batched=batched)
-        F_in_v2 = sum_hidden_spectrum_v2(wl,fx,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=Nplanet,batched=batched) 
+    def calc_v2(self,wl,fx,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,batched=True,Nstar=400,Nplanet=200,constant_dlogl=False):
+        F_out_v2 = sum_stellar_spectrum_v2(wl,fx,vel_eq,i_stellar,a1,a2,diff_rot_rate,N=Nstar,batched=batched,constant_dlogl=constant_dlogl)
+        F_in_v2 = sum_hidden_spectrum_v2(wl,fx,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=Nplanet,batched=batched,constant_dlogl=constant_dlogl) 
         F_out_v2.block_until_ready()
         F_in_v2.block_until_ready()
         return(F_out_v2,F_in_v2)
+    def calc_v1_mu(self,wl,fx_array,xp,yp,Rp,vel_eq,i_stellar,mu_array,Nstar=400,Nplanet=200,small_planet=True,constant_dlogl=False):
+        F_out_v1 = sum_stellar_spectrum_v1_mu(wl,fx_array,vel_eq,i_stellar,mu_array,N=Nstar,constant_dlogl=constant_dlogl)
+        F_in_v1 = sum_hidden_spectrum_v1_mu(wl,fx_array,xp,yp,Rp,vel_eq,i_stellar,mu_array,N=Nplanet,small_planet=small_planet,constant_dlogl=constant_dlogl) 
+        F_out_v1.block_until_ready()
+        F_in_v1.block_until_ready()
+        return(F_out_v1,F_in_v1)
     #End of wrappers.
 
+
+
+
     def compute_spectrum(self):
-        """This wraps the main computation, switching between modes of 
+        """This does the main logical switching between modes of 
         integration depending on the input that is stored in the set of class 
-        attributes. The simulation output and other variables are raised 
+        attributes, and calls the calculation wrappers. 
+        The simulation output and other variables are raised 
         to class-wide attributes. Note that jitting is not done at this 
-        level, but all computations under the hood are jitted.
+        level, but all computations under the hood are jitted for speed.
 
         Parameters
         ----------
@@ -449,17 +511,18 @@ class StarRotator(object):
         #These grids are not meant for computation (because under the hood, computation
         #might use analytical tricks, meaning that these grids are not exactly the same
         #as what is being calculated). Instead, these are for visualization purposes.
-        if self.model == "pySME":
-            self.flux_grid,self.vel_grid = self.compute_grids(
-                self.x,self.y,self.stelinc,self.velStar,self.drr,0.0,0.0)#If pySME: override LD.
-        else:
-            self.flux_grid,self.vel_grid = self.compute_grids(
-                self.x,self.y,self.stelinc,self.velStar,self.drr,self.u1,self.u2)
+        #Note that this logic-switching here is now doubled, and this should be included in the main logic switches below.
+        # if self.model == "pySME":
+        #     self.flux_grid,self.vel_grid = self.compute_grids(
+        #         self.x,self.y,self.stelinc,self.velStar,self.drr,0.0,0.0)#If pySME: override LD.
+        # else:
+        #     self.flux_grid,self.vel_grid = self.compute_grids(
+        #         self.x,self.y,self.stelinc,self.velStar,self.drr,self.u1,self.u2)
 
 
         # Now we do the integration, switching between modes as input requires.
         if self.drr == 0 and self.fx_in.ndim == 1:
-            print('Calculating v1')
+            print('Calculating v1 (no drr, no mu dependence)')
             self.stellar_spectrum, self.Fp = self.calc_v1(self.wl_in,
                                             self.fx_in,
                                             self.xp,self.yp,
@@ -468,10 +531,11 @@ class StarRotator(object):
                                             self.stelinc,
                                             self.u1,self.u2,
                                             Nstar=self.grid_size,
-                                            Nplanet=self.grid_planet_size
+                                            Nplanet=self.grid_planet_size,
+                                            constant_dlogl=self.constant_dlogl
                                             )
         elif self.drr != 0 and self.fx_in.ndim == 1:
-            print('Calculating v2')
+            print('Calculating v2 (with drr, no mu dependence)')
             self.stellar_spectrum, self.Fp = self.calc_v2(self.wl_in,
                                             self.fx_in,
                                             self.xp,self.yp,
@@ -482,35 +546,79 @@ class StarRotator(object):
                                             self.u1,self.u2,
                                             batched=True,
                                             Nstar=self.grid_size,
-                                            Nplanet=self.grid_planet_size
+                                            Nplanet=self.grid_planet_size,
+                                            constant_dlogl=self.constant_dlogl
                                             )
         elif self.drr == 0. and self.fx_in.ndim > 1:
-            print('Calculating v1 -- mu')
-            raise Exception("Multi-dimensional stellar spectrum (mu dependence) is not supported yet.")
+            print('Calculating v1_mu (no drr, with mu dependence)')
+            self.stellar_spectrum, self.Fp = self.calc_v1_mu(self.wl_in,
+                                            self.fx_in,
+                                            self.xp,self.yp,
+                                            self.Rp_Rs,
+                                            self.velStar,
+                                            self.stelinc,
+                                            self.mu_array,
+                                            Nstar = self.grid_size,
+                                            Nplanet = self.grid_planet_size,
+                                            small_planet=self.small_planet,
+                                            constant_dlogl=self.constant_dlogl
+                                            )
         else:
-            print('Calculating v2 -- mu')
-            raise Exception("Multi-dimensional stellar spectrum (mu dependence) is not supported yet.")
+            print('Calculating v3 (with drr and with mu dependence)')
+            raise Exception("Multi-dimensional stellar spectrum (mu dependence) plus drr is not supported yet.")
         
 
 
-        self.fxt = self.stellar_spectrum-self.Fp
-        self.fxtn = (self.fxt.T / np.nanmedian(self.FxT,axis = 1)).T
-        self.residuals_abs = self.fxt/self.fxt[0] #Assumes that first spectrum is out of transit!!
-        self.residuals_norm = self.fxtn/self.fxtn[0] #These are really here just for convenience.
 
-        #If this point is reached, at least the functions ran through, so we change the satus message.
+        # #This defines the output.
+        self.wl = self.wl_in
+        self.spectra = self.stellar_spectrum-self.Fp #Spectral time series
+        self.lightcurve = np.mean(self.spectra, axis=1) / np.max(np.mean(self.spectra, axis=1))
+        self.masks = None #This no longer exists as output but did previously
+        self.spectra_norm = (self.spectra.T / np.nanmedian(self.spectra,axis = 1)).T
+        self.residual = self.spectra/self.stellar_spectrum
+        self.residual_norm = self.spectra_norm/self.stellar_spectrum * np.nanmedian(self.stellar_spectrum)
+
+
+
+
+        #If this point is reached, at least the functions ran through, so we change the status message.
         self.status = 'success computing spectra'
         #That does not, of course, mean that the calculation is correct/accurate, just that it finished.
    
+
+
+    def plot_residuals(self):
+        """Plot the residuals if available.
+
+        Parameters
+        ----------
+            None
+        Returns
+        -------
+            None
+        """
+        import matplotlib.pyplot as plt
+        if self.residual is not None:
+            plt.pcolormesh(self.wl,self.phases,self.residual)
+            plt.xlabel('Wavelength (nm)')
+            plt.ylabel('Orbital phase')
+            plt.show()
+
+
+
 
         # CONTINUE HERE NEXT TIME:
         # [DONE] Fix normalizations and uniformity of calling v1, v2, v1_mu.
         # [DONE] Implement optional switching to fast doppler shifting method (switched by wavelength input, either array or float). Done for v1.
         # [DONE] Complete the generation of output. 
+        # [DONE] Fix definition of mu. Now mu is apparently assumed to be equal to r. But it is sqrt(1-r**2). Confirm this by testing new integrate.integrate_fluxdisk_mu function.
+        # Finish logic switching.
+        # Add dlogl input.
+        # Implement spectral resolution.
         # Complete the plotting of basic output.
-        # Complete / test the workflow with pySME to create the fx_array input and execute the mu-dependent calculations.
-        # Create a working KELT-9 example.
-        # Give wavelength control (see below).
+        # Complete / test the workflow with pySME.
+        # Create a suite of working (KELT-9) examples.
 
         # Also need to make a decision regarding control over the wavelength axis:
         # A start and a stop wavelength is a bit silly. 
@@ -529,31 +637,6 @@ class StarRotator(object):
         # Add brute-force integration with no tricks, and free velocity and flux grids as input. That is v3. A spectrum index-map (that enables mu, or other variation in the spectrum).
 
 
-        # flux_out = []
-        # mask_out = []
-        # print('--- Building local spectrum')
-        # for i in range(self.Nexp):
-        #     if isinstance(self.mus,np.ndarray) == True:
-        #         wlp,Fp,flux,mask = integrate_depr.build_local_spectrum_limb_resolved(self.xp[i],self.yp[i],self.zp[i],self.Rp_Rs,wl,fx_list,self.mus,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid, self.flux_grid)
-        #         self.fx_list = copy.deepcopy(fx_list)
-        #     else:
-        #         wlp,Fp,flux,mask = integrate_depr.build_local_spectrum_fast(self.xp[i],self.yp[i],self.zp[i],self.Rp_Rs,wl,fx,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid,self.flux_grid)
-        #     integrate_depr.statusbar(i,self.Nexp)
-
-        #     F_out[i,:]=F-Fp
-        #     F_planet[i,:] = Fp
-        #     flux_out.append(flux)
-        #     mask_out.append(mask)
-        # #This defines the output.
-        # self.wl = wlF
-        # self.stellar_spectrum = F
-        # self.Fp = copy.deepcopy(F_planet)
-        # self.spectra = copy.deepcopy(F_out)
-        # self.lightcurve = np.mean(F_out, axis=1) / np.max(np.mean(F_out, axis=1))
-        # self.masks = mask_out
-        # self.residual = self.spectra/self.stellar_spectrum
-            
-    
 
         # MAKE IT AT HABIT TO RUN PYTEST BEFORE COMMITS!
 
@@ -639,22 +722,6 @@ class StarRotator(object):
         self.residual = self.spectra/self.stellar_spectrum
 
 
-    def plot_residuals(self):
-        """Plot the residuals if available.
-
-        Parameters
-        ----------
-            None
-        Returns
-        -------
-            None
-        """
-        import matplotlib.pyplot as plt
-        if self.residual is not None:
-            plt.pcolormesh(self.wl,self.times,self.residual)
-            plt.xlabel('Wavelength (nm)')
-            plt.ylabel('Phase')
-            plt.show()
 
 
     def convolve_spectral_resolution(self):

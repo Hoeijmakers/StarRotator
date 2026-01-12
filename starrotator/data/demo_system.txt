@@ -14,6 +14,6 @@ FeH             0.0
 logg            4.0
 u1              0.93
 u2              -0.23
-mus             0
+N_mu            0
 R               115000
 model      	PHOENIX

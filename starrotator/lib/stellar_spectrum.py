@@ -255,7 +255,7 @@ def get_spectrum_pysme(wave_start, wave_end, T, logg, Z, linelist = '', mu=[], a
             fx.append(f.copy())
             if len(w) < 5:
                 print("get_spectrum_pysme: It seems that your returned wavelength grid is shorter than expected. Please make sure that your line list has spectral lines in your specified wavelength range.")
-        return(wl, fx)
+        return(wl, np.array(fx))
 
     else:
         sme = synthesize_spectrum(sme)

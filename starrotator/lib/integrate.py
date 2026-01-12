@@ -692,60 +692,6 @@ def sum_hidden_spectrum_v1_mu(wl,fx_array,xp,yp,Rp,vel_eq,i_stellar,mu_array,N=1
 
 
 
-
-
-#    #This is pasted from sum_stellar_spectrum_v1_mu from above.
-#    if constant_dlogl:
-#        doppler_shift_batch = jax.vmap(doppler_shift_dlogl, in_axes=(None, 0, None))
-#    else:
-#        doppler_shift_batch = jax.vmap(doppler_shift, in_axes=(None, 0, None))
-
-#    fx_array_shifted = doppler_shift_batch(wl,fx_array,v_axis)
-#    #So the output will have dimensions len(v) * len(fx_array) * len(wl) whereas the shape of the output
-#    # of a single call to doppler_shift would have dimensions len(v)*len(wl)).
-#
-
-#    #We first need to convert the mu array to values of r, and then bin it up to find bin edges in r-space:
-#    r_array = jnp.sqrt(1 - mu_array**2)# Array in radial coordinate corresponding to mu angles.
-#    r_centers = (r_array[0:-1]+r_array[1:])/2
-#    rmin = jnp.concatenate([jnp.array([0]), r_centers])
-#    rmax = jnp.concatenate([r_centers,     jnp.array([1])])
-#
-#
-#    #We then compute the arrays of y-edges associated with these mu edges.
-#    #This comes from mu^2 = x^2+y^2, leading to y = sqrt(mu^2 - x^2).
-#    ymin = jnp.sqrt(jnp.clip(rmin[None,:]**2 - x[:, None]**2,0,None))
-#    ymax = jnp.sqrt(jnp.clip(rmax[None,:]**2 - x[:, None]**2,0,None))
-#    #This is where the magic happens, because the output of the below is a 
-#    #2D array for the minimum and maximum edges: N_mu times N_x.
-#    #For each x, it tells you what the y-values are of the edges of the r-bins.
-#    #This is easiest to understand for x=0 (center of the disk up):
-#    #As you travel up in from y=0 to y=1, you start in first r-bin, until you
-#    #reach the y-coordinate of the second r bin, etc.
-#    #until y=1 and you have reached the top of the disk.
-#    #This is also true for x>0, but now, the starting value is non-zero r. Meaning r-bins disappear
-#    #as you travel outward in the x-direction. At x close to 1, most r values don't occur anymore in the column
-#    #above you. This is automatically handled by the clip statement: For an r bin that is not in the column at x=/=0,
-#    #ymin and ymax are both zero. So the area of this piece will be (ymax-ymin)*dx = 0. 
-#    # This also works for partial bins: If ymin gets clipped but not ymax. Lovely!
-#
-#    W = (ymax-ymin) *dx
-#
-#    
-#    total = circ_int_q_ld(0.0,0.0) #The analytical integral of a non-limb-darkened star.
-#    # print(np.shape(fx_array_shifted))
-#    # print(np.shape(W.T))
-#    fx_weighted = W.T * np.transpose(fx_array_shifted,(2,0,1))
-#    fx_sum = jnp.sum(fx_weighted,axis=(1,2))
-#
-#    return(fx_sum*2 / total)#Factor of 2 because this has been assuming a semi-circle.
-
-
-
-
-
-
-
 #sum_hidden_spectrum_v1(wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N=100)
 # def sum_hidden_spectrum_v2(wl,fx,vel_grid_array,flux_grid_array,N=100,batched=True):
 @partial(jax.jit,static_argnames=['N','batched','constant_dlogl'])
@@ -885,24 +831,29 @@ def create_hidden_grid_array(xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=50)
             The size of the differential (dx*R) that may be used to renormalise the flux array, since it has an 
             aritrary size compared to that of the stellar disk.
     """
-
     x = jnp.linspace(-1,1,N)
     dx = x[1]-x[0]
 
     x_array = x*Rp + xp[:,None] # Rescaling the grid to only encompass the planet (much finer than star typically)
     y_array = x*Rp + yp[:,None] # Note that we do a circle in a square so y=x.
     dxR = dx*Rp # Rescaling the size of the differential.
-    mu = jnp.sqrt(x[None,:]**2 + x[:,None]**2) #Yes, this is the same mu as pySME mu jsyk (cos(theta)).
-    mask = jnp.where(mu > 1,jnp.nan,mu)*0.0+1.0
+    r_squared = x[None,:]**2 + x[:,None]**2 
+    mu_squared = 1 - r_squared #Yes, this is the same mu as pySME mu jsyk (cos(theta)).
+    mask = jnp.where(r_squared > 1,jnp.nan,r_squared)*0.0+1.0
 
-    flux_disk_array  = calc_flux_stellar(x_array.T,y_array.T,a1,a2,norm=False) #This is really, really awesome.
+    flux_disk_array  = calc_flux_stellar(x_array.T,y_array.T,a1,a2,norm=False) #This is really, really awesome (the fact that it's all vectorised).
     vel_disk_array  = calc_vel_stellar(x_array.T,y_array.T,i_stellar, vel_eq, diff_rot_rate)
 
 
-    flux_disk_array_masked = flux_disk_array*mask.T[:,:,None] #This crops out the circle that is the planet.
-    vel_disk_array_masked = vel_disk_array*mask.T[:,:,None]
-    mu_array_masked = mu*1.0
-    return(flux_disk_array_masked,vel_disk_array_masked,mu_array_masked,dxR)
+    flux_disk_array_masked = flux_disk_array*mask.T[:,:,None] #This crops out the circle that is the planet. 
+    #Note that even though x and x_array do not measure the same thing (x is the star, x_array the planet),
+    #this can be applied to the small region that is the planet because x (-1,1) has the same shape as x_array (-1,1)*Rp. 
+    vel_disk_array_masked = vel_disk_array*mask.T[:,:,None]  
+    #Bit hacky but it is robust.
+
+    mu_array_masked = jnp.sqrt(mu_squared*mask)#Calculation of the mu array is inaccurate. Needs to do x_array**2+y_array**2 or something.
+    #Implement this when needed. Until then, a jnp.nan is returned.
+    return(flux_disk_array_masked,vel_disk_array_masked,mu_array_masked*jnp.nan,dxR)
 
 
 
