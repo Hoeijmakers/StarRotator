@@ -596,7 +596,63 @@ def test_fast_doppler():
     assert(mean_difference < 2e-3) # This is a large relative error. Why?
 
 
+def test_demo_computation():
+    from starrotator import StarRotator
+    KELT9 = StarRotator()
+    assert KELT9.status == 'success computing spectra'
 
+
+def test_wavelength_control():
+    from starrotator import StarRotator
+    import numpy as np
+    input = {}
+    input['phases'] = np.linspace(-0.1,0.1,31)
+    input['grid_size_star'] = 100
+    input['grid_size_planet'] = 50
+    input['sma_Rs'] = 3.153
+    input['e'] = 0.0
+    input['inclination'] = 89.0
+    input['obliquity'] = 0.0
+    input['RpRs'] = 0.1
+    input['Rstar'] = 1.4
+    input['P'] = 2.3
+    input['mp'] = 0.0
+    input['veq'] = 20.0
+    input['stelinc'] = 90.0
+    input['T'] = 8000.0
+    input['FeH'] = 0.0
+    input['logg'] = 4.5
+    input['drr'] = 0.0
+    input['u1'] = 0.93
+    input['u2'] = -0.23
+    input['R'] = 100_000
+    input['model'] = 'PHOENIX'
+
+    N1 = 4321
+    input['wavelength'] = np.linspace(585,595,N1)
+    input['wavelength_type'] = 'explicit' 
+
+    KELT1 = StarRotator(input=input,run_computation=False)
+    assert KELT1.status == 'ready for computation'
+    assert len(KELT1.wl_model) == N1
+    assert len(KELT1.wl_in) == N1
+
+    N2 = 12340
+    input['wavelength'] = [585,595,N2]
+    input['wavelength_type'] = 'linear' 
+    KELT2 = StarRotator(input=input,run_computation=False)
+    assert KELT2.status == 'ready for computation'
+    assert len(KELT2.wl_model) == N2
+    assert len(KELT2.wl_in) == N2
+
+    N3 = 8472
+    input['wavelength'] = [585,595,N3]
+    input['wavelength_type'] = 'constant_dlogl' 
+    KELT3 = StarRotator(input=input,run_computation=False)
+    assert KELT3.status == 'ready for computation'
+    assert len(KELT3.wl_model) == N3
+    assert np.isscalar(KELT3.wl_in) == True   
+    assert KELT3.constant_dlogl == True
 
 
 
@@ -628,8 +684,6 @@ def test_default_computation():
     input['R'] = 100_000
     input['model'] = 'PHOENIX'
     input['N_mu'] = 0
-    input['omega'] = 0.0
-    input['constant_dlogl'] = False
     input['small_planet'] = True
     input['grid_model'] = 'atlas12.sav'
     input['abund'] = {}

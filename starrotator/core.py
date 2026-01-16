@@ -128,7 +128,7 @@ class StarRotator(object):
         self.get_stellar_spectrum()
         self.compute_orbit()
 
-
+        self.status = 'ready for computation'
         #This is the primary cascade that gets run.
         if run_computation:
             self.compute_spectrum()
@@ -441,7 +441,7 @@ class StarRotator(object):
         
         self.wl_model = wl_model*1.0 #Retain the model output wavelength in case dlogl is set. 
         if self.wavelength_type == 'constant_dlogl':
-            self.wl_in = dlogl
+            self.wl_in = float(dlogl)
         else:
             self.wl_in = wl_model*1.0
         
