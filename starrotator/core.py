@@ -276,6 +276,8 @@ class StarRotator(object):
         else:
             self.N_mu = 0.0 #This variable needs to be defined because elsewhere I use it to 
             #distinguish the model case.
+        if self.N_mu > 0:
+            self.small_planet = input['small_planet']
 
         self.residual = None
         self.wl_in = None
@@ -414,7 +416,7 @@ class StarRotator(object):
             if self.N_mu == 0:
                 print(f'--- Generating spectrum using pySME without mu-dependence in wavelength mode {self.wavelength_type}.')
                 print(f'-----T={self.T}K, log(g)={self.logg}, Z={self.Z}.')
-                wl, fx= spectrum.get_spectrum_pysme( 
+                wl_model, fx_model= spectrum.get_spectrum_pysme( 
                                                     wl_input, 
                                                     self.T, 
                                                     self.logg, 
@@ -426,7 +428,7 @@ class StarRotator(object):
             else:
                 print(f'--- Generating spectrum using pySME with mu-dependence in wavelength mode {self.wavelength_type}.')
                 print(f'-----T={self.T}K, log(g)={self.logg}, Z={self.Z}.')
-                wl, fx= spectrum.get_spectrum_pysme(wl_input,
+                wl_model, fx_model= spectrum.get_spectrum_pysme(wl_input,
                                                     self.T, 
                                                     self.logg, 
                                                     self.Z, 
@@ -607,10 +609,12 @@ class StarRotator(object):
         # [DONE] Complete the generation of output. 
         # [DONE] Fix definition of mu. Now mu is apparently assumed to be equal to r. But it is sqrt(1-r**2). Confirm this by testing new integrate.integrate_fluxdisk_mu function.
         # [DONE] Finish logic switching.
-        # Add dlogl input.
+        # [DONE] Add dlogl input.
+        # [DONE] Complete / test the workflow with pySME.
+        # Debug faulty mu dependence in Develop_starrotator_object.
         # Implement spectral resolution.
         # Complete the plotting of basic output.
-        # Complete / test the workflow with pySME.
+
         # Create a suite of working (KELT-9) examples.
 
         # Also need to make a decision regarding control over the wavelength axis:

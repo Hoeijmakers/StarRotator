@@ -41,6 +41,9 @@ def test_demo_files():
     import starrotator.lib.util as util
     import json
     data_path = files("starrotator.data").joinpath("demo_input.json")
+    util.file_exists(data_path)
+    linelist_path = files("starrotator.data").joinpath("demo_linelist.dat")
+    util.file_exists(linelist_path)
     with data_path.open("r") as f:
         input =  json.load(f)#This creates a dict from a JSON input file.
     mandatory_keywords = {'wavelength':[[list,'array-like'],['type']],
@@ -655,6 +658,30 @@ def test_wavelength_control():
     assert KELT3.constant_dlogl == True
 
 
+def test_pysme():
+    import starrotator.lib.stellar_spectrum as spectrum
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from importlib.resources import files
+    import starrotator.lib.util as util
+    linelist_path = files("starrotator.data").joinpath("demo_linelist.dat")
+    util.file_exists(linelist_path)
+    wl_input = np.linspace(585,595,20000)
+
+    wl, fx= spectrum.get_spectrum_pysme( 
+        wl_input, 
+        8000.0, 
+        4.5, 
+        0.1, 
+        linelist = linelist_path, 
+        mu = np.linspace(0,1,10),
+        grid = 'atlas12.sav',
+        abund = {}
+        )
+    assert len(wl) == 20000
+    assert len(fx) == 10
+
+
 
 def test_default_computation():
     from starrotator import StarRotator
@@ -694,6 +721,43 @@ def test_default_computation():
     KELT9.status = ''
     KELT9.compute_spectrum()
     assert KELT9.status == 'success computing spectra'
+
+
+def test_pysme_computation():
+    from starrotator import StarRotator
+    import numpy as np
+    input = {}
+    input['wavelength'] = np.linspace(585,595,10000)
+    input['wavelength_type'] = 'explicit'
+    input['phases'] = np.linspace(-0.1,0.1,41)
+    input['grid_size_star'] = 150
+    input['grid_size_planet'] = 100
+    input['sma_Rs'] = 3.153
+    input['e'] = 0.0
+    input['inclination'] = 89.0
+    input['obliquity'] = 0.0
+    input['RpRs'] = 0.1
+    input['Rstar'] = 1.4
+    input['P'] = 2.3
+    input['mp'] = 0.0
+    input['veq'] = 20.0
+    input['stelinc'] = 90.0
+    input['T'] = 8000.0
+    input['FeH'] = 0.0
+    input['logg'] = 4.5
+    input['drr'] = 0.0
+    input['u1'] = 0.93
+    input['u2'] = -0.23
+    input['R'] = 100_000
+    input['model'] = 'pysme'
+    input['N_mu'] = 0
+    input['omega'] = 0.0
+    input['small_planet'] = True
+    input['grid_model'] = 'atlas12.sav'
+    input['abund'] = {}
+    KELT9 = StarRotator(input=input)
+    assert KELT9.status == 'success computing spectra'
+    assert len(KELT9.wl_in) == 10000
 
 
 

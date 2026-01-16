@@ -176,10 +176,8 @@ def get_spectrum_pysme(wl, T, logg, Z, linelist = '', mu=[], abund = {}, grid = 
 
         Parameters
         ----------
-        wave_start : float
-            Start of modelled wavelength range in nm in air
-        wave_end :  float
-            Ending wavelength range in nm in air
+        wl : array-like
+            Wavelength axis or coding of wavelength axis.
         T : int, float
             The model effective temperature of the star in Kelvin.
         logg : int, float
@@ -229,7 +227,7 @@ def get_spectrum_pysme(wl, T, logg, Z, linelist = '', mu=[], abund = {}, grid = 
         sme.atmo.source = grid # type: ignore
 
     # Convert from nm to Angstrom
-    wl_A = wl*10.0
+    wl_A = np.array(wl)*10.0
     if len(wl_A) > 2: #Interpret as a directly defined wavelength array.
         sme.wave = [wl_A] # type: ignore
     else:
