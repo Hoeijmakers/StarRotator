@@ -21,18 +21,29 @@ def read_into_dictionary(filepath):
     return data
 
 
-def check_integrity_input(input_dict,additional_keywords=[]):
-    mandatory_keywords = ['sma_Rs','e','omega','inclination','obliquity',
-                          'RpRs','P','veq','stelinc',
-                          'drr','T','FeH','logg','u1','u2','N_mu','R','model']
-    if len(additional_keywords) > 0:
-        mandatory_keywords=mandatory_keywords+additional_keywords
-
-    for keyword in mandatory_keywords:
-        try: 
-            assert keyword in input_dict
-        except:
+def check_integrity_input(input_dict,req_keywords):
+    """This tests the integrity of an input dictionary.
+    The pattern is that the req_keyword dict has the required keywords
+    as entries, set to a 2-element list, of which the first element
+    is a list of the required variable types, and the second element
+    is named tests that the keyword in the input dict should be tested against.
+    
+    Valid tests are 'type', 'pos', 'notnegative', 'nonans' and 'exists' (for paths)."""
+    for keyword in req_keywords:
+        if keyword not in input_dict:
             raise Exception(f'Keyword {keyword} not found in input dict.')
+        types,tests = req_keywords[keyword]
+        if 'type' in tests:
+            typetest(input_dict[keyword],types,f'{keyword} in input dictionary')
+        if 'notnegative' in tests:
+            notnegativetest(input_dict[keyword],f'{keyword} in input dictionary')
+        if 'pos' in tests:
+            postest(input_dict[keyword],f'{keyword} in input dictionary')
+        if 'nonans' in tests:
+            nantest(input_dict[keyword],f'{keyword} in input dictionary')
+        if 'exists' in tests:
+            file_exists(input_dict[keyword],f'{keyword} in input dictionary')
+
 
 
 
@@ -92,6 +103,14 @@ def dir_exists(dir,varname=''):
     if Path(dir).is_dir() != True:
         raise FileNotFoundError(f'{varname} is not a directory.')
 
+def is_array_like_non_scalar(x):
+    import numpy as np
+    try:
+        arr = np.asarray(x)
+        return arr.ndim > 0
+    except Exception:
+        return False
+
 def typetest(var,vartype,varname=''):
     """This program tests the type of var which has the name varname against
     the type vartype (or the types in list vartype), and raises an exception if
@@ -101,24 +120,38 @@ def typetest(var,vartype,varname=''):
     Example:
     a = 'ohai'
     utils.typtest('a',a,str)"""
+    import numpy as np
     if isinstance(varname,str) != True:
-        print(varname)
         raise Exception("Input error in typetest: varname should be of type string.")
 
     #Test two cases, if vartype is a list, we test each element.
     if isinstance(vartype,list) == True:
         error = 1
         msg = "Type error: Variable %s should be one of these types: " % varname
-        for type in vartype:
-            msg+=' %s' % type
-            if isinstance(var,type) == True:
-                error = 0
+        for T in vartype:
+            msg+=' %s' % T
+            if isinstance(T,str):
+                if T == 'array-like':
+                    if is_array_like_non_scalar(var):
+                        error = 0
+                else:
+                    raise Exception(f'Input error in typetest: This typestring {T} is not supported.')
+            else:
+                if isinstance(var,T) == True:
+                    error = 0
         if error == 1:
             raise Exception(msg)
     else:
         #Otherwise, we do the classical typetest.
-        if isinstance(var,vartype) != True:
-            raise Exception("Type error: Variable %s should be  of type %s." % (varname,vartype))
+        if isinstance(vartype,str):
+            if vartype == 'array-like':
+                if not is_array_like_non_scalar(var):
+                    raise Exception("Type error: Variable %s should be  of type %s." % (varname,vartype))
+            else:
+                raise Exception('Input error in typetest: This typestring {T} is not supported.')
+        else: 
+            if isinstance(var,vartype) != True:
+                raise Exception("Type error: Variable %s should be  of type %s." % (varname,vartype))
 
 def typetest_array(var,vartype,varname=''):
     """This program tests the type of the elements in the array or list var which has the

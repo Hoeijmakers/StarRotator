@@ -17,15 +17,14 @@ import starrotator.lib.util as util
 from importlib.resources import files
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
-
-import copy
-import os.path
-
+import os
+from pathlib import Path
 import jax
+import json
 from jax import jit, lax
 from jax import numpy as jnp
 from functools import partial
-from starrotator.lib.operations import vert_int_q_ld, circ_int_q_ld, vert_int_q_ld_bounded
+from starrotator.lib.operations import constant_velocity_grid
 from starrotator.lib.util import gaussian
 import starrotator.lib.util as ut
 from starrotator.lib.vgrid import calc_vel_stellar, calc_flux_stellar
@@ -35,85 +34,41 @@ from starrotator.lib.integrate import sum_hidden_spectrum_v2, sum_stellar_spectr
 
 
 class StarRotator(object):
-    def __init__(self,wave_start,wave_end,grid_size,
-                grid_planet_size=None,system_path=None,
-                obs_path=None,input={},linelist_path=''):
+    def __init__(self,input=None,run_computation=True):
         """
         Welcome to StarRotator.
 
-        The StarRotator object contains the main functionality of StarRotator.
-        Upon initialization, the exoplanet system input is read from file, and the
-        model is computed. Calling this class with the minimum required input
-        makes the model default to demo input parameters shipped together with this code.
-        Normal use cases habe the user provide input parameters, either via parameter
-        files (system_path and obs_path) or with a dictionary (input). In the case of
-        pySME usage (disk-resolved spectra), a path to a pySME-compatible linelist file
-        needs to be provided as well.
+        The StarRotator object wraps the main functionality of StarRotator for easy use.
+        This is not the only way to run the StarRotator computations, but the easiest one,
+        and likely sufficient when you are running forward models and making plots.
+
+        The StarRotator object is initialized with a dictionary or JSON file as input. 
+        Calling this class with empty input makes the model run a set of demo input 
+        parameters shipped together with this code.
+
+        In normal use cases, the user can switch between modelling the stellar spectrum
+        based on PHOENIX models (Husser et al. 2013) or pySME (Wehrhahn et al 2019). 
+        pySME enables disk-resolved spectra (mu-dependence) as well as fine-tuned control
+        over elemental abundances, but requires additional input, including a path to 
+        a pySME-compatible linelist file as well as a choice of stellar model.
 
         Note that in PHOENIX mode, Starrotator will download PHOENIX spectra automatically
         to a cache directorly, located in the default cache directory (access this path using
         the print_intput method -- see below).
 
+        Alternatively, a user has the freedom to supply their own stellar spectrum, or list of
+        mu-dependent spectra if neither PHOENIX or pySME are sufficient.
+
         The calculation outputs the out-of-transit stellar spectrum, in-transit time-series,
-        the in-transit time-series normalised to the wavelength-mean
+        the in-transit time-series normalised to the wavelength-mean.
+
 
 
         Parameters
         ----------
-        wave_start : float
-            Start of modelled wavelength range in nm in vacuum.
-
-        wave_end : float
-            Ending Wavelength range in nm in vacuum.
-
-        grid_size: int
-            Number of grid cells to make up the stellar disk. Set to values greater than 400
-            to limit numerical errors, or less if you are trying things out and just
-            want speed.
-
-        grid_planet_size: None, int
-            Number of grid cells to make up the planet disk. If set to None this is set to be
-            equal to half of the grid size of the star.
-
-        system_path : str
-            Path to parameter file defining the system. This file should contain the following keywords
-            and values on separate lines, and the default values are as follows:
-            50000.0     v_eq
-            90.0        stellar i
-            0.0         Differential rotation parameter (alpha)
-            5000.0      Stellar effective temperature (K)
-            0.0         Fe/H
-            4.5         logg
-            0.93        Limb-darkening coefficient u1
-            -0.23       Limb-darkening coefficient u2
-            0           Number of mu angles to consider. For values higher than zero, StarRotator switches to SPECTRUM rather than PHOENIX.
-            3.153       a/Rs
-            0.0         e
-            0.0         omega
-            86.79       Orbital inclination
-            85.0        Projected obliquity
-            0.08228     Rp/Rs
-            1.4811235   Orbital period
-            57095.68572 Transit center time - 2400000.
-            phases      mode, providing the interpretation of the timestamps of the observations.
-            Note that if mode is set to pysme, the limb darkening parameters that the user provides are overridden.
-            If no system path is set, the input defaults to the demo data packaged along with the package.
-            
-        obs_path: str
-            Path to the parameter file defining the timestamps of the observations.
-            Tthis file is assumed to contain a list of orbital phases. Note that if you are 
-            modelling observations of long exposure times, the output of StarRotator will be less accurate 
-            because the planet moves significantly during an exposures. This effect is greater for orbits 
-            aligned to the stellar equator (obliquity 0 degrees).
-
-        linelist_path: str
-            Path to the VALD linelist used for generating a spectrum using pySME.
-            This can also be provided in the input dictionary (see below). 
-                
-            
         input : dict
-            A dictionary of the input parameters can be provided instead of input files.
-            If a dictionary and file paths are provided simultaneously, the dictionary overrides.    
+            A dictionary of the input parameters can be provided instead of input files. The input dict has
+            a large number of mandatory keywords as well as optional ones.   
 
             
         Class methods
@@ -141,28 +96,26 @@ class StarRotator(object):
 
         """
 
-        import pdb
         self.status = 'initialised'
-        self.wave_start=float(wave_start)
-        self.wave_end=float(wave_end)
-        self.grid_size=int(grid_size)
-        if grid_planet_size is not None:
-            self.grid_planet_size = int(grid_planet_size) # Making this accessible to the user if needed.
+
+        if input is None:
+            input = files("starrotator.data").joinpath("demo_input.json")
+
+        if isinstance(input, dict):
+            pass
+        elif isinstance(input, (str, os.PathLike)):
+            infile = Path(input)
+            if not infile.is_file():
+                raise FileExistsError(f'Inpath {str(infile)} is not set to an existing file.')
+                
+            with infile.open("r") as f:
+                input =  json.load(f)#This creates a dict from a JSON input file.
         else:
-            self.grid_planet_size = int(grid_size/2)
-        self.linelist_path = linelist_path
-        self.input = input
-        self.system_path = system_path
-        self.obs_path = obs_path
-        if (self.system_path is None or self.obs_path is None) and len(self.input) == 0:
-            #Meaning, if no input is provided, default to the demo data.
-            self.system_path = files("starrotator.data").joinpath("demo_system.txt")
-            self.obs_path = files("starrotator.data").joinpath("demo_observations.txt")
-            self.linelist_path = files('starrotator.data').joinpath("demo_linelist.dat")
+            raise TypeError("input must be a dict or a path-like object pointing to a valid JSON configuration file.")
 
 
-        self.read_system(system_path=self.system_path,obs_path=self.obs_path,input=self.input)
-
+        self.read_input(input)
+        
 
         # Test if a confifile exists in the default location:
         if ut.CONFIG_FILE.exists():
@@ -172,166 +125,161 @@ class StarRotator(object):
             ut.save_default_config()#This contains a path to a default
             #location where app or cache data is expected.
 
-
-        #This is the primary cascade that gets run.
         self.get_stellar_spectrum()
         self.compute_orbit()
-        self.compute_spectrum()
 
-    def read_system(self,system_path=None,obs_path=None,linelist_path=None,input={}):
-        """Reads in the stellar, planet and observation parameters from file; performing
-        tests on the input and raising the read variables to the class.
+
+        #This is the primary cascade that gets run.
+        if run_computation:
+            self.compute_spectrum()
+
+        # That is the end of the simulation. Everything below here is the definition of class functions.
+        # Including ones that expose output plots.
+
+
+
+
+    def read_input(self,input={}):
+        """Reads the input, performing tests on the input and raising the read variables to the class.
 
         Parameters
         ----------
-            star_path : str
-                Path to parameter file defining the star.
-            planet_path: str
-                Path to the parameter file defining the planet and its orbit.
-            obs_path: str
-                Path to the parameter file defining the timestamps of the observations.
             input: dict
                 A dictionary with input parameters, instead of using textfiles as input.
-                This allows programmatic control over all StarRotator inputs. The following keys
-                need to be defined in any order:
-                veq (equatorial velocity, km/s, float),
-                stelinc (inclination of stellar rotation axis, degrees, float),
-                drr (differential rotation, float),
-                T (Teff, float)
-                FeH (metallicity, float)
-                logg (float)
-                u1 (limb darkening parameter 1)
-                u2 (limb darkening parameter 2)
-                mus (number of mu angles, int)
-                R (resolving power, float)
-                model (model type, string, either PHOENIX or pySME)
-                sma_Rs (semi-major axis in stellar radii, NOT SOLAR radii!, float)
-                Rstar (stellar radius in solar radii)
-                e (eccentricity, float)
-                omega (longitude of periastron, degrees, float)
-                inclination (degrees, float)
-                obliquity (degrees, float)
-                RpRs (planet-star radius ratio, float)
-                P (orbital period in days, float)
-                phases (numpy array, set to the orbital phase values of the time series)
-
-
-            Setting the input dictionary overrules all keyword-based input parameters.
-            If the model is set to pySME, then the following parameters also need to be set:
+                This allows programmatic control over all StarRotator inputs. 
+                If the model is set to pySME, then the following parameters also need to be set:
                 grid_model (str, either atlas12.sav or marcs2012.sav are provided by default),
                 abund (list, empty by default) The elements are strings of definitions of
                 single-key dictionaries of the form ["{X:6.4}","{Y:6.3}"] etc.
                 linelist_path (str, path to VALD-style line-list for pysme to use)
         """
         self.status = 'start reading input'
-        if len(input)==0:#If we read input from config files, put them in a dictionary after all.
-            input = util.read_into_dictionary(system_path)
-            input['linelist_path'] = linelist_path
-            util.check_integrity_input(input)
 
-            phases = [] #These are in orbital phase.
+        #All input needs to be set explicitly, even if sensible defaults could be defined.
+        #The reason is that I want to expose the input to the user to create up-front understanding/
+        #expectations of what is happening under the hood.
+        mandatory_keywords = {'wavelength':[[list,'array-like'],['type']],
+                              'wavelength_type':[[str],['type']],
+                              'phases':[[list,'array-like'],['type']],
+                              'grid_size_star':[[int],['type','pos','nonans']],
+                              'grid_size_planet':[[int],['type','pos','nonans']],
+                              'sma_Rs':[[float],['type','pos','nonans']],
+                              'e':[[int,float],['type','notnegative','nonans']],
+                              'inclination':[[int,float],['type','nonans']],
+                              'obliquity':[[int,float],['type','nonans']],
+                              'RpRs':[[int,float],['type','notnegative']],
+                              'Rstar':[[int,float],['type','pos']],
+                              'P':[[int,float],['type','pos','nonans']],
+                              'mp':[[int,float],['type','notnegative','nonans']],
+                              'veq':[[int,float],['type','notnegative','nonans']],
+                              'stelinc':[[int,float],['type','nonans']],
+                              'T':[[int,float],['type','pos','nonans']],
+                              'FeH':[[int,float],['type','nonans']],
+                              'logg':[[int,float],['type','nonans']],
+                              'drr':[[int,float],['type','notnegative','nonans']],
+                              'u1':[[int,float],['type','nonans']],
+                              'u2':[[int,float],['type','nonans']],
+                              'R':[[int,float],['type','nonans']],
+                              'model':[[str],['type']]
+                              }
+        
+        util.check_integrity_input(input,mandatory_keywords)
+        #If this is met, then we can continue checking cases: e and pySME
 
-            if obs_path is not None:
-                obsparams = open(obs_path,'r').read().splitlines()
-                for i in obsparams:
-                    phases.append(float(i.split()[0]))
-                self.phases = np.array(phases)
-            else:
-                raise Exception('Obs_path needs to be set if input dictionary is not.')
-        else:
-            util.check_integrity_input(input,['phases'])
-            self.phases = np.array(input['phases'])
+        # Check that the wavelength axis is correctly specified.
+        if input['wavelength_type'] not in ['explicit','linear','minmax','constant_dlogl']:
+            raise Exception(f"wavelength_type in input needs to be set to 'explicit','linear','minmax' or 'constant_dlogl' ({input['wavelength_type']})")
+        if input['wavelength_type'] == 'linear':
+            if len(input['wavelength']) != 3:
+                raise Exception(f"Length of wavelength input array is required to be equal to 3 (min, max, number of steps).")
+        if input['wavelength_type'] == 'minmax':
+            if len(input['wavelength']) != 2:
+                raise Exception(f"Length of wavelength input array is required to be equal to 2 (min, max).")            
+        if input['wavelength_type'] == 'constant_dlogl':
+            if len(input['wavelength']) != 3:
+                raise Exception(f"Length of wavelength input array is required to be equal to 3 (min, max, delta-logl).")          
+        # The choice of wavelength axis is going to be passed to where the stellar spectrum is loaded/determined.
+        # self.constant_dlogl is set in get_stellar_spectrum.
+
+
+        #The following are only to be set if certain criteria are met.
+        #If in pySME mode, then we require all the pySME input:
+        if input['model'].lower() in ['pysme','sme']:
+            additional_keywords = {'N_mu':[[int],['type','notnegative']],
+                            'grid_model':[[str],['type']],
+                            'abund':[[dict],['type']]
+                            } #Note that the linelist path and 
+                            # small-planet approximation are checked 
+                            # for separately, below.
+            util.check_integrity_input(input,additional_keywords)
+            if int(input['N_mu']) > 0:
+                if 'small_planet' not in input: #Set to default....
+                    input['small_planet'] = True
+                else:#... or check that it is OK.
+                    util.check_integrity_input(input,{'small_planet':[[bool],['type']]})
+            if 'linelist_path' not in input: #Set to default...
+                demopath = files('starrotator.data').joinpath("demo_linelist.dat")
+                util.file_exists(demopath)
+                input['linelist_path'] = demopath
+            else:#.... or check that it is OK.
+                util.file_exists(input['linelist_path'])
+        if input['e'] > 0:
+            additional_keywords = {'omega':[[int,float],['type']]}
+            util.check_integrity_input(input,additional_keywords)
+
+        #Still good? Then we have finished our checks and we can raise everything
+        #to the class-level.
 
         self.input = input #Raise to class to make available.
-            
-        self.velStar    = float(input['veq'])
-        self.stelinc    = float(input['stelinc'])
-        self.drr        = float(input['drr'])
-        self.T          = float(input['T'])
-        self.Z          = float(input['FeH'])
-        self.logg       = float(input['logg'])
-        self.u1         = float(input['u1'])
-        self.u2         = float(input['u2'])
-        self.R          = float(input['R'])
-        self.N_mu        = int(input['N_mu'])
-        self.model      = str(input['model'])
-        self.sma_Rs     = float(input['sma_Rs'])
-        self.Rstar      = float(input['Rstar'])
+        self.wavelength_type = input['wavelength_type']
+        self.wavelength = jnp.array(input['wavelength'])
+        # self.wave_start = np.min(self.wavelength)
+        # self.wave_end   = np.max(self.wavelength)      
+        self.phases     = jnp.array(input['phases'])
+        self.Nexp       = len(self.phases)#Number of exposures.
+        self.grid_size  = int(input['grid_size_star'])
+        self.grid_planet_size = int(input['grid_size_planet'])    
+        self.sma_Rs     = float(input['sma_Rs'])    
         self.ecc        = float(input['e'])
-        self.omega      = float(input['omega'])
         self.orbinc     = float(input['inclination'])
         self.pob        = float(input['obliquity'])#Obliquity.
         self.Rp_Rs      = float(input['RpRs'])
+        self.Rstar      = float(input['Rstar'])
         self.orb_p      = float(input['P'])
-        self.constant_dlogl = False
-        self.small_planet = True
-
-        # Optional planet mass:
-        if 'mp' not in input:
-            self.mp = 0.0
+        self.mp         = float(input['mp'])
+        self.velStar    = float(input['veq'])
+        self.stelinc    = float(input['stelinc'])
+        self.T          = float(input['T'])
+        self.Z          = float(input['FeH'])
+        self.logg       = float(input['logg'])
+        self.drr        = float(input['drr'])
+        self.u1         = float(input['u1'])
+        self.u2         = float(input['u2'])
+        self.R          = float(input['R'])
+        self.model      = str(input['model'])
+        #These were all the mandatory ones.
+        if 'omega' in input: 
+            self.omega      = float(input['omega'])
         else:
-            self.mp     = float(input['mp'])
+            self.omega = 0.0
 
-        # Set small planet approximation to True to default if we're in mu-resolved case:
-        if self.N_mu > 0:
-            if 'small_planet' not in input:
-                self.small_planet = True
-            else:
-                self.small_planet = bool(input['small_planet'])
 
         # If pysme, check and set required pysme input:
         if self.model.lower() in ['pysme','sme']:
-            also_req_keys = ['grid_model','abund','linelist_path']
             # Set linelist path to demo if not provided in input dictionary.
-            if 'linelist_path' not in input:
-                input['linelist_path'] = files('starrotator.data').joinpath("demo_linelist.dat")
-            util.check_integrity_input(input,also_req_keys)
             self.grid_model = str(input['grid_model'])
             self.abund      = input['abund']
             self.linelist_path = input['linelist_path']
-            if not os.path.isfile(self.linelist_path):
-                raise Exception("pySME linelist_path does not point to an existing file.")
-            
+            self.N_mu        = int(input['N_mu'])
+            # Deal with mu input: Equidistant spacing in sqrt-space.
+            self.mu_array = np.sqrt(np.linspace(0,1,int(self.N_mu)))
+        else:
+            self.N_mu = 0.0 #This variable needs to be defined because elsewhere I use it to 
+            #distinguish the model case.
 
-
-
-
-
-
-        self.Nexp = len(self.phases)#Number of exposures.
         self.residual = None
         self.wl_in = None
         self.blurred = 0
-        try:
-            util.vartest(self.wave_start,varname='wave_start in input',nonans=True,pos=True)
-            util.vartest(self.wave_end,varname='wave_end in input',nonans=True,pos=True)
-            util.vartest(self.velStar,varname='veq in input',nonans=True,notnegative=True)
-            util.vartest(self.stelinc,varname='stelinc in input',nonans=True)
-            util.vartest(self.T,varname='Teff in input',nonans=True,notnegative=True)
-            util.vartest(self.logg,varname='logg in input',nonans=True)
-            util.vartest(self.R,varname='Resolution in input',nonans=True,pos=True)
-            util.vartest(self.orb_p,varname='period in input',nonans=True,notnegative=True)
-            util.vartest(self.Rp_Rs,varname='RpRs in input',nonans=True,notnegative=True)
-            util.vartest(self.ecc,varname='e in input',nonans=True,notnegative=True)
-            util.vartest(self.sma_Rs,varname='sma_Rs in input',nonans=True,notnegative=True)
-            util.vartest(self.Rstar,varname='Rstar in input',nonans=True,pos=True)
-            util.vartest(self.u1,varname='u1 in input',nonans=True)
-            util.vartest(self.u2,varname='u1 in input',nonans=True)
-            util.vartest(self.model,varname='model in input')
-            util.vartest(self.Z,varname='Metallicity in input',nonans=True)
-            util.vartest(self.pob,varname='Obliquity in input',nonans=True)
-            util.vartest(self.orbinc,varname='Inclination in input',nonans=True)
-            util.vartest(self.omega,varname='Omega in input',nonans=True)
-            util.vartest(self.drr,varname='Alpha (drr) in input',nonans=True)
-            util.vartest(self.mp,varname='mp in input',nonans=True,notnegative=True)
-            util.vartest(self.N_mu,varname='N_mu in input',notnegative=True)
-        except ValueError as err:
-            print("Parser: ",err.args)
-
-
-        # Deal with mu input: Equidistant spacing in sqrt-space.
-        if self.N_mu != 0:
-            self.mu_array = np.sqrt(np.linspace(0,1,int(self.N_mu)))
         self.status = 'success reading input'
 
 
@@ -341,15 +289,12 @@ class StarRotator(object):
         debug how this model instance will or has behaved. 
         """
 
-        print('Paths:')
-        print(f'\tSystem path: \t {self.system_path}')
-        print(f'\tObs path: \t {self.obs_path}')
-        print(f'\tLinelist path: \t {self.linelist_path}')
 
         print('')
         print('Input dictionary:')
         for i in self.input:
-            print('\t'+i,'\t',self.input[i])
+            if i not in ['wavelength','phases']:
+                print('\t'+i,'\t',self.input[i]) # To keep it readable.
             
 
         print('')
@@ -359,25 +304,24 @@ class StarRotator(object):
 
         print('')
         print('Wavelength:')
-        print('\t',f'Start: {self.wave_start}')
-        print('\t',f'End: {self.wave_end}')
+        print('\t',f'Type: {self.wavelength_type}')
+        print('\t',f'Coding: {self.wavelength}')
         if self.wl_in is not None:
-            print('\t',f'Min: {np.min(self.wl_in)}')
-            print('\t',f'Max: {np.max(self.wl_in)}')
-            print('\t',f'N: {len(self.wl_in)}')
-
+            print('\t',f'Min: {np.min(self.wl_model)}')
+            print('\t',f'Max: {np.max(self.wl_model)}')
+            print('\t',f'N: {len(self.wl_model)}')
+            if self.wavelength_type == 'constant_dlogl':
+                print('\t',f'dlogl: {self.wl_in}')
+            print(f'\t','To access wavelengths, print class.wl_model manually.')
         print('')
         print('Phases:')
-        print(f'\tN_phases: \t {len(self.phases)}')
-        for i in self.phases:
-            print(f'\t{i}')
+        print(f'\t',f'N_phases: \t {len(self.phases)}')
+        print(f'\t',f'To access phases, print class.phases manually.')
 
-        print('')
-        print('N_mu angles:')
-        print('\t',self.N_mu)
-
-        print('')
-
+        if self.model.lower() in ['pysme','sme']:
+            print('In pySME mode.')
+            print(f'\tLinelist path: \t {self.linelist_path}')
+            print(f'\t',f'N_mu angles: {self.N_mu}')
 
         print('')
         print('Cache dir:')
@@ -408,23 +352,70 @@ class StarRotator(object):
         Obtaining the unbroadened spectrum using one of StarRotator's 
         #default methods: PHOENIX or pySME.
         The input stored in the class attributes control a logic to 
-        switch between PHOENIX (mus=0) and pySME.
+        switch between PHOENIX (mus=0) and pySME, and the definition
+        of the wavelength axis. PHOENIX models are interpolated onto this
+        axis when using explicit, linear or constant-dlogl grids (so be careful that
+        sufficient resolution is available to avoid undersampling).
+        Setting the wavelength type to min-max preserves the PHOENIX wavelength
+        grid and uses a default pySME sampling.
         """
 
-        if self.N_mu == 0: #If we have no mu-resolved case then...
-            if self.model.lower() == 'phoenix': #Either use PHOENIX
-                print('--- Reading spectrum from PHOENIX')
-                print(f'-----T={self.T}K, log(g)={self.logg}, Z={self.Z}.')
-                wl_wide,fx_wide = spectrum.load_PHOENIX(self.T,
+
+        if self.wavelength_type == 'explicit':
+            wl_input = self.wavelength # In principle, the input to the spectrum functions is the wavelength axis directly.
+            self.constant_dlogl = False
+        if self.wavelength_type == 'minmax':
+            # g = dynamics.doppler_factor(self.velStar) # Dont bother to compensate the edges. Up to the user (more predictable output).
+            wl_input = self.wavelength #[np.min(self.wavelength)/g, np.max(self.wavelength)*g]
+            self.constant_dlogl = False
+        if self.wavelength_type == 'linear':
+            # g = dynamics.doppler_factor(self.velStar)
+            wl_input = np.linspace(*self.wavelength)# np.linspace(self.wavelength[0]/g, self.wavelength[1]*g,self.wavelength[2])
+            #self.wavelength is coded as min,max,N, just as linspace.
+            self.constant_dlogl = False
+        if self.wavelength_type == 'constant_dlogl':
+            wl_input,dlogl = constant_velocity_grid(*self.wavelength)
+            self.constant_dlogl = True
+            
+        self.wl_requested_for_model = wl_input*1.0
+
+
+        # To clear up what's happening with the wavelength input here and the various wavelength parameters:
+        # The output of all of this is the wl_in and fx_in parameters, as they form the 
+        # input to the computation later.
+
+        # wl_in is either set to the wavelength axis that is coming out of the model, that is wl_model.
+        # Or it is set to dlogl (scalar) in case constant_dlogl is requested. 
+        # The wavelength output is also retrained in this case, in self.wl_model, but this is only
+        # relevant for the case of constant_dlogl. In other cases, wl_in and wl_model are the same.
+
+        # Now, wl_model is either equal to wl_input, unless minmax is requested, in which case it is 
+        # equal to the PHOENIX model grid, cropped to min-max.
+        # And wl_input is either an array with the wavelength samples, and then set to be equal to
+        # wl_model, or it encoded minmax, in which case wl_model was set to the output of PHOENIX or pySME at minimax.
+
+        if self.model.lower() == 'phoenix': #Either use PHOENIX
+            print(f'--- Reading spectrum from PHOENIX in wavelength mode {self.wavelength_type}')
+            print(f'-----T={self.T}K, log(g)={self.logg}, Z={self.Z}.')
+            wl_wide,fx_wide = spectrum.load_PHOENIX(self.T,
                                                self.logg,
                                                metallicity=self.Z)
-                wl = wl_wide[(wl_wide > self.wave_start) & (wl_wide < self.wave_end)]
-                fx = fx_wide[(wl_wide > self.wave_start) & (wl_wide < self.wave_end)]
-            elif self.model.lower() in ['pysme','sme']: #Or use pySME
-                print('--- Generating spectrum using pySME')
+            #This model is defined on a very wide wavelength range, from ~100nm to 5um.
+            if self.wavelength_type == 'minmax':
+                wl_model = wl_wide[(wl_wide > np.min(wl_input)) & (wl_wide < np.max(wl_input))]
+                fx_model = fx_wide[(wl_wide > np.min(wl_input)) & (wl_wide < np.max(wl_input))]
+            else:
+                wl_model = wl_input
+                fx_model = np.interp(wl_input,wl_wide,fx_wide)
+
+
+
+        elif self.model.lower() in ['pysme','sme']: #Or use pySME
+            if self.N_mu == 0:
+                print(f'--- Generating spectrum using pySME without mu-dependence in wavelength mode {self.wavelength_type}.')
                 print(f'-----T={self.T}K, log(g)={self.logg}, Z={self.Z}.')
-                wl, fx= spectrum.get_spectrum_pysme(self.wave_start, 
-                                                    self.wave_end, 
+                wl, fx= spectrum.get_spectrum_pysme( 
+                                                    wl_input, 
                                                     self.T, 
                                                     self.logg, 
                                                     self.Z, 
@@ -433,16 +424,9 @@ class StarRotator(object):
                                                     abund = self.abund
                                                     )
             else:
-                raise Exception('Invalid model spectrum chosen. Input either PHOENIX or pySME in '
-                'star.txt')
-            self.wl_in = wl*1.0
-            self.fx_in = fx*1.0
-        else: #If we do have the mu-resolved case, then we must be in pySME:
-            if self.model.lower() in ['pysme','sme']: #Or use pySME
-                print('--- Generating spectrum using pySME with mu-dependence')
+                print(f'--- Generating spectrum using pySME with mu-dependence in wavelength mode {self.wavelength_type}.')
                 print(f'-----T={self.T}K, log(g)={self.logg}, Z={self.Z}.')
-                wl, fx= spectrum.get_spectrum_pysme(self.wave_start, 
-                                                    self.wave_end, 
+                wl, fx= spectrum.get_spectrum_pysme(wl_input,
                                                     self.T, 
                                                     self.logg, 
                                                     self.Z, 
@@ -451,10 +435,19 @@ class StarRotator(object):
                                                     grid = self.grid_model,
                                                     abund = self.abund
                                                     )
-                self.wl_in = wl*1.0
-                self.fx_in = fx*1.0 # Note that this is now an array.
-            else:
-                raise Exception("With mu-dependence, model must be set to pysme.")
+        else:
+            raise Exception('Invalid model spectrum chosen. Choose either PHOENIX or pySME as spectral model.')
+        
+        
+        self.wl_model = wl_model*1.0 #Retain the model output wavelength in case dlogl is set. 
+        if self.wavelength_type == 'constant_dlogl':
+            self.wl_in = dlogl
+        else:
+            self.wl_in = wl_model*1.0
+        
+        self.fx_in = fx_model*1.0
+
+
 
 
     #Define a set of wrappers to avoid having to refer to self all the time in compute_spectrum().
@@ -613,7 +606,7 @@ class StarRotator(object):
         # [DONE] Implement optional switching to fast doppler shifting method (switched by wavelength input, either array or float). Done for v1.
         # [DONE] Complete the generation of output. 
         # [DONE] Fix definition of mu. Now mu is apparently assumed to be equal to r. But it is sqrt(1-r**2). Confirm this by testing new integrate.integrate_fluxdisk_mu function.
-        # Finish logic switching.
+        # [DONE] Finish logic switching.
         # Add dlogl input.
         # Implement spectral resolution.
         # Complete the plotting of basic output.
@@ -639,89 +632,6 @@ class StarRotator(object):
 
 
         # MAKE IT AT HABIT TO RUN PYTEST BEFORE COMMITS!
-
-
-    def compute_spectrum_depr(self):
-        """This is where the main computation takes place. The simulation output
-        and other variables are raised to class-wide attributes.
-
-        Parameters
-        ----------
-            None
-        """
-        import math
-        #Two arrays for the x and y axes
-        self.x = np.linspace(-1,1,num=2*self.grid_size) #in units of stellar radius
-        self.y = np.linspace(-1,1,num=2*self.grid_size) #in units of stellar radius
-        #Calculate the velocity and flux grids
-        print('--- Computing velocity/flux grids')
-        self.vel_grid = vgrid.calc_vel_stellar(self.x,self.y, self.stelinc, self.velStar, self.drr,  self.pob)
-        if self.model == "pySME":
-            self.flux_grid = vgrid.calc_flux_stellar(self.x,self.y,0,0) #Let pysme do the limb darkening
-        else:
-            self.flux_grid = vgrid.calc_flux_stellar(self.x,self.y,self.u1,self.u2)
-        if isinstance(self.mus,np.ndarray) != True:#SWITCH BETWEEN PHOENIX (mus=0) AND pySME
-            if self.model.lower() == 'phoenix':
-                print('--- Reading spectrum from PHOENIX')
-                print('-----T=%sK, log(g)=%s, Z=%s.' % (self.T,self.logg,self.Z))
-                wl,fx = spectrum.read_spectrum(self.T,self.logg,metallicity=self.Z)
-            elif self.model.lower() in ['pysme','sme']:
-                print('--- Creating spectrum from pySME')
-                print('-----T=%sK, log(g)=%s, Z=%s.' % (self.T,self.logg,self.Z))
-                wl, fx= spectrum.get_spectrum_pysme(self.wave_start, self.wave_end, self.T, self.logg, self.Z, self.linelist_path, grid = self.grid_model)
-            else:
-                raise Exception('Invalid model spectrum chosen. Input either PHOENIX or pySME in '
-                'star.txt')
-            self.wl_in = wl*1.0
-            self.fx_in = fx*1.0
-            print('--- Integrating disk')
-            if  self.drr == 0:
-                print('------ Fast integration (drr not set)')
-                wlF,F = integrate_depr.build_spectrum_fast(wl,fx,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid,self.flux_grid)
-            else:
-                print('------ Slow integration (drr set)')
-                wlF,F = integrate_depr.build_spectrum_slow(wl,fx,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid,self.flux_grid)
-        else:
-            if self.model == 'pySME':
-                print('--- Computing limb-resolved spectra with pySME')
-                print('-----T=%sK, log(g)=%s, Z=%s.'% (self.T,self.logg,self.Z))
-                wl, fx_list = spectrum.get_spectrum_pysme(self.wave_start, self.wave_end, self.T, self.logg, self.Z, self.linelist_path, self.mus, self.abund, grid=self.grid_model)
-                print('--- Integrating limb-resolved disk')
-                wlF,F = integrate_depr.build_spectrum_limb_resolved(wl,fx_list,self.mus, self.wave_start,self.wave_end,self.x,self.y,self.vel_grid,self.flux_grid)
-            else:
-                raise Exception('Invalid model spectrum chosen. Make pySME the input model.')
-
-
-        self.xp,self.yp,self.zp = ppos.calc_planet_pos(self.sma_Rs, self.ecc, self.omega, self.orbinc, self.pob, self.Rp_Rs, self.orb_p, self.times, self.exptimes)
-
-
-        F_out = np.zeros((self.Nexp,len(F)))
-        F_planet = np.zeros((self.Nexp,len(F)))
-        flux_out = []
-        mask_out = []
-        print('--- Building local spectrum')
-        for i in range(self.Nexp):
-            if isinstance(self.mus,np.ndarray) == True:
-                wlp,Fp,flux,mask = integrate_depr.build_local_spectrum_limb_resolved(self.xp[i],self.yp[i],self.zp[i],self.Rp_Rs,wl,fx_list,self.mus,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid, self.flux_grid)
-                self.fx_list = copy.deepcopy(fx_list)
-            else:
-                wlp,Fp,flux,mask = integrate_depr.build_local_spectrum_fast(self.xp[i],self.yp[i],self.zp[i],self.Rp_Rs,wl,fx,self.wave_start,self.wave_end,self.x,self.y,self.vel_grid,self.flux_grid)
-            integrate_depr.statusbar(i,self.Nexp)
-
-            F_out[i,:]=F-Fp
-            F_planet[i,:] = Fp
-            flux_out.append(flux)
-            mask_out.append(mask)
-        #This defines the output.
-        self.wl = wlF
-        self.stellar_spectrum = F
-        self.Fp = copy.deepcopy(F_planet)
-        self.spectra = copy.deepcopy(F_out)
-        self.lightcurve = np.mean(F_out, axis=1) / np.max(np.mean(F_out, axis=1))
-        self.masks = mask_out
-        self.residual = self.spectra/self.stellar_spectrum
-
-
 
 
     def convolve_spectral_resolution(self):

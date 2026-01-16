@@ -167,7 +167,7 @@ def load_PHOENIX(T,logg,metallicity=0.0,alpha=0.0):
         raise ValueError('')
 
 
-def get_spectrum_pysme(wave_start, wave_end, T, logg, Z, linelist = '', mu=[], abund = {}, grid = ''):
+def get_spectrum_pysme(wl, T, logg, Z, linelist = '', mu=[], abund = {}, grid = ''):
     """Constructing a spectrum from pySME. pySME uses the MARCS 2014 grid by
     default. It is also possible to use the ATLAS12 model by setting grid='ATLAS12'.
     Individual elemental abundances can also be specified and updated. If an array of
@@ -229,18 +229,17 @@ def get_spectrum_pysme(wave_start, wave_end, T, logg, Z, linelist = '', mu=[], a
         sme.atmo.source = grid # type: ignore
 
     # Convert from nm to Angstrom
-    wave_start *= 10
-    wave_end *= 10
+    wl_A = wl*10.0
+    if len(wl_A) > 2: #Interpret as a directly defined wavelength array.
+        sme.wave = [wl_A] # type: ignore
+    else:
+        sme.wran = [[np.min(wl_A), np.max(wl_A)]]
 
-    # Account for velocity shift in wavelengths for StarRotator
-    wave_start -= 5
-    wave_end += 5
 
     if abund:
         for i in range(len(abund)):
             sme.abund.update_pattern(updates=ast.literal_eval(abund[i]))
 
-    sme.wran = [[wave_start, wave_end]] # type: ignore
     vald = ValdFile(linelist)
     sme.linelist = vald
 

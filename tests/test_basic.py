@@ -30,6 +30,7 @@ def test_imports():
     from importlib.resources import files
     from functools import partial
     import jax
+    import json
     from jax import jit, lax
     import jax.numpy as jnp
     from starrotator.lib.constants import rad_in_deg, R_sun, d_in_seconds, c as c_light
@@ -38,11 +39,36 @@ def test_imports():
 def test_demo_files():
     from importlib.resources import files
     import starrotator.lib.util as util
-    data_path = files("starrotator.data").joinpath("demo_system.txt")
-    obs_path = files("starrotator.data").joinpath("demo_observations.txt")
-    paramdict = util.read_into_dictionary(data_path)
-    util.check_integrity_input(paramdict)
-
+    import json
+    data_path = files("starrotator.data").joinpath("demo_input.json")
+    with data_path.open("r") as f:
+        input =  json.load(f)#This creates a dict from a JSON input file.
+    mandatory_keywords = {'wavelength':[[list,'array-like'],['type']],
+                              'wavelength_type':[[str],['type']],
+                              'phases':[[list,'array-like'],['type']],
+                              'grid_size_star':[[int],['type','pos','nonans']],
+                              'grid_size_planet':[[int],['type','pos','nonans']],
+                              'sma_Rs':[[float],['type','pos','nonans']],
+                              'e':[[int,float],['type','notnegative','nonans']],
+                              'inclination':[[int,float],['type','nonans']],
+                              'obliquity':[[int,float],['type','nonans']],
+                              'RpRs':[[int,float],['type','notnegative']],
+                              'Rstar':[[int,float],['type','pos']],
+                              'P':[[int,float],['type','pos','nonans']],
+                              'mp':[[int,float],['type','notnegative','nonans']],
+                              'veq':[[int,float],['type','notnegative','nonans']],
+                              'stelinc':[[int,float],['type','nonans']],
+                              'T':[[int,float],['type','pos','nonans']],
+                              'FeH':[[int,float],['type','nonans']],
+                              'logg':[[int,float],['type','nonans']],
+                              'drr':[[int,float],['type','notnegative','nonans']],
+                              'u1':[[int,float],['type','nonans']],
+                              'u2':[[int,float],['type','nonans']],
+                              'R':[[int,float],['type','nonans']],
+                              'model':[[str],['type']]
+                              }
+        
+    util.check_integrity_input(input,mandatory_keywords)
 
 
 def test_integrators():
@@ -576,7 +602,39 @@ def test_fast_doppler():
 
 def test_default_computation():
     from starrotator import StarRotator
-    KELT9 = StarRotator(500,502,100)
+    import numpy as np
+    input = {}
+    input['wavelength'] = [585,595,5000]
+    input['wavelength_type'] = 'constant_dlogl' 
+    input['phases'] = np.linspace(-0.1,0.1,41)
+    input['grid_size_star'] = 150
+    input['grid_size_planet'] = 100
+    input['sma_Rs'] = 3.153
+    input['e'] = 0.0
+    input['inclination'] = 89.0
+    input['obliquity'] = 0.0
+    input['RpRs'] = 0.1
+    input['Rstar'] = 1.4
+    input['P'] = 2.3
+    input['mp'] = 0.0
+    input['veq'] = 20.0
+    input['stelinc'] = 90.0
+    input['T'] = 8000.0
+    input['FeH'] = 0.0
+    input['logg'] = 4.5
+    input['drr'] = 0.0
+    input['u1'] = 0.93
+    input['u2'] = -0.23
+    input['R'] = 100_000
+    input['model'] = 'PHOENIX'
+    input['N_mu'] = 0
+    input['omega'] = 0.0
+    input['constant_dlogl'] = False
+    input['small_planet'] = True
+    input['grid_model'] = 'atlas12.sav'
+    input['abund'] = {}
+
+    KELT9 = StarRotator(input=input)
     assert KELT9.status == 'success computing spectra'
     KELT9.drr = 0.1
     KELT9.status = ''
