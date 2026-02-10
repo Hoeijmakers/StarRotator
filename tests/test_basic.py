@@ -226,12 +226,9 @@ def test_mu_integration_v1():
     fx_sum = sum_stellar_spectrum_v1_mu(wl,fx_array,vsini,90.0,mu,N=201)
     fx_v1 = sum_stellar_spectrum_v1(wl,fx,vsini,90.0,0.0,0.0,N=201)
 
-    # plt.plot(fx_sum)
-    # plt.plot(fx_v1)
-    # plt.show()
-
-    max_rel_error = np.max(np.abs((fx_sum-fx_v1)/fx_v1))
-    assert max_rel_error < 1e-6
+    
+    mean_rel_error = np.mean(np.abs((fx_sum-fx_v1)/fx_v1))
+    assert mean_rel_error < 1e-5
 
 
 

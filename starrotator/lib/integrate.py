@@ -148,7 +148,8 @@ def sum_stellar_spectrum_v1_mu(wl,fx_array,vel_eq,i_stellar,mu_array,N=400,const
 
     #doppler_shift_batch = jax.vmap(doppler_shift, in_axes=(None, 0, None)) # Here is some of the magic.
 
-    fx_array_shifted = doppler_shift_batch(wl,fx_array,v_axis)
+    fx_array_shifted = doppler_shift_batch(wl,jnp.flip(fx_array),v_axis) #Flip this because mu-array is sorted the wrong way.
+
     #So the output will have dimensions len(v) * len(fx_array) * len(wl) whereas the shape of the output
     # of a single call to doppler_shift would have dimensions len(v)*len(wl)).
 
@@ -171,7 +172,8 @@ def sum_stellar_spectrum_v1_mu(wl,fx_array,vel_eq,i_stellar,mu_array,N=400,const
     #using square arrays, well here we go.
 
     #We first need to convert the mu array to values of r, and then bin it up to find bin edges in r-space:
-    r_array = jnp.sqrt(1 - mu_array**2)# Array in radial coordinate corresponding to mu angles.
+    r_array = jnp.sqrt(1 - jnp.flip(mu_array)**2)# Array in radial coordinate corresponding to mu angles. 
+    #Also flip mu array so this is ordered ascending, otherwise the below doesn't work.
     r_centers = (r_array[0:-1]+r_array[1:])/2
     rmin = jnp.concatenate([jnp.array([0]), r_centers])
     rmax = jnp.concatenate([r_centers,     jnp.array([1])])
