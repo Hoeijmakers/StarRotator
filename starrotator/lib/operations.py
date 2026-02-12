@@ -69,191 +69,6 @@ def convolve(array,kernel,edge_degree=1,fit_width=2):
     return np.convolve(array_padded,kr,'valid')
 
 
-def smooth(fx,w,edge_degree=1):
-    """
-    This function takes a spectrum, and blurs it using either a
-    Gaussian kernel or a box kernel, which have a FWHM width of w px everywhere.
-    Meaning that the width changes dynamically on a constant d-lambda grid.
-    Set the mode to gaussian or box. Because in box, care is taken to correctly
-    interpolate the edges, it is about twice slower than the Gaussian.
-    This interpolation is done manually in the fun.box function.
-    """
-
-    import numpy as np
-
-    truncsize=4.0#The gaussian is truncated at 8 sigma.
-    shape=np.shape(fx)
-
-    sig_w = w / 2*np.sqrt(2.0*np.log(2)) #Transform FWHM to Gaussian sigma. In km/s.
-    trunc_dist=np.round(sig_w*truncsize).astype(int)
-
-    #First define the kernel.
-    kw=int(np.round(truncsize*sig_w*2.0))
-    if kw % 2.0 != 1.0:#This is to make sure that the kernel has an odd number of
-    #elements, and that it is symmetric around zero.
-        kw+=1
-
-    kx=findgen(kw)
-    kx-=np.mean(kx)#This must be centered around zero. Doing a hardcoded check:
-    if (-1.0)*kx[-1] != kx[0]:
-        print(kx)
-        raise Exception("ERROR in box_smooth: Kernel could not be made symmetric somehow. Attempted kernel grid is printed above. Kernel width is %s pixels." % kw)
-    k=gaussian(kx,1.0,0.0,sig_w)
-    k/=np.sum(k)
-    return(convolve(fx,k,edge_degree))
-
-
-def derivative(x):
-    """
-    This computes the simple numerical derivative of x by convolving with kernel [-1,0,1].
-
-    Parameters
-    ----------
-    x : list, np.ndarray
-        The array from which the derivative is required.
-
-    Returns
-    -------
-    derivative : np.array
-        The numerical derivative of x.
-
-    Example
-    -------
-    >>> import numpy as np
-    >>> x=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]
-    >>> dx=derivative(x)
-    """
-    import numpy as np
-    x=np.array(x)
-    d_kernel=np.array([-1,0,1])/2.0
-    return(convolve(x,d_kernel,fit_width=3))
-
-def constant_velocity_wl_grid(wl,fx,oversampling=1.0):
-    """This function will define a constant-velocity grid that is (optionally)
-    sampled a number of times finer than the SMALLEST velocity difference that is
-    currently in the grid.
-
-    Example: wl_cv,fx_cv = constant_velocity_wl_grid(wl,fx,oversampling=1.5).
-
-    This function is hardcoded to raise an exception if wl or fx contain NaNs,
-    because interp1d does not handle NaNs.
-
-
-    Parameters
-    ----------
-    wl : list, np.ndarray
-        The wavelength array to be resampled.
-
-    fx : list, np.ndarray
-        The flux array to be resampled.
-
-    oversampling : float
-        The factor by which the wavelength array is *minimally* oversampled.
-
-
-    Returns
-    -------
-    wl : np.array
-        The new wavelength grid.
-
-    fx : np.array
-        The interpolated flux values.
-
-    a : float
-        The velocity step in km/s.
-
-
-    """
-    import astropy.constants as consts
-    import numpy as np
-    from scipy import interpolate
-
-
-    oversampling=float(oversampling)
-    wl=np.array(wl)
-    fx=np.array(fx)
-
-    c=consts.c.to('km/s').value
-
-    dl=derivative(wl)
-    dv=dl/wl*c
-    a=np.min(dv)/oversampling
-
-    wl_new=0.0
-    #The following while loop will define the new pixel grid.
-    #It starts trying 100,000 points, and if that's not enough to cover the entire
-    #range from min(wl) to max(wl), it will add 100,000 more; until it's enough.
-    n=len(wl)
-    while np.max(wl_new) < np.max(wl):
-        x=findgen(n)
-        wl_new=np.exp(a/c * x)*np.min(wl)
-        n+=len(wl)
-    wl_new[0]=np.min(wl)#Artificially set to zero to avoid making a small round
-    #off error in that exponent.
-
-    #Then at the end we crop the part that goes too far:
-    wl_new_cropped=wl_new[(wl_new <= np.max(wl))]
-    x_cropped=x[(wl_new <= np.max(wl))]
-    i_fx = interpolate.interp1d(wl,fx)
-    fx_new_cropped =i_fx(wl_new_cropped)
-    return(wl_new_cropped,fx_new_cropped,a)
-
-
-
-
-
-def doppler(dv):
-    """This computes the relativistic doppler parameter.
-        Parameters
-        ----------
-        dv : float
-            The radial velocity in m/s
-
-        Returns
-        -------
-        x:  float
-            Returns the doppler parameter.
-    """
-    import astropy.constants as const
-    import numpy as np
-    import lib.test as test
-    # Do not perform tests because this thing is in a double forloop.
-    # test.typetest(dv,float,varname='dv in doppler(dv)')
-    c = const.c.value#Comes out in m/s.
-    beta = dv/c
-    return(np.sqrt((1+beta)/(1-beta)))#Relativistic Doppler effect.
-
-
-def shift(wl,wl_wide,fx,dv):
-    """Doppler-shift a spectrum.
-
-        Parameters
-        ----------
-        wl : np.array()
-            The wavelength axis of the spectrum.
-        fx : np.array()
-            The corresponding flux axis.
-        dv : int, float
-            The radial velocity (positive = redshift) in m/s.
-
-
-        Returns
-        -------
-        fx: np.array()
-            The shifted spectrum evaluated on the original wavelength axis.
-            The missing edge is set to NaN. The function calling this should better
-            be able to handle NaNs.
-    """
-    from scipy.interpolate import interp1d
-    import astropy.constants as const
-    import numpy as np
-
-    #Do not run tests on the input here because this thing is in a double forloop somewhere.
-    wl_shifted =  wl_wide*doppler(dv)#Relativistic Doppler effect.
-    fx_i=interp1d(wl_shifted,fx,bounds_error=False)#Put NaNs at the edges.
-    fx_shifted=fx_i(wl)#Interpolated onto the narrower wl.
-    return(fx_shifted)
-
 
 def airtovac(wlnm):
     """Convert air to vaccuum wavelengths.
@@ -411,29 +226,6 @@ def vactoair(wlnm):
 
 
 
-def limb_darkening_older(mu,u1,u2):
-    """Evaluate quadratic limb darkening, taken from de Mooij 2017,
-    (https://arxiv.org/pdf/1709.00680.pdf). Provide the mu-angle of grid cell i,j
-    and multiply the resulting weight against spectrum i,j.
-
-    This formula has been updated for a
-    potential typo from (1-mu)**2 to (1-mu**2)
-
-        Parameters
-        ----------
-        mu : float, np.array()
-            the cosine of the angle between the line of sight and the stellar
-            surface vertical.
-        u1,u2: float,
-            Linear and quadratic limb-darkening coefficients.
-        Returns
-        -------
-        w: float
-            The weight, <= 1.
-    """
-    w=(1-u1*(1-mu)-u2*(1-mu**2))
-
-    return(w)
 
 
 
@@ -441,7 +233,9 @@ def limb_darkening_older(mu,u1,u2):
 import jax
 from jax import jit
 import jax.numpy as jnp
-
+from functools import partial
+import numpy as np
+from jax import lax
 
 
 
@@ -609,6 +403,145 @@ def constant_velocity_grid(lam_min, lam_max, N):
 
     lam = jnp.exp(loglam)
     return lam, dloglam
+
+
+
+
+def prepare_gaussian_convolver(wl, R, nsigma=4,percentile=1):
+    """
+    Precompute kernel window half-width required by the jitted convolution function below.
+
+    wl : 1D numpy array (not jax array!) of wavelength grid
+    R  : resolving power
+    nsigma : minimal truncation radius of Gaussian
+    """
+
+    wl = np.asarray(wl)
+
+
+    if min(np.diff(wl)) <=0:
+        raise Exception("Wavelength axis should be strictly ascending.")
+    # Estimate an outlier-robust estimate of the smallest wavelength spacing in the grid
+    # taking the 1% percentile by default (to avoid rare cases with insanely small wavelength shifts)
+    # likely due to accidental repetition of wavelength values or sub-pixel shifted-overlaps.
+    # This is quite pathological but at least now we control for it.
+    dlam_min = np.percentile(np.diff(wl),percentile)
+
+    # Largest wavelength -> largest sigma
+    sigma_max = wl.max() / (R * 2.0 * jnp.sqrt(2.0 * jnp.log(2.0)))
+
+    # Convert sigma from wavelength units to pixels
+    radius = int(np.ceil(nsigma * sigma_max / dlam_min))
+
+    return int(radius)
+
+
+
+@partial(jax.jit,static_argnames=['radius'])
+def convolve_gaussian_explicit(wl, flux, R, radius):
+    """
+    wl   : (nλ,)
+    flux : (nλ,) or (nt, nλ)
+    R    : resolving power
+    radius: The half-width of the window that defines the mask onto which the gaussian kernel is defined.
+        This needs to be large enough to cover even the widest FWHM (at the longest wl). Use the
+        function prepare_gaussian_convolver to get a suitable estimate.
+    """
+
+    # Always operate on 2D arrays
+    flux = jnp.atleast_2d(flux)     # (nt, nλ)
+
+    nlam = wl.size
+    nt   = flux.shape[0]
+    window_size = 2*radius+1
+
+    def convolve_one_pixel(i):
+        lam_i = wl[i]
+        # Gaussian sigma at this wavelength
+        sigma_i = lam_i / (R * 2.0 * jnp.sqrt(2.0 * jnp.log(2.0)))
+        # ---- fixed-size slice around pixel i ----
+        start = jnp.clip(i - radius, 0, nlam - window_size)
+        wl_win   = lax.dynamic_slice(wl,   (start,), (window_size,))
+        flux_win = lax.dynamic_slice(flux, (0, start), (nt, window_size))
+        # ---- Gaussian weights ----
+        dlam = wl_win - lam_i
+        weights = jnp.exp(-0.5 * (dlam / sigma_i) ** 2)
+        # Normalize weights
+        weights = weights / jnp.sum(weights)
+        # Weighted sum over wavelength window
+        return jnp.sum(flux_win * weights[None, :], axis=1)
+    # Vectorize over wavelength pixels
+    result = jax.vmap(convolve_one_pixel)(jnp.arange(nlam))
+    # result shape: (nλ, nt) → transpose
+    return result.T
+
+
+
+
+@partial(jax.jit, static_argnames=("nsig"))
+def convolve_gaussian_constant_dlogl(dlogl, flux, R, nsig=4):
+    """
+    Gaussian spectrograph convolution on constant log-lambda grid.
+    Full-length kernel with Gaussian tails clipped beyond nsig sigma.
+
+    Parameters
+    ----------
+    wl : (Nλ,)
+        Log-spaced wavelength grid
+    flux : (Nλ,) or (Nt, Nλ)
+        Spectrum or time-series spectra
+    R : float
+        Resolving power
+    nsig : float (static)
+        Gaussian truncation radius in sigma
+
+    Returns
+    -------
+    convolved : same shape as flux
+    """
+
+    # ---- ensure flux is 2D (Nt, Nλ) ----
+    flux = jnp.atleast_2d(flux)
+    Nt, Nlam = flux.shape
+
+    # ---- Gaussian sigma in log λ ----
+    c = 2.0 * jnp.sqrt(2.0 * jnp.log(2.0))   # FWHM→σ conversion
+    sigma_loglam = 1.0 / (R * c)
+    sigma_pix = sigma_loglam / dlogl
+
+    # -------------------------------------------------
+    # Build FULL-LENGTH circular Gaussian kernel
+    # -------------------------------------------------
+
+    # pixel indices
+    i = jnp.arange(Nlam)
+
+    # circular distance from pixel 0
+    dist = jnp.minimum(i, Nlam - i)
+
+    # Gaussian kernel
+    kernel = jnp.exp(-0.5 * (dist / sigma_pix) ** 2)
+
+    # ---- clip far Gaussian tails ----
+    kernel = jnp.where(dist <= nsig * sigma_pix, kernel, 0.0)
+
+    # normalize
+    kernel = kernel / jnp.sum(kernel)
+
+    # -------------------------------------------------
+    # FFT convolution
+    # -------------------------------------------------
+    kernel_fft = jnp.fft.rfft(kernel)
+    flux_fft   = jnp.fft.rfft(flux, axis=1)
+
+    convolved_fft = flux_fft * kernel_fft[None, :]
+    convolved = jnp.fft.irfft(convolved_fft, n=Nlam, axis=1)
+
+    # return original dimensionality
+    return convolved
+
+
+
 
 
 

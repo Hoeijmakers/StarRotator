@@ -596,6 +596,37 @@ def test_fast_doppler():
     assert(mean_difference < 2e-3) # This is a large relative error. Why?
 
 
+
+def test_convolution():
+    import starrotator.lib.operations as ops
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from starrotator.lib.operations import constant_velocity_grid, convolve_gaussian_constant_dlogl 
+
+    Nwl = 50001
+    Nspec = 30
+    wlmin,wlmax = 400,600
+    R = 20000.0
+    wl = np.linspace(wlmin,wlmax,Nwl)
+    fx = np.zeros((Nspec,Nwl))
+    fx[:,int((Nwl-1)/2)] = 1.0
+    fx[:,int((Nwl-1)/4)] = 0.3      
+
+
+    radius = ops.prepare_gaussian_convolver(wl,R)
+    fx_blurred = ops.convolve_gaussian_explicit(wl,fx,R,radius)    
+
+    wl2,dlogl = constant_velocity_grid(wlmin,wlmax,Nwl)
+    fx_blurred_2 = convolve_gaussian_constant_dlogl(dlogl, fx, R, nsig=4)
+
+    integral = np.sum(fx[0])
+    integration_error = (np.trapezoid(fx_blurred[0])-integral)/integral
+    assert (np.abs(integration_error) < 1e5 )
+
+    integration_error_2 = (np.trapezoid(fx_blurred_2[0])-integral)/integral
+    assert (np.abs(integration_error_2) < 1e5 )    
+
+
 def test_demo_computation():
     from starrotator import StarRotator
     KELT9 = StarRotator()
