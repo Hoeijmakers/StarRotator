@@ -148,7 +148,7 @@ def sum_stellar_spectrum_v1_mu(wl,fx_array,vel_eq,i_stellar,mu_array,N=400,const
 
     #doppler_shift_batch = jax.vmap(doppler_shift, in_axes=(None, 0, None)) # Here is some of the magic.
 
-    fx_array_shifted = doppler_shift_batch(wl,jnp.flip(fx_array),v_axis) #Flip this because mu-array is sorted the wrong way.
+    fx_array_shifted = doppler_shift_batch(wl,jnp.flip(fx_array,axis=0),v_axis) #Flip this because mu-array is sorted the wrong way.
 
     #So the output will have dimensions len(v) * len(fx_array) * len(wl) whereas the shape of the output
     # of a single call to doppler_shift would have dimensions len(v)*len(wl)).
