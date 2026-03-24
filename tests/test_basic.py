@@ -621,10 +621,18 @@ def test_convolution():
 
     integral = np.sum(fx[0])
     integration_error = (np.trapezoid(fx_blurred[0])-integral)/integral
-    assert (np.abs(integration_error) < 1e5 )
+    assert (np.abs(integration_error) < 5e-4 )
 
     integration_error_2 = (np.trapezoid(fx_blurred_2[0])-integral)/integral
-    assert (np.abs(integration_error_2) < 1e5 )    
+    assert (np.abs(integration_error_2) < 5e-4 )
+
+
+    # Testing that convolution successfully takes 2D input:
+    fx_blurred = ops.convolve_gaussian_explicit(wl,np.vstack([fx,fx,fx]),R,radius)    
+    fx_blurred_2 = convolve_gaussian_constant_dlogl(dlogl,np.vstack([fx,fx,fx]), R, nsig=4)    
+
+    assert np.sum(fx_blurred[1]-fx_blurred[0]) < 1e-6
+    assert np.sum(fx_blurred_2[1]-fx_blurred_2[0]) < 1e-6
 
 
 def test_demo_computation():
