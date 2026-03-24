@@ -197,9 +197,8 @@ class StarRotator(object):
                 raise Exception(f"Length of wavelength input array is required to be equal to 2 (min, max).")            
         if input['wavelength_type'] == 'constant_dlogl':
             if len(input['wavelength']) != 3:
-                raise Exception(f"Length of wavelength input array is required to be equal to 3 (min, max, delta-logl).")          
+                raise Exception(f"Length of wavelength input array is required to be equal to 3 (min, max, number of steps).")          
         # The choice of wavelength axis is going to be passed to where the stellar spectrum is loaded/determined.
-        # self.constant_dlogl is set in get_stellar_spectrum.
 
 
         #The following are only to be set if certain criteria are met.
@@ -566,16 +565,38 @@ class StarRotator(object):
 
 
         # #This defines the output.
-        self.wl = self.wl_in
+        if self.wavelength_type == 'constant_dlogl':
+            self.wl = self.wl_model
+        else:
+            self.wl = self.wl_in
+
+
         self.spectra = self.stellar_spectrum-self.Fp #Spectral time series
-        self.lightcurve = np.mean(self.spectra, axis=1) / np.max(np.mean(self.spectra, axis=1))
-        self.masks = None #This no longer exists as output but did previously
-        self.spectra_norm = (self.spectra.T / np.nanmedian(self.spectra,axis = 1)).T
-        self.residual = self.spectra/self.stellar_spectrum
-        self.residual_norm = self.spectra_norm/self.stellar_spectrum * np.nanmedian(self.stellar_spectrum)
 
+        if self.R > 0.0:
+            
+            if self.wavelength_type == 'constant_dlogl':
+                print(f'Blurring to spectral resolving power {self.R} in dlogl mode using fft.')
+                self.Ft = np.squeeze(ops.convolve_gaussian_constant_dlogl(self.wl_in, self.spectra, self.R, nsig=4))
+                self.F0 = np.squeeze(ops.convolve_gaussian_constant_dlogl(self.wl_in, self.stellar_spectrum, self.R, nsig=4))
+            else:
+                print(f'Blurring to spectral resolving power {self.R} using explicit convolution.')
+                radius = ops.prepare_gaussian_convolver(self.wl_in,self.R)
+                self.Ft = np.squeeze(ops.convolve_gaussian_explicit(self.wl_in,self.spectra,self.R,radius))
+                self.F0 = np.squeeze(ops.convolve_gaussian_explicit(self.wl_in,self.stellar_spectrum,self.R,radius))      
+        else:
+            self.Ft = self.spectra * 1.0
+            self.F0 = self.stellar_spectrum
+        # Self.Ft stands for Spectral Time-series (F(t)).
 
+        # Self.Ft and self.wl are, in principle, the entirety of the relevant output of this code.
+        # However for convenience, we define a couple of convenience-products that are mostly
+        # useful for plotting purposes.
 
+        self.lightcurve = np.mean(self.Ft, axis=1) / np.max(np.mean(self.Ft, axis=1))
+        # self.Ft_norm = (self.Ft.T / np.nanmedian(self.Ft,axis = 1)).T
+        self.residual = self.Ft/self.F0
+        # self.residual_norm = self.Ft_norm/self.F0 * np.nanmedian(self.F0)
 
         #If this point is reached, at least the functions ran through, so we change the status message.
         self.status = 'success computing spectra'
@@ -611,8 +632,8 @@ class StarRotator(object):
         # [DONE] Finish logic switching.
         # [DONE] Add dlogl input.
         # [DONE] Complete / test the workflow with pySME.
-        # Debug faulty mu dependence in Develop_starrotator_object.
-        # Implement spectral resolution.
+        # [DONE] Debug faulty mu dependence in Develop_starrotator_object.
+        # [PROGRESS] Implement spectral resolution.
         # Complete the plotting of basic output.
 
         # Create a suite of working (KELT-9) examples.
