@@ -596,7 +596,8 @@ class StarRotator(object):
         self.lightcurve = np.mean(self.Ft, axis=1) / np.max(np.mean(self.Ft, axis=1))
         # self.Ft_norm = (self.Ft.T / np.nanmedian(self.Ft,axis = 1)).T
         self.residual = self.Ft/self.F0
-        # self.residual_norm = self.Ft_norm/self.F0 * np.nanmedian(self.F0)
+
+        self.residual_norm = (self.residual.T/np.median(self.residual,axis=1)).T
 
         #If this point is reached, at least the functions ran through, so we change the status message.
         self.status = 'success computing spectra'
@@ -604,7 +605,7 @@ class StarRotator(object):
    
 
 
-    def plot_residuals(self):
+    def plot_residuals(self,wlmin=0.0,wlmax=np.inf):
         """Plot the residuals if available.
 
         Parameters
@@ -614,12 +615,79 @@ class StarRotator(object):
         -------
             None
         """
-        import matplotlib.pyplot as plt
-        if self.residual is not None:
-            plt.pcolormesh(self.wl,self.phases,self.residual)
-            plt.xlabel('Wavelength (nm)')
-            plt.ylabel('Orbital phase')
-            plt.show()
+        # --- figure and gridspec ---
+
+        import matplotlib.gridspec as gridspec
+        fig = plt.figure(figsize=(12, 14))
+        gs = gridspec.GridSpec(nrows=4, ncols=2, height_ratios=[1, 1, 1, 1])
+
+        wlmin = np.max([wlmin,np.min(self.wl)])
+        wlmax = np.min([wlmax,np.max(self.wl)])
+
+
+        # --- Panel A (full width) ---
+        i=int(0.5*len(self.phases))
+        axA = fig.add_subplot(gs[0, :])
+        axA.plot(self.wl, self.Ft[i]/np.median(self.Ft[i]),label='Middle spectrum',color='C0')
+        axA.plot(self.wl, self.F0/np.median(self.F0),'--',label='Out-of-transit spectrum',color='C0')
+        axA.plot(self.wl, (self.residual_norm[i]-1)*10+1,label='Normalised Residual (x10)',color='C2')
+
+        if self.R > 0.0:
+            residual_preblur = self.spectra/self.stellar_spectrum
+            axA.plot(self.wl, (residual_preblur[i]/np.median(residual_preblur[i])-1)*10+1,'--',label='Normalised Residual (x10 at R = $\\infty$)',color='C2')
+        axA.set_xlim(wlmin,wlmax)
+        axA.legend(frameon=False)
+
+
+        # --- Panel B (full width) ---
+        axB = fig.add_subplot(gs[1, :])
+        pcm1 = axB.pcolormesh(self.wl, self.phases, self.residual, shading='auto')
+        # fig.colorbar(pcm1, ax=axC)
+        axB.set_title("Spectral time-series residuals")
+        # axB.set_xlabel('Wavelength (nm)')
+        axB.set_ylabel('Orbital phase')
+        axB.sharex(axA)
+
+        # --- Panel D (full width) ---
+        axC = fig.add_subplot(gs[2, :])
+        pcm2 = axC.pcolormesh(self.wl, self.phases, self.residual_norm, shading='auto')
+        # # fig.colorbar(pcm2, ax=axD)
+        axC.set_title("Normalised spectral time-series residuals")
+        axC.set_xlabel('Wavelength (nm)')
+        axC.set_ylabel('Orbital phase')
+        axC.sharex(axA)
+
+        # --- Panel D ---
+        axD = fig.add_subplot(gs[3, 0])
+        axD.plot(self.phases,self.lightcurve,marker='.')
+        axD.set_title("Lightcurve")
+        axD.set_xlabel('Orbital phase')
+        axD.set_ylabel('Relative flux')
+
+
+
+        # --- Panel E ---
+
+        if self.N_mu > 0:
+            c_spec = self.fx_in[-1]
+        else:
+            c_spec = self.fx_in
+
+
+        axE = fig.add_subplot(gs[3, 1])
+        axE.plot(self.wl,self.stellar_spectrum,'--',label='R = $\\infty$',color='C0')
+        axE.plot(self.wl,self.F0,label=f'R = {int(self.R)}',color='C0')
+        axE.plot(self.wl_in,c_spec,label='Central disk spectrum',color='C2')
+        axE.set_title("Rotational and instrumental broadening")
+        axE.set_xlabel('Wavelength (nm)')
+        axE.set_ylabel('Relative flux')
+        axE.legend(frameon=False)
+        axE.sharex(axA)
+
+
+        # --- layout ---
+        plt.tight_layout()
+        plt.show()
 
 
 
@@ -633,17 +701,13 @@ class StarRotator(object):
         # [DONE] Add dlogl input.
         # [DONE] Complete / test the workflow with pySME.
         # [DONE] Debug faulty mu dependence in Develop_starrotator_object.
-        # [PROGRESS] Implement spectral resolution.
-        # Complete the plotting of basic output.
+        # [DONE] Implement spectral resolution.
+        # [DONE] Complete the plotting of basic output.
 
-        # Create a suite of working (KELT-9) examples.
 
-        # Also need to make a decision regarding control over the wavelength axis:
-        # A start and a stop wavelength is a bit silly. 
-        # Need a target (data) wavelength grid onto which the result is (to be) binned-interpolated. This can be done using shone.opacity.bin_opacity().
-        # And an under-the-hood model wavelength grid. This should be dloglambda-constant, so that doppler shifting can be sped up.
-        # [DONE] Make fast doppler shifting
-        # Add constant-dlogl switching in all functions. See if it can be made default.
+        # Add a method of adding spots. (temperature, radius, lat, long), Can be outside of the object cascade but with a modified integrator.
+        # Create a suite of working (KELT-9) examples documented in readme.
+        # Add a numpyro model.
 
         # TO DO LATER:
         # Fix installation instructions in Readme.
