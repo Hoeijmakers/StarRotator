@@ -341,7 +341,8 @@ class StarRotator(object):
                                                 P = self.orb_p, 
                                                 e = self.ecc, 
                                                 omega = self.omega,
-                                                i=self.orbinc
+                                                i=self.orbinc,
+                                                obliquity=self.pob
                                                 )
         # Convert the output from solar radii to stellar radii:
         self.xp,self.yp,self.zp = xp/self.Rstar, yp/self.Rstar, zp/self.Rstar
@@ -624,13 +625,18 @@ class StarRotator(object):
         wlmin = np.max([wlmin,np.min(self.wl)])
         wlmax = np.min([wlmax,np.max(self.wl)])
 
+        if wlmax < np.min(self.wl) or wlmin > np.max(self.wl) or wlmin > wlmax:
+            #If the input is non-sensical, continue without wl limits.
+            wlmin = np.min(self.wl)
+            wlmax = np.max(self.wl)
+
 
         # --- Panel A (full width) ---
         i=int(0.5*len(self.phases))
         axA = fig.add_subplot(gs[0, :])
-        axA.plot(self.wl, self.Ft[i]/np.median(self.Ft[i]),label='Middle spectrum',color='C0')
+        axA.plot(self.wl, self.Ft[i]/np.median(self.Ft[i]),label='Mid-timeseries spectrum (i={i})',color='C0')
         axA.plot(self.wl, self.F0/np.median(self.F0),'--',label='Out-of-transit spectrum',color='C0')
-        axA.plot(self.wl, (self.residual_norm[i]-1)*10+1,label='Normalised Residual (x10)',color='C2')
+        axA.plot(self.wl, (self.residual_norm[i]-1)*10+1,label='Normalised Residual at mid-timeseries (x10)',color='C2')
 
         if self.R > 0.0:
             residual_preblur = self.spectra/self.stellar_spectrum
@@ -638,6 +644,8 @@ class StarRotator(object):
         axA.set_xlim(wlmin,wlmax)
         axA.legend(frameon=False)
 
+
+        
 
         # --- Panel B (full width) ---
         axB = fig.add_subplot(gs[1, :])
@@ -648,9 +656,13 @@ class StarRotator(object):
         axB.set_ylabel('Orbital phase')
         axB.sharex(axA)
 
+
+        selected_residual = self.residual_norm[:,(self.wl > wlmin)&(self.wl < wlmax)]
+        vmin,vmax = np.min(selected_residual), np.max(selected_residual)
+
         # --- Panel D (full width) ---
         axC = fig.add_subplot(gs[2, :])
-        pcm2 = axC.pcolormesh(self.wl, self.phases, self.residual_norm, shading='auto')
+        pcm2 = axC.pcolormesh(self.wl, self.phases, self.residual_norm, shading='auto',vmin = vmin, vmax = vmax)
         # # fig.colorbar(pcm2, ax=axD)
         axC.set_title("Normalised spectral time-series residuals")
         axC.set_xlabel('Wavelength (nm)')
@@ -675,9 +687,10 @@ class StarRotator(object):
 
 
         axE = fig.add_subplot(gs[3, 1])
+        axE.plot(self.wl,c_spec,label='Central disk spectrum',color='C2',alpha=0.5)
         axE.plot(self.wl,self.stellar_spectrum,'--',label='R = $\\infty$',color='C0')
         axE.plot(self.wl,self.F0,label=f'R = {int(self.R)}',color='C0')
-        axE.plot(self.wl_in,c_spec,label='Central disk spectrum',color='C2')
+
         axE.set_title("Rotational and instrumental broadening")
         axE.set_xlabel('Wavelength (nm)')
         axE.set_ylabel('Relative flux')
@@ -703,11 +716,10 @@ class StarRotator(object):
         # [DONE] Debug faulty mu dependence in Develop_starrotator_object.
         # [DONE] Implement spectral resolution.
         # [DONE] Complete the plotting of basic output.
-
-
         # Add a method of adding spots. (temperature, radius, lat, long), Can be outside of the object cascade but with a modified integrator.
         # Create a suite of working (KELT-9) examples documented in readme.
         # Add a numpyro model.
+        # Add animation.
 
         # TO DO LATER:
         # Fix installation instructions in Readme.
@@ -722,85 +734,6 @@ class StarRotator(object):
 
         # MAKE IT AT HABIT TO RUN PYTEST BEFORE COMMITS!
 
-
-    def convolve_spectral_resolution(self):
-        """Convolves the residual to conform to a spectral resolving power.
-        An approximation is made is that the convolution of the ratio of the in/out of transit
-        spectra is the same as the ratio of the convolutions of the in/out transit spectra. This
-        is done because taking the ratio of the convolution leads to numerical errors.
-
-        Parameters
-        ----------
-            None
-        Returns
-        -------
-            None
-        """
-        import lib.operations as ops
-        import astropy.constants as const
-        import copy
-        import scipy.ndimage.filters as SNF
-        import scipy.interpolate as interp
-        from starrotator.lib.integrate_depr import statusbar as statusbar
-        dv = const.c.value / self.R / 1000.0 #in km/s
-
-        if self.blurred != 0:
-            raise Exception("Blurring has already been performed. Re-run compute-residuals if you "
-            "wish to repeat this operation with a different value of the resolving power. ")
-
-        if self.residual is not None:
-            print('--- Blurring')
-            for i in range(len(self.spectra)):
-                statusbar(i,len(self.spectra))
-                res = self.residual[i]
-                wl_constant_v,res_constant_v,a = ops.constant_velocity_wl_grid(self.wl,res,3.0)
-                res_smooth = ops.smooth(res_constant_v,dv/a)
-                self.residual[i] = interp.interp1d(wl_constant_v,res_smooth,
-                fill_value='extrapolate',bounds_error=False)(self.wl)
-            self.blurred = 1
-        else:
-            print('--- Skipping blurring because no residuals have been computed.')
-
-
-    def compute_flux_grid_pysme(self):
-        '''Calculate the flux grid used for visualisation purposes when using pySME-generated
-        spectra. Note that this flux grid is not used in any calculations.
-        
-        Parameters:
-        -----------
-        None
-        
-        Returns:
-        --------
-        flux_grid: 2d np.array
-            Flux grid calculated from mean flux of pySME spectra at each calculated mu angle.
-        '''
-        import numpy as np
-        import lib.operations as ops
-        import lib.stellar_spectrum as spectrum
-        import sys
-        import lib.test as test
-
-        F = 0#output
-
-        # Calculate radii at the edge of the annuli
-        rmu = np.sqrt(1 - self.mus**2)
-        rlist = np.sqrt(0.5 * (rmu[:-1] ** 2 + rmu[1:] ** 2))  # area midpoints between rmu
-        rlist = np.concatenate(([1], rlist))
-
-        z,x_full,y_full = vgrid.calc_z(self.x,self.y)
-        flux_grid = z*0.0
-
-        for i in range(len(self.x)):
-            for j in range(len(self.y)):
-                if np.sqrt(self.x[i]**2+self.y[j]**2) <= 1.0:
-                    r = np.sqrt(self.x[i]**2 + self.y[j]**2)
-                    index = np.where(r < rlist)[-1][-1]
-                    if self.mus[index] > 0:
-                        flux_grid[j,i] = np.nanmean(self.fx_list[index])
-
-        flux_grid /= np.nansum(flux_grid)
-        return flux_grid
     
     def animate(self):
         """Plots an animation of the transit event, the stellar flux and velocity
