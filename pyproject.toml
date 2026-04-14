@@ -14,11 +14,13 @@ dependencies = [
   "astropy",
   "scipy",
   "requests",
-  "pysme-astro",
-  "jax[cpu]",
+  "jax",
   "platformdirs",
   "jaxoplanet"
 ]
+
+[project.optional-dependencies]
+sme = ["pysme-astro"]
 
 [build-system]
 requires = ["setuptools>=61.0"]
