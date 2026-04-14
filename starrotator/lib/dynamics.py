@@ -206,7 +206,7 @@ def doppler_shift_dlogl(dlogl,fx,v):
 
 @jit
 def orbit_euclidian(phase, a = 5.0, m = 0.0, P = 4.0, e = 0.0, omega = 0.0,
-                i=90.0):
+                i=90.0, obliquity = 0.0):
     """
     This function calculates the x, y and z position of a planet in 
     an elliptical orbit using jaxoplanet. 
@@ -245,6 +245,9 @@ def orbit_euclidian(phase, a = 5.0, m = 0.0, P = 4.0, e = 0.0, omega = 0.0,
     i : float
         Orbital inclination in degrees. 90 is transiting.
 
+    obliquity: float
+        Projected obliquity in degrees. 0 is parallel to the stellar equator.
+
     Returns
     -------
     x : float, array-like, same as phase
@@ -252,26 +255,32 @@ def orbit_euclidian(phase, a = 5.0, m = 0.0, P = 4.0, e = 0.0, omega = 0.0,
 
     """
     from jaxoplanet.orbits import keplerian
-    from starrotator.lib.util import rad_in_deg, R_sun, d_in_seconds, G, M_sun
-    import numpy as np
+    from starrotator.lib.util import R_sun, d_in_seconds, G, M_sun
+    import jax.numpy as jnp
 
 
     a_cgs = a*R_sun
     P_cgs = P*d_in_seconds
 
-    M = a_cgs**3 / P_cgs**2 * 4 * np.pi**2 / G - m
+    M = a_cgs**3 / P_cgs**2 * 4 * jnp.pi**2 / G - m
 
 
     star = keplerian.Central(mass=M/M_sun, radius=1.0)
 
     system = keplerian.System(star).add_body(mass = m, period = P, 
-                        eccentricity = e, omega_peri = omega/rad_in_deg,
-                        inclination = i/rad_in_deg,time_transit=0.0
+                        eccentricity = e, omega_peri = jnp.radians(omega),
+                        inclination = jnp.radians(i),time_transit=0.0
                         )
 
     planet = system.bodies[0]
 
+    
+
     x,y,z = planet.position(phase * P) # in Rsol.
-    return(x,y,z*-1) #Invert z so that negative directions are towards the observer.
+
+    l_rad = jnp.radians(obliquity)
+    x_proj = x * jnp.cos(l_rad) - y * jnp.sin(l_rad)
+    y_proj = x * jnp.sin(l_rad) + y * jnp.cos(l_rad) # Eq 4+5 of Cegla 2016.
+    return(x_proj,y_proj,z*-1) #Invert z so that negative directions are towards the observer.
 
 
