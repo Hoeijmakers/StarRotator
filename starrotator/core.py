@@ -606,7 +606,7 @@ class StarRotator(object):
    
 
 
-    def plot_residuals(self,wlmin=0.0,wlmax=np.inf):
+    def plot_residuals(self,wlmin=0.0,wlmax=np.inf,filename=None,dpi=300):
         """Plot the residuals if available.
 
         Parameters
@@ -634,9 +634,9 @@ class StarRotator(object):
         # --- Panel A (full width) ---
         i=int(0.5*len(self.phases))
         axA = fig.add_subplot(gs[0, :])
-        axA.plot(self.wl, self.Ft[i]/np.median(self.Ft[i]),label='Mid-timeseries spectrum (i={i})',color='C0')
+        axA.plot(self.wl, self.Ft[i]/np.median(self.Ft[i]),label=f'Mid-timeseries spectrum (i={i})',color='C0')
         axA.plot(self.wl, self.F0/np.median(self.F0),'--',label='Out-of-transit spectrum',color='C0')
-        axA.plot(self.wl, (self.residual_norm[i]-1)*10+1,label='Normalised Residual at mid-timeseries (x10)',color='C2')
+        axA.plot(self.wl, (self.residual_norm[i]-1)*10+1,label=f'Normalised Residual at mid-timeseries (x10 at R = {int(self.R)})',color='C2')
 
         if self.R > 0.0:
             residual_preblur = self.spectra/self.stellar_spectrum
@@ -688,7 +688,7 @@ class StarRotator(object):
 
         axE = fig.add_subplot(gs[3, 1])
         axE.plot(self.wl,c_spec,label='Central disk spectrum',color='C2',alpha=0.5)
-        axE.plot(self.wl,self.stellar_spectrum,'--',label='R = $\\infty$',color='C0')
+        axE.plot(self.wl,self.stellar_spectrum,'--',label=f'R = $\\infty$, vsin(i) = {self.velStar*np.sin(np.radians(self.stelinc))} km/s',color='C0')
         axE.plot(self.wl,self.F0,label=f'R = {int(self.R)}',color='C0')
 
         axE.set_title("Rotational and instrumental broadening")
@@ -700,6 +700,9 @@ class StarRotator(object):
 
         # --- layout ---
         plt.tight_layout()
+
+        if filename:
+            plt.savefig(filename,dpi=dpi)
         plt.show()
 
 

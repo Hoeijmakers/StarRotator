@@ -254,7 +254,7 @@ def sum_stellar_spectrum_v2(wl,fx,vel_eq,i_stellar,a1,a2,diff_rot_rate,N=200,bat
         diff_rot_rate : float
             Differential rotation parameter as defined in Cegla et al. 2016.
             If you wish to use a non-differentially rotating star, you'll be better off calculating 
-            the stellar spectrum without using this fully pixellated model.
+            the stellar spectrum without using this fully pixellated model, meaing v1 or v1_mu.
 
         batched : bool
             Compute the sum row-by-row or entirely at once (warning: very memory hungry).
@@ -280,7 +280,20 @@ def sum_stellar_spectrum_v2(wl,fx,vel_eq,i_stellar,a1,a2,diff_rot_rate,N=200,bat
     
 
 @jit
-def sum_stellar_spectrum_v3(wl,fx_array,fx_map,v_map,weights=None):
+def sum_stellar_spectrum_v3(wl,fx,vel_eq,i_stellar,a1,a2,N=200,batched=True,constant_dlogl=False):
+    """
+    Brute-force integration of a stellar disk with a single input spectrum, as well as spots.
+    Spots are defined using a sequence of x-y positions, creating a spot-mask.
+    
+    This takes a custom velocity map (could be generated with rigid rotation, drr or anything else) as well as an array of
+    spectra to be tiled onto the disk. The gridpoint locations of each spectrum in that list are mapped using the fx_map parameter.
+    The gridsize is specified by the sizes of v_map and fx_map.
+
+    """
+
+
+@jit
+def sum_stellar_spectrum_v4(wl,fx_array,fx_map,v_map,weights=None):
     """
     Brute-force integration of a custom stellar disk.
     
@@ -291,9 +304,9 @@ def sum_stellar_spectrum_v3(wl,fx_array,fx_map,v_map,weights=None):
     """
 
 
-
-
-
+#Why is this not done column-by-column? One RV position at a time?
+#Well, I guess because this is meant for the DRR case. So RV is not constant in columns.
+#But you can imagine situations where summing in columns is better.
 @partial(jax.jit,static_argnames=["batched","constant_dlogl"])
 def sum_by_vel_and_flux_row(wl,fx,vel_grid,flux_grid,batched=True,constant_dlogl=False):
     """
@@ -780,7 +793,7 @@ def sum_hidden_spectrum_v2(wl,fx,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N
 
 
 @partial(jax.jit,static_argnames=['N'])
-def create_hidden_grid_array(xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=50):
+def create_hidden_grid_array(xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=50,projected=True):
     """This builds arrays of the flux grid and velocity grid of the stellar disk that are
         hidden behind the planet.
 
@@ -798,6 +811,9 @@ def create_hidden_grid_array(xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=50)
 
         yp : array-like
             The vertical location of the planet, either as a float or as a 1D array.
+
+        Rp : float
+            The radius of the planet, in stellar radii.
 
         vel_eq : float
             The equatorial velocity of the star in km/s.
@@ -859,6 +875,123 @@ def create_hidden_grid_array(xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=50)
 
 
 
+
+
+@partial(jax.jit,static_argnames=['N'])
+def create_spot_grid_array(xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=50):
+    """This builds arrays of the flux grid and velocity grid of the stellar disk that are
+       part of a spot. This is modeled after create_hidden_grid_array above.
+
+       This is the simplest implementation of a spotty stellar disk, whereby the
+       spectrum of the star gets replaced by that of a spot -- conceptually nearly
+       identical to replacing the spectrum of the star with 0, in the case of when the
+       hidden spectrum (see above function) is calculated.
+
+        This version creates a FREE VELOCITY GRID (that means: with possible drr), and the 
+        possibility to add center-to-limb variation is modelled by broad-band limb darkening. 
+
+        The output are 3D arrays of flux and velocity grids, one for each spot,
+        with areas that are outside the spot or stellar disk set to NaN. These are designed
+        to be passed into sum_hidden_spectrum_v2.
+
+    
+
+        Note that the coordinates should be chosen such that spots do not overlap.
+        If they overlap, over-subtraction will occur. This code does not check for this.
+
+        Also note that there is no way to account for the planet overlapping the spots.
+        So this is a model for unocculted spots only.
+
+        Parameters
+        ----------
+        xp : array-like
+            The horizontal location of the spots, either as a float or as a 1D array.
+
+        yp : array-like
+            The vertical location of the spots, either as a float or as a 1D array.
+
+        Rp : array-like
+            The radii of the spots, in stellar radii.
+
+        vel_eq : float
+            The equatorial velocity of the star in km/s.
+
+        i_stellar : float
+            The inclination of the stellar spin axis in degrees.
+
+        diff_rot_rate : float
+            If you set this to zero, v1 may be the more suitable integration method.
+
+        a1 : float
+            Linear limb darkening coefficient.
+
+        a2 : float
+            Quadratic limb darkening coefficient.
+
+        N : int
+            Number of grid-points onto which the planet is simulated. Note that the resolution of 
+            the planet is independent of the resolution of the grid of the star. Also note that 
+            as this calculation is batched over planet positions, cases where you have many planet 
+            positions and high N will result in high memory load if batched is set to false.
+
+
+        Returns
+        -------
+        flux_grid_array : array
+            3D array of flux grids that are hidden by the planet, meant as input for sum_hidden_spectrum_v2
+            
+        vel_grid_array : array
+            3D array of velocity grids that are hidden by the planet, meant as input for sum_hidden_spectrum_v2
+
+        differential : float
+            The size of the differential (dx*R) that may be used to renormalise the flux array, since it has an 
+            aritrary size compared to that of the stellar disk.
+    """
+    x = jnp.linspace(-1,1,N)
+    dx = x[1]-x[0]
+    dxR = dx*Rp # Rescaling the size of the differential. This is an array of length S = N_spots
+
+    zp = jnp.sqrt(1-xp**2-yp**2)
+
+    X, Y = jnp.meshgrid(x, x)
+    
+    X_array = X*Rp[:,None,None]+xp[:,None,None]
+    Y_array = Y*Rp[:,None,None]+yp[:,None,None]
+    r2 = X_array**2 + Y_array**2
+    Z_array = jnp.sqrt(jnp.clip(1 - r2, 0, 1))
+
+    n_s = jnp.array([xp, yp, zp]).T #Unit vector in the direction normal to the spot.
+    # stack grid normals
+    grid = jnp.stack([X_array, Y_array, Z_array], axis=-1)   # (S, Ny, Nx, 3)
+    # align spot normals to grid shape
+    n_s = n_s[:, None, None, :]              # (S, 1, 1, 3)
+    # dot product. This here is the magic, realising that in a spot, the unit vector normal to the surface should
+    # be within a range of angles of the spot center, and the x-y plane maps onto surface normals (that is mu),
+    # and then the fact that this "within range of angles" is effected by demanding that a dot product is greater
+    # than a limit cos(alpha).
+    dot_product = jnp.sum(grid * n_s, axis=-1)      # (S, Ny, Nx)
+    # Note that with R equal to the spot radius, if we assume that to be the great-circle distance, then R = alpha.
+    # Otherwise, alpha = jnp.asin(Rp). I use the latter because I think its more observationally meaningful.
+    #Since we want to know cos(alpha), and alpha=arcsin(R), we get cos(alpha) = sqrt(1-R**2)
+    cos_alpha = jnp.sqrt(1-Rp**2) #This is length S.
+
+
+    mask = (r2 <= 1.0) & (dot_product >= cos_alpha) #To be inside a spot and inside the star at the same time.
+
+    x_array,y_array = X_array[:,0,:],Y_array[:,:,0]
+    flux_disk_array  = calc_flux_stellar(x_array.T,y_array.T,a1,a2,norm=False) #This is really, really awesome (the fact that it's all vectorised).
+    vel_disk_array  = calc_vel_stellar(x_array.T,y_array.T,i_stellar, vel_eq, diff_rot_rate)
+    
+
+    flux_disk_array_masked =flux_disk_array * (mask.transpose(1,2,0)) #This crops out the circle that is the planet. 
+    #Note that even though x and x_array do not measure the same thing (x is the star, x_array the planet),
+    #this can be applied to the small region that is the planet because x (-1,1) has the same shape as x_array (-1,1)*Rp. 
+    vel_disk_array_masked = vel_disk_array * (mask.transpose(1,2,0)) 
+    #Bit hacky but it is robust.
+
+    mu_array_masked = (1-r2) * mask  #Calculation of the mu array is inaccurate. Needs to do x_array**2+y_array**2 or something.
+    #Implement this when needed. Until then, a jnp.nan is returned.
+    return(flux_disk_array_masked,vel_disk_array_masked,mu_array_masked*jnp.nan,dxR)
 
 
 
