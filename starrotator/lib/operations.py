@@ -473,7 +473,7 @@ def convolve_gaussian_explicit(wl, flux, R, radius):
     # Vectorize over wavelength pixels
     result = jax.vmap(convolve_one_pixel)(jnp.arange(nlam))
     # result shape: (nλ, nt) → transpose
-    return result.T
+    return jnp.squeeze(result.T)
 
 
 
@@ -538,7 +538,7 @@ def convolve_gaussian_constant_dlogl(dlogl, flux, R, nsig=4):
     convolved = jnp.fft.irfft(convolved_fft, n=Nlam, axis=1)
 
     # return original dimensionality
-    return convolved
+    return jnp.squeeze(convolved)
 
 
 

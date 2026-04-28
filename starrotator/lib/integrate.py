@@ -310,7 +310,8 @@ def sum_stellar_spectrum_v4(wl,fx_array,fx_map,v_map,weights=None):
 @partial(jax.jit,static_argnames=["batched","constant_dlogl"])
 def sum_by_vel_and_flux_row(wl,fx,vel_grid,flux_grid,batched=True,constant_dlogl=False):
     """
-    Batched lax.scan implementation of full-grid summing.
+    Batched lax.scan implementation of full-grid summing. Under normal circumstances,
+    you will want batched=True, unless you have got tons of memory available.
     
     This chops up the problem of summing up to the integrated spectrum by 
     looping over rows of the disk's grid. This can be used with an arbitrary
@@ -709,8 +710,8 @@ def sum_hidden_spectrum_v1_mu(wl,fx_array,xp,yp,Rp,vel_eq,i_stellar,mu_array,N=1
 
 #sum_hidden_spectrum_v1(wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N=100)
 # def sum_hidden_spectrum_v2(wl,fx,vel_grid_array,flux_grid_array,N=100,batched=True):
-@partial(jax.jit,static_argnames=['N','batched','constant_dlogl'])
-def sum_hidden_spectrum_v2(wl,fx,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=100,batched=True,constant_dlogl=False):
+# @partial(jax.jit,static_argnames=['N','batched','constant_dlogl','spot'])
+def sum_hidden_spectrum_v2(wl,fx,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=100,batched=True,constant_dlogl=False,spot=False):
     """This builds the stellar spectrum that is hidden behind the planet by doppler-shifting 
         and interpolating the input spectrum, summing only over the range of coordinates that is
         obscured by the planet disk.
@@ -763,11 +764,15 @@ def sum_hidden_spectrum_v2(wl,fx,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N
             Whether or not to use fast doppler shifting. This requires that the wavelength axis is a float, set to the
             constant value of dloglambda (and not an explicit wavelength array). 
 
+        spot : bool
+            Under normal circumstances, this will calculate the spectrum behind a circularly projected area on the 
+            stellar disk. With spot = True, it uses instead projected circular areas on the star, i.e. spots.
+
 
         Returns
         -------
         F : array
-            The flux axis of the summed spectrum corresponding to the input wavelength points, for each planet position
+            The flux axis of the summed spectrum corresponding to the input wavelength points, for each planet/spot position
             (so this is generally a 2D array). Note that the result is unnormalised and therefore depends on the
             normalization of the flux grid array and of the input spectrum.
     """
@@ -775,7 +780,11 @@ def sum_hidden_spectrum_v2(wl,fx,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N
 
     x = jnp.linspace(-1,1,N)
     total = circ_int_q_ld(a1,a2) #The analytical integral
-    flux_grid_array,vel_grid_array,mu_array,dxR = create_hidden_grid_array(xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=N)
+
+    if spot:
+        flux_grid_array,vel_grid_array,mu_array,dxR = create_spot_grid_array(xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=N)
+    else:
+        flux_grid_array,vel_grid_array,mu_array,dxR = create_hidden_grid_array(xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=N)
 
 
     def scan_fn(carry, inputs):
@@ -786,14 +795,14 @@ def sum_hidden_spectrum_v2(wl,fx,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N
 
     _, F_out = lax.scan(scan_fn, 0, (vel_grid_array.T, flux_grid_array.T))
 
-    return(F_out*dxR**2 / total)
+    return((F_out.T*dxR**2 / total).T) #Transposing-detransposing because of the possibility that dxR is a vector (if spot True).
 
 
 
 
 
 @partial(jax.jit,static_argnames=['N'])
-def create_hidden_grid_array(xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=50,projected=True):
+def create_hidden_grid_array(xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=50):
     """This builds arrays of the flux grid and velocity grid of the stellar disk that are
         hidden behind the planet.
 
@@ -877,8 +886,8 @@ def create_hidden_grid_array(xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=50,
 
 
 
-@partial(jax.jit,static_argnames=['N'])
-def create_spot_grid_array(xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=50):
+@partial(jax.jit,static_argnames=['N','margin'])
+def create_spot_grid_array(xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=50,margin=0.15):
     """This builds arrays of the flux grid and velocity grid of the stellar disk that are
        part of a spot. This is modeled after create_hidden_grid_array above.
 
@@ -934,6 +943,9 @@ def create_spot_grid_array(xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=50):
             as this calculation is batched over planet positions, cases where you have many planet 
             positions and high N will result in high memory load if batched is set to false.
 
+        margin : float
+            For projected spots, the radius of the window needs to be slightly bigger than the radius of the spot.
+
 
         Returns
         -------
@@ -947,7 +959,7 @@ def create_spot_grid_array(xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=50):
             The size of the differential (dx*R) that may be used to renormalise the flux array, since it has an 
             aritrary size compared to that of the stellar disk.
     """
-    x = jnp.linspace(-1,1,N)
+    x = jnp.linspace(-1,1,N)*(1+margin)
     dx = x[1]-x[0]
     dxR = dx*Rp # Rescaling the size of the differential. This is an array of length S = N_spots
 
@@ -974,10 +986,10 @@ def create_spot_grid_array(xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=50):
     # Otherwise, alpha = jnp.asin(Rp). I use the latter because I think its more observationally meaningful.
     #Since we want to know cos(alpha), and alpha=arcsin(R), we get cos(alpha) = sqrt(1-R**2)
     cos_alpha = jnp.sqrt(1-Rp**2) #This is length S.
+    cos_alpha = cos_alpha[:, None, None]
 
 
     mask = (r2 <= 1.0) & (dot_product >= cos_alpha) #To be inside a spot and inside the star at the same time.
-
     x_array,y_array = X_array[:,0,:],Y_array[:,:,0]
     flux_disk_array  = calc_flux_stellar(x_array.T,y_array.T,a1,a2,norm=False) #This is really, really awesome (the fact that it's all vectorised).
     vel_disk_array  = calc_vel_stellar(x_array.T,y_array.T,i_stellar, vel_eq, diff_rot_rate)

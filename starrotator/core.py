@@ -463,23 +463,27 @@ class StarRotator(object):
         flux_grid  = calc_flux_stellar(x,y,a1,a2,norm=False)
         return(flux_grid,vel_grid)
     def calc_v1(self,wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,Nstar=400,Nplanet=200,constant_dlogl=False):
+        # Simplest: PHOENIX, no DRR.
         F_out_v1 =  sum_stellar_spectrum_v1(wl,fx,vel_eq,i_stellar,a1,a2,N=Nstar,constant_dlogl=constant_dlogl)
         F_in_v1 = sum_hidden_spectrum_v1(wl,fx,xp,yp,Rp,vel_eq,i_stellar,a1,a2,N=Nplanet,constant_dlogl=constant_dlogl)
         F_out_v1.block_until_ready()
         F_in_v1.block_until_ready()
         return(F_out_v1,F_in_v1)
     def calc_v2(self,wl,fx,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,batched=True,Nstar=400,Nplanet=200,constant_dlogl=False):
+        # PHOENIX with DRR.
         F_out_v2 = sum_stellar_spectrum_v2(wl,fx,vel_eq,i_stellar,a1,a2,diff_rot_rate,N=Nstar,batched=batched,constant_dlogl=constant_dlogl)
         F_in_v2 = sum_hidden_spectrum_v2(wl,fx,xp,yp,Rp,vel_eq,i_stellar,diff_rot_rate,a1,a2,N=Nplanet,batched=batched,constant_dlogl=constant_dlogl) 
         F_out_v2.block_until_ready()
         F_in_v2.block_until_ready()
         return(F_out_v2,F_in_v2)
     def calc_v1_mu(self,wl,fx_array,xp,yp,Rp,vel_eq,i_stellar,mu_array,Nstar=400,Nplanet=200,small_planet=True,constant_dlogl=False):
+        # pySME, no DRR.
         F_out_v1 = sum_stellar_spectrum_v1_mu(wl,fx_array,vel_eq,i_stellar,mu_array,N=Nstar,constant_dlogl=constant_dlogl)
         F_in_v1 = sum_hidden_spectrum_v1_mu(wl,fx_array,xp,yp,Rp,vel_eq,i_stellar,mu_array,N=Nplanet,small_planet=small_planet,constant_dlogl=constant_dlogl) 
         F_out_v1.block_until_ready()
         F_in_v1.block_until_ready()
         return(F_out_v1,F_in_v1)
+    # def calc_v3()
     #End of wrappers.
 
 
@@ -578,13 +582,13 @@ class StarRotator(object):
             
             if self.wavelength_type == 'constant_dlogl':
                 print(f'Blurring to spectral resolving power {self.R} in dlogl mode using fft.')
-                self.Ft = np.squeeze(ops.convolve_gaussian_constant_dlogl(self.wl_in, self.spectra, self.R, nsig=4))
-                self.F0 = np.squeeze(ops.convolve_gaussian_constant_dlogl(self.wl_in, self.stellar_spectrum, self.R, nsig=4))
+                self.Ft = ops.convolve_gaussian_constant_dlogl(self.wl_in, self.spectra, self.R, nsig=4)
+                self.F0 = ops.convolve_gaussian_constant_dlogl(self.wl_in, self.stellar_spectrum, self.R, nsig=4)
             else:
                 print(f'Blurring to spectral resolving power {self.R} using explicit convolution.')
                 radius = ops.prepare_gaussian_convolver(self.wl_in,self.R)
-                self.Ft = np.squeeze(ops.convolve_gaussian_explicit(self.wl_in,self.spectra,self.R,radius))
-                self.F0 = np.squeeze(ops.convolve_gaussian_explicit(self.wl_in,self.stellar_spectrum,self.R,radius))      
+                self.Ft = ops.convolve_gaussian_explicit(self.wl_in,self.spectra,self.R,radius)
+                self.F0 = ops.convolve_gaussian_explicit(self.wl_in,self.stellar_spectrum,self.R,radius)     
         else:
             self.Ft = self.spectra * 1.0
             self.F0 = self.stellar_spectrum
@@ -707,37 +711,6 @@ class StarRotator(object):
 
 
 
-
-        # CONTINUE HERE NEXT TIME:
-        # [DONE] Fix normalizations and uniformity of calling v1, v2, v1_mu.
-        # [DONE] Implement optional switching to fast doppler shifting method (switched by wavelength input, either array or float). Done for v1.
-        # [DONE] Complete the generation of output. 
-        # [DONE] Fix definition of mu. Now mu is apparently assumed to be equal to r. But it is sqrt(1-r**2). Confirm this by testing new integrate.integrate_fluxdisk_mu function.
-        # [DONE] Finish logic switching.
-        # [DONE] Add dlogl input.
-        # [DONE] Complete / test the workflow with pySME.
-        # [DONE] Debug faulty mu dependence in Develop_starrotator_object.
-        # [DONE] Implement spectral resolution.
-        # [DONE] Complete the plotting of basic output.
-        # Add a method of adding spots. (temperature, radius, lat, long), Can be outside of the object cascade but with a modified integrator.
-        # Create a suite of working (KELT-9) examples documented in readme.
-        # Add a numpyro model.
-        # Add animation.
-
-        # TO DO LATER:
-        # Fix installation instructions in Readme.
-        # Fix documentation. [setup is complete. need to start populating with sections. docstring autosummaries are off because most functions have docstings that are poorly formatted]
-        # Drop small-planet-approximation in integrate.py for mu-dependence in hidden-spectrum.
-        # Add correction-polynomials for the integrals in the various functions v1,v2 to correct for the bias induced by the pixellation of the grid (approximating a circle with a grid of squares).
-        # Can be measured empirically but can probably also be evaluated analytically (though perhaps not in the pseudo-analytical limb darkening model -- or, I don't want to bother). 
-        # Add Retrieval workflow that makes use of the exposed functions (not the class object).
-        # Add brute-force integration with no tricks, and free velocity and flux grids as input. That is v3. A spectrum index-map (that enables mu, or other variation in the spectrum).
-
-
-
-        # MAKE IT AT HABIT TO RUN PYTEST BEFORE COMMITS!
-
-    
     def animate(self):
         """Plots an animation of the transit event, the stellar flux and velocity
         fields, and the resulting transit and line-shape variations. The animation
@@ -764,7 +737,7 @@ class StarRotator(object):
             shutil.rmtree('anim/')#First delete the contents of the anim folder.
         os.mkdir('anim/')
         minflux = min(self.lightcurve)
-        F=self.stellar_spectrum
+        F=self.F0
         if self.model.lower() in ['pysme','sme'] and isinstance(self.mus,np.ndarray) == True:
             flux_grid = self.compute_flux_grid_pysme()
         else:
@@ -841,6 +814,39 @@ class StarRotator(object):
             'have been created in the anim/ folder. If you want to convert these into a .gif '
             'please do it in some alternative way, or install Imagemagick, see '
             'https://imagemagick.org')
+
+
+
+
+        # CONTINUE HERE NEXT TIME:
+        # [DONE] Fix normalizations and uniformity of calling v1, v2, v1_mu.
+        # [DONE] Implement optional switching to fast doppler shifting method (switched by wavelength input, either array or float). Done for v1.
+        # [DONE] Complete the generation of output. 
+        # [DONE] Fix definition of mu. Now mu is apparently assumed to be equal to r. But it is sqrt(1-r**2). Confirm this by testing new integrate.integrate_fluxdisk_mu function.
+        # [DONE] Finish logic switching.
+        # [DONE] Add dlogl input.
+        # [DONE] Complete / test the workflow with pySME.
+        # [DONE] Debug faulty mu dependence in Develop_starrotator_object.
+        # [DONE] Implement spectral resolution.
+        # [DONE] Complete the plotting of basic output.
+        # [DONE] Create a suite of working (KELT-9) examples documented in readme.
+        # [DONE] Add a method of adding spots. (temperature, radius, lat, long), Can be outside of the object cascade but with a modified integrator. Including an example notebook.
+        # Add animation.
+        # Develop a numpyro model notebook.
+
+
+        # TO DO LATER:
+        # [DONE] Fix installation instructions in Readme.
+        # Fix documentation. [setup is complete. need to start populating with sections. docstring autosummaries are off because most functions have docstings that are poorly formatted]
+        # Drop small-planet-approximation in integrate.py for mu-dependence in hidden-spectrum.
+        # Add correction-polynomials for the integrals in the various functions v1,v2 to correct for the bias induced by the pixellation of the grid (approximating a circle with a grid of squares).
+        # Can be measured empirically but can probably also be evaluated analytically (though perhaps not in the pseudo-analytical limb darkening model -- or, I don't want to bother). 
+        # Add brute-force integration with no tricks, and free velocity and flux grids as input. That is v3. A spectrum index-map (that enables mu, or other variation in the spectrum).
+
+        # MAKE IT AT HABIT TO RUN PYTEST BEFORE COMMITS!
+
+    
+
 
 
 
