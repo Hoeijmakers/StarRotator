@@ -255,7 +255,7 @@ def orbit_euclidian(phase, a = 5.0, m = 0.0, P = 4.0, e = 0.0, omega = 0.0,
 
     """
     from jaxoplanet.orbits import keplerian
-    from starrotator.lib.util import R_sun, d_in_seconds, G, M_sun
+    from starrotator.lib.constants import R_sun, d_in_seconds, G, M_sun
     import jax.numpy as jnp
 
 

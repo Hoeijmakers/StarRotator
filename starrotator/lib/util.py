@@ -218,21 +218,6 @@ def gaussian(x,A,mu,sig,cont=0.0):
 import json
 from pathlib import Path
 import platformdirs
-import astropy.units as u
-from astropy.constants import (G as quantity_G, c as quantity_c,  # pyright: ignore[reportAttributeAccessIssue]
-                               M_sun as quantity_M_sun, # pyright: ignore[reportAttributeAccessIssue]
-                               R_sun as quantity_R_sun # pyright: ignore[reportAttributeAccessIssue]
-                            )#
-
-
-#Hardcoded natural constants in cgs:
-G = quantity_G.cgs.value
-c = quantity_c.cgs.value
-M_sun = quantity_M_sun.cgs.value
-R_sun = quantity_R_sun.cgs.value
-d_in_seconds =  (1 * u.d).cgs.value # pyright: ignore[reportAttributeAccessIssue]
-rad_in_deg = (1 * u.rad).to('degree').value # pyright: ignore[reportAttributeAccessIssue]
-
 
 
 # Harcoded paths that are mostly OS independent:
