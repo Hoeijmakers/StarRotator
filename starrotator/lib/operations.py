@@ -486,8 +486,8 @@ def convolve_gaussian_constant_dlogl(dlogl, flux, R, nsig=4):
 
     Parameters
     ----------
-    wl : (Nλ,)
-        Log-spaced wavelength grid
+    dlogl : float
+        Spacing of the log-spaced wavelength grid
     flux : (Nλ,) or (Nt, Nλ)
         Spectrum or time-series spectra
     R : float
