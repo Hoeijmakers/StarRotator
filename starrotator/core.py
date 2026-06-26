@@ -53,14 +53,14 @@ class StarRotator(object):
         a pySME-compatible linelist file as well as a choice of stellar model.
 
         Note that in PHOENIX mode, Starrotator will download PHOENIX spectra automatically
-        to a cache directorly, located in the default cache directory (access this path using
+        to a cache directory, located in the default cache directory (access this path using
         the print_intput method -- see below).
 
-        Alternatively, a user has the freedom to supply their own stellar spectrum, or list of
+        Alternatively, a user has the freedom to supply their own stellar spectrum, or an array of
         mu-dependent spectra if neither PHOENIX or pySME are sufficient.
 
         The calculation outputs the out-of-transit stellar spectrum, in-transit time-series,
-        the in-transit time-series normalised to the wavelength-mean.
+        the in-transit time-series normalised to the wavelength-median.
 
 
 
@@ -68,32 +68,43 @@ class StarRotator(object):
         ----------
         input : dict
             A dictionary of the input parameters can be provided instead of input files. The input dict has
-            a large number of mandatory keywords as well as optional ones.   
+            a large number of mandatory keywords as well as optional ones.
+
+        run_computation: bool
+            A switch for supressing the calculation, for debugging purposes or checking input before a big
+            calculation.   
 
             
         Class methods
         -------------
-        THIS IS OUTDATED
-        After initializing the class like a=StarRotator(588.0,592.0,200.0),
-        the following methods are available to manipulate the simulation after
+        After initializing the class like star = StarRotator(input=input_dict),
+        the following methods are available to interact with the simulation after
         it has been calculated the first time, or to plot the simulation output.
-        star.read_system() Reads in (new) exoplanet system files (see above).
-        star.compute_spectrum() recomputes the simulation.
-        star.plot_residuals() Produces a 2D plot of the residuals.
-        star.animate() Produces an animation of the transiting system. One frame
-        corresponding to each phase provided.
+        star.plot_residuals() Produces a 2D plot of the products, used for quick
+        investigation of results.
+        star.print_input() prints out the parameters / settings that were input.
 
         
         Output attributes
         -----------------
-        THIS IS OUTDATED
-        After initializing the class like star = StarRotator(588.0,592.0,200.0),
+        After initializing the class like star = StarRotator(input=input_dict),
         the primary simulation output can be accessed as follows:
-        star.wl (wavelength array)
-        star.spectra (matrix of spectra, 2D np.array)
-        star.lightcurve (list of fluxes)
-        star.residual (residual after dividing out of transit spectra, 2D np.array)
+        star.wl (wavelength array 1D array)
+        star.F0 (the out of transit stellar spectrum)
+        star.Ft (matrix of spectral time-series, 2D array)
+        star.lightcurve (1D array)
+        star.residual (residual after dividing out of transit spectra, 2D array)
+        self.residual_norm (residual divided by the along-wavelength median).
 
+        In addition, other attributes that could be useful:
+        star.xp, star.yp, star.zp give the x, y, z coordinates of the planet.
+        star.rv gives the radial velocity of the planet.
+        star.spectra give the spectra time-series without application of
+        resolution broadening.
+        star.wl_in gives the wavelength axis of the model.
+        self.fx_in gives the model spectrum (with which the disk is tiled).
+        If this is a mu-dependent spectrum (e.g. computed with pySME), then 
+        self.mu_array contains the mu angles.
         """
 
         self.status = 'initialised'
@@ -125,7 +136,17 @@ class StarRotator(object):
             ut.save_default_config()#This contains a path to a default
             #location where app or cache data is expected.
 
-        self.get_stellar_spectrum()
+
+
+
+        #Switch between if a model needs to be read or if it is provided by the user.    
+        if self.model.lower() not in ['custom','self']:
+            self.get_stellar_spectrum()
+        else:
+            self.constant_dlogl = False # Needs to be set by self.get_stellar_spectrum() otherwise.
+            self.wl_requested_for_model = self.wavelength
+            self.wl_model = self.wavelength
+            self.wl_in = self.wavelength
         self.compute_orbit()
 
         self.status = 'ready for computation'
@@ -139,19 +160,32 @@ class StarRotator(object):
 
 
 
+
+
+
+
+
+
+
+
+
+
     def read_input(self,input={}):
         """Reads the input, performing tests on the input and raising the read variables to the class.
 
         Parameters
         ----------
             input: dict
-                A dictionary with input parameters, instead of using textfiles as input.
-                This allows programmatic control over all StarRotator inputs. 
-                If the model is set to pySME, then the following parameters also need to be set:
-                grid_model (str, either atlas12.sav or marcs2012.sav are provided by default),
-                abund (list, empty by default) The elements are strings of definitions of
-                single-key dictionaries of the form ["{X:6.4}","{Y:6.3}"] etc.
-                linelist_path (str, path to VALD-style line-list for pysme to use)
+                A dictionary with input parameters, instead of using textfiles
+                as input. This allows programmatic control over all StarRotator 
+                inputs. If the model is set to pySME, then the following
+                parameters also need to be set in the dict: 
+                * grid_model (str, either atlas12.sav or marcs2012.sav are 
+                provided by default),
+                * abund (list, empty by default) The elements are strings of 
+                definitions of single-key dictionaries of the form 
+                ["{X:6.4}","{Y:6.3}"] etc.
+                * linelist_path (str, path to VALD-style line-list for pysme to use)
         """
         self.status = 'start reading input'
 
@@ -177,8 +211,6 @@ class StarRotator(object):
                               'FeH':[[int,float],['type','nonans']],
                               'logg':[[int,float],['type','nonans']],
                               'drr':[[int,float],['type','notnegative','nonans']],
-                              'u1':[[int,float],['type','nonans']],
-                              'u2':[[int,float],['type','nonans']],
                               'R':[[int,float],['type','nonans']],
                               'model':[[str],['type']]
                               }
@@ -203,14 +235,18 @@ class StarRotator(object):
 
         #The following are only to be set if certain criteria are met.
         #If in pySME mode, then we require all the pySME input:
-        if input['model'].lower() in ['pysme','sme']:
+        if input['model'].lower() in ['phoenix']:
+            additional_keywords = {
+                              'u1':[[int,float],['type','nonans']],
+                              'u2':[[int,float],['type','nonans']],
+                                }
+        elif input['model'].lower() in ['pysme','sme']:
             additional_keywords = {'N_mu':[[int],['type','notnegative']],
                             'grid_model':[[str],['type']],
-                            'abund':[[dict],['type']]
+                            'abund':[[list,dict],['type']]
                             } #Note that the linelist path and 
                             # small-planet approximation are checked 
                             # for separately, below.
-            util.check_integrity_input(input,additional_keywords)
             if int(input['N_mu']) > 0:
                 if 'small_planet' not in input: #Set to default....
                     input['small_planet'] = True
@@ -220,12 +256,20 @@ class StarRotator(object):
                 demopath = files('starrotator.data').joinpath("demo_linelist.dat")
                 util.file_exists(demopath)
                 input['linelist_path'] = demopath
+            if 'abund' not in input: #Set to empty
+                input['abund'] = []
             else:#.... or check that it is OK.
                 util.file_exists(input['linelist_path'])
-        if input['e'] > 0:
-            additional_keywords = {'omega':[[int,float],['type']]}
-            util.check_integrity_input(input,additional_keywords)
 
+        elif input['model'].lower() in ['custom','self']:
+            additional_keywords = {
+                            'model_fx':[[list,'array-like'],['type']]
+                            }
+        else:
+            raise Exception("Model needs to be set to either PHOENIX, pySME or custom.")
+        if input['e'] > 0:
+            additional_keywords = {'omega':[[int,float],['type']]}            
+        util.check_integrity_input(input,additional_keywords)
         #Still good? Then we have finished our checks and we can raise everything
         #to the class-level.
 
@@ -252,8 +296,6 @@ class StarRotator(object):
         self.Z          = float(input['FeH'])
         self.logg       = float(input['logg'])
         self.drr        = float(input['drr'])
-        self.u1         = float(input['u1'])
-        self.u2         = float(input['u2'])
         self.R          = float(input['R'])
         self.model      = str(input['model'])
         #These were all the mandatory ones.
@@ -261,6 +303,15 @@ class StarRotator(object):
             self.omega      = float(input['omega'])
         else:
             self.omega = 0.0
+        if 'u1' in input:
+            self.u1 = float(input['u1'])
+        else:
+            self.u1 = 0.0
+        if 'u2' in input:
+            self.u2 = float(input['u2'])
+        else:
+            self.u2 = 0.0
+       
 
 
         # If pysme, check and set required pysme input:
@@ -272,7 +323,21 @@ class StarRotator(object):
             self.N_mu        = int(input['N_mu'])
             # Deal with mu input: Equidistant spacing in sqrt-space.
             self.mu_array = np.sqrt(np.linspace(0,1,int(self.N_mu)))
-        else:
+        elif self.model.lower() in ['custom','self']:
+            self.fx_in = np.array(input['model_fx'])
+            if np.squeeze(self.fx_in).ndim == 1: 
+                self.N_mu = 0
+                additional_keywords = {#Careful because now we need to check for limb darkening params.
+                              'u1':[[int,float],['type','nonans']],
+                              'u2':[[int,float],['type','nonans']],
+                                }
+                util.check_integrity_input(input,additional_keywords)
+            if np.squeeze(self.fx_in).ndim == 2:
+                self.N_mu = len(self.fx_in)
+                self.mu_array = np.array(input['mu_array'])
+            if np.squeeze(self.fx_in).ndim > 2:
+                raise Exception("Dimensionality of input spectra is larger than 2.")
+        else: #We must be Phoenix
             self.N_mu = 0.0 #This variable needs to be defined because elsewhere I use it to 
             #distinguish the model case.
         if self.N_mu > 0:
@@ -322,6 +387,9 @@ class StarRotator(object):
         if self.model.lower() in ['pysme','sme']:
             print('In pySME mode.')
             print(f'\tLinelist path: \t {self.linelist_path}')
+            print(f'\t',f'N_mu angles: {self.N_mu}')
+        if self.model.lower() in ['custom','self']:
+            print('In user provided model mode.')
             print(f'\t',f'N_mu angles: {self.N_mu}')
 
         print('')
@@ -394,7 +462,7 @@ class StarRotator(object):
         # Now, wl_model is either equal to wl_input, unless minmax is requested, in which case it is 
         # equal to the PHOENIX model grid, cropped to min-max.
         # And wl_input is either an array with the wavelength samples, and then set to be equal to
-        # wl_model, or it encoded minmax, in which case wl_model was set to the output of PHOENIX or pySME at minimax.
+        # wl_model, or it encoded minmax, in which case wl_model was set to the output of PHOENIX or pySME at min-max.
 
         if self.model.lower() == 'phoenix': #Either use PHOENIX
             print(f'--- Reading spectrum from PHOENIX in wavelength mode {self.wavelength_type}')
@@ -408,7 +476,10 @@ class StarRotator(object):
                 fx_model = fx_wide[(wl_wide > np.min(wl_input)) & (wl_wide < np.max(wl_input))]
             else:
                 wl_model = wl_input
-                fx_model = np.interp(wl_input,wl_wide,fx_wide) #THIS IS AN ERROR IF NWL IS SMALL!
+                fx_model = np.interp(wl_input,wl_wide,fx_wide) #THIS IS AN ERROR IF NWL IS SMALL! NEEDS TO BIN INSTEAD.
+                print('--- WARNING: An interpolation from model wavelengths to user wavelengths is done.')
+                print('--- This assumes that the user wavelengths well sample the model (i.e. n_wl is large).')
+                print('--- Binning should be implemented here instead => WIP.')
 
 
 
@@ -483,7 +554,8 @@ class StarRotator(object):
         F_out_v1.block_until_ready()
         F_in_v1.block_until_ready()
         return(F_out_v1,F_in_v1)
-    # def calc_v3()
+    # def calc_v3():
+        # pySME, DRR. Requires developing a full, slow, brute-force integrator.
     #End of wrappers.
 
 
@@ -506,6 +578,8 @@ class StarRotator(object):
         self.x = jnp.linspace(-1,1,self.grid_size) #in units of stellar radius
         self.y = jnp.linspace(-1,1,self.grid_size)
 
+        if self.wl_in is None:
+            raise Exception("Input wavelength wl_in was left to None and the calculation cannot continue.")
 
         #These grids are not meant for computation (because under the hood, computation
         #might use analytical tricks, meaning that these grids are not exactly the same
@@ -573,10 +647,11 @@ class StarRotator(object):
         if self.wavelength_type == 'constant_dlogl':
             self.wl = self.wl_model
         else:
-            self.wl = self.wl_in
+            self.wl = self.wl_in #This switching is needed because in case of dlogl, self.wl_in is set to a single float.
+            #But is this really needed? Isn't self.wl = self.wl_model always correct?
 
 
-        self.spectra = self.stellar_spectrum-self.Fp #Spectral time series
+        self.spectra = self.stellar_spectrum-self.Fp #Spectral time series, with planet-blocked contribution removed.
 
         if self.R > 0.0:
             
@@ -597,9 +672,7 @@ class StarRotator(object):
         # Self.Ft and self.wl are, in principle, the entirety of the relevant output of this code.
         # However for convenience, we define a couple of convenience-products that are mostly
         # useful for plotting purposes.
-
         self.lightcurve = np.mean(self.Ft, axis=1) / np.max(np.mean(self.Ft, axis=1))
-        # self.Ft_norm = (self.Ft.T / np.nanmedian(self.Ft,axis = 1)).T
         self.residual = self.Ft/self.F0
 
         self.residual_norm = (self.residual.T/np.median(self.residual,axis=1)).T
@@ -621,7 +694,6 @@ class StarRotator(object):
             None
         """
         # --- figure and gridspec ---
-
         import matplotlib.gridspec as gridspec
         fig = plt.figure(figsize=(12, 14))
         gs = gridspec.GridSpec(nrows=4, ncols=2, height_ratios=[1, 1, 1, 1])
@@ -647,6 +719,7 @@ class StarRotator(object):
             axA.plot(self.wl, (residual_preblur[i]/np.median(residual_preblur[i])-1)*10+1,'--',label='Normalised Residual (x10 at R = $\\infty$)',color='C2')
         axA.set_xlim(wlmin,wlmax)
         axA.legend(frameon=False)
+        axA.set_ylabel('Relative flux')
 
 
         
@@ -683,7 +756,6 @@ class StarRotator(object):
 
 
         # --- Panel E ---
-
         if self.N_mu > 0:
             c_spec = self.fx_in[-1]
         else:
@@ -691,8 +763,8 @@ class StarRotator(object):
 
 
         axE = fig.add_subplot(gs[3, 1])
-        axE.plot(self.wl,c_spec,label='Central disk spectrum',color='C2',alpha=0.5)
-        axE.plot(self.wl,self.stellar_spectrum,'--',label=f'R = $\\infty$, vsin(i) = {self.velStar*np.sin(np.radians(self.stelinc))} km/s',color='C0')
+        axE.plot(self.wl,c_spec,label='Central disk spectrum',color='C2',alpha=0.5,linewidth=1)
+        axE.plot(self.wl,self.stellar_spectrum,'--',label=f'R = $\\infty$, vsin(i) = {self.velStar*np.sin(np.radians(self.stelinc))} km/s',color='C0',linewidth=2.5)
         axE.plot(self.wl,self.F0,label=f'R = {int(self.R)}',color='C0')
 
         axE.set_title("Rotational and instrumental broadening")
@@ -702,7 +774,9 @@ class StarRotator(object):
         axE.sharex(axA)
 
 
-        # --- layout ---
+
+
+
         plt.tight_layout()
 
         if filename:
@@ -711,143 +785,6 @@ class StarRotator(object):
 
 
 
-    def animate(self):
-        """Plots an animation of the transit event, the stellar flux and velocity
-        fields, and the resulting transit and line-shape variations. The animation
-        is located in the subfolder `anim`. Anything located in this folder prior
-        to running this function will be removed. The creation of the animation gif file
-        requires that the imagemagick package is installed on your system. If it is not, an error
-        will be raised. The PNG files will have been saved in the anim directory nonetheless.
-
-        Parameters
-        ----------
-            None
-        Returns
-        -------
-            None
-        """
-        import matplotlib.pyplot as plt
-        import starrotator.lib.integrate_depr as integrate_depr
-        import numpy as np
-        from matplotlib.patches import Circle
-        import shutil
-        import os
-        import os.path
-        if os.path.isdir('anim/') == True:
-            shutil.rmtree('anim/')#First delete the contents of the anim folder.
-        os.mkdir('anim/')
-        minflux = min(self.lightcurve)
-        F=self.F0
-        if self.model.lower() in ['pysme','sme'] and isinstance(self.mus,np.ndarray) == True:
-            flux_grid = self.compute_flux_grid_pysme()
-        else:
-            flux_grid = self.flux_grid
-        for i in range(self.Nexp):
-            mask = self.masks[i]
-            fig,ax = plt.subplots(nrows=2, ncols=2,figsize=(8,8))
-            ax[0][0].pcolormesh(self.x,self.y,flux_grid*mask,vmin=0, vmax=1.0*np.nanmax(flux_grid),cmap='autumn')
-            ax[1][0].pcolormesh(self.x,self.y,self.vel_grid*mask,cmap='bwr')
-            ax[0][0].axes.set_aspect('equal')
-            ax[1][0].axes.set_aspect('equal')
-            if self.zp[i] > 0.0:
-                planet1 = Circle((self.xp[i],self.yp[i]),self.Rp_Rs, facecolor='black',
-                edgecolor='black', lw=1)
-                planet2 = Circle((self.xp[i],self.yp[i]),self.Rp_Rs, facecolor='black',
-                edgecolor='black', lw=1)
-                ax[0][0].add_patch(planet1)
-                ax[1][0].add_patch(planet2)
-            ax[0][0].set_xlim((min(self.x),max(self.x)))
-            ax[1][0].set_xlim((min(self.x),max(self.x)))
-            ax[0][0].set_ylim((min(self.y),max(self.y)))
-            ax[1][0].set_ylim((min(self.y),max(self.y)))
-            ax[0][1].plot(self.times[0:i],self.lightcurve[0:i],'.',color='black')
-            ax[0][1].set_xlim((min(self.times),max(self.times)))
-            ax[0][1].set_ylim((minflux-0.1*self.Rp_Rs**2.0),1.0+0.1*self.Rp_Rs**2)
-            ax[1][1].plot(self.wl,F/np.nanmax(F),color='black',alpha = 0.5)
-            ymin = np.nanmin(F/np.nanmax(F))
-            ymax = np.nanmax(F/np.nanmax(F))
-            linedepth = ymax - ymin
-            ax[1][1].plot(self.wl,self.spectra[i]/np.nanmax(self.spectra[i]),color='black')
-            yl = (ymin-0.1*linedepth,ymax+0.3*linedepth)
-            ax[1][1].set_ylim(yl)
-            ax2 = ax[1][1].twinx()
-            ax2.plot(self.wl,(self.spectra[i])*np.nanmax(F)/F/np.nanmax(self.spectra[i]),
-            color='skyblue')
-            sf = 30.0
-            ax2.set_ylim((1.0-(1-yl[0])/sf,1.0+(yl[1]-1)/sf))
-            ax2.set_ylabel('Ratio in transit / out of transit',fontsize = 7)
-            ax2.tick_params(axis='both', which='major', labelsize=6)
-            ax2.tick_params(axis='both', which='minor', labelsize=5)
-            ax[0][0].set_ylabel('Y (Rs)',fontsize=7)
-            ax[0][0].tick_params(axis='both', which='major', labelsize=6)
-            ax[0][0].tick_params(axis='both', which='minor', labelsize=5)
-            ax[1][0].set_ylabel('Y (Rs)',fontsize=7)
-            ax[1][0].set_xlabel('X (Rs)',fontsize=7)
-            ax[1][0].tick_params(axis='both', which='major', labelsize=6)
-            ax[1][0].tick_params(axis='both', which='minor', labelsize=5)
-            ax[0][1].set_ylabel('Normalised flux',fontsize=7)
-            ax[0][1].set_xlabel('Orbital Phase',fontsize='small')
-            ax[0][1].tick_params(axis='both', which='major', labelsize=6)
-            ax[0][1].tick_params(axis='both', which='minor', labelsize=5)
-            ax[1][1].set_ylabel('Normalised flux',fontsize=7)
-            ax[1][1].set_xlabel('Wavelength (nm)',fontsize=7)
-            ax[1][1].tick_params(axis='both', which='major', labelsize=6)
-            ax[1][1].tick_params(axis='both', which='minor', labelsize=5)
-            if len(str(i)) == 1:
-                out = '000'+str(i)
-            if len(str(i)) == 2:
-                out = '00'+str(i)
-            if len(str(i)) == 3:
-                out = '0'+str(i)
-            if len(str(i)) == 4:
-                out = str(i)
-            fig.savefig('anim/'+out+'.png', dpi=fig.dpi)
-            integrate_depr.statusbar(i,self.Nexp)
-            plt.close()
-        print('',end="\r")
-        print('--- Saving to animation.gif')
-
-        status = os.system('convert -delay 8 anim/*.png animation.gif')
-        if status != 0:
-            raise Exception('The conversion of the animation frames into a gif has failed; '
-            'probably because the Imagemagick convert command was not found. The animation frames '
-            'have been created in the anim/ folder. If you want to convert these into a .gif '
-            'please do it in some alternative way, or install Imagemagick, see '
-            'https://imagemagick.org')
-
-
-
-
-        # CONTINUE HERE NEXT TIME:
-        # [DONE] Fix normalizations and uniformity of calling v1, v2, v1_mu.
-        # [DONE] Implement optional switching to fast doppler shifting method (switched by wavelength input, either array or float). Done for v1.
-        # [DONE] Complete the generation of output. 
-        # [DONE] Fix definition of mu. Now mu is apparently assumed to be equal to r. But it is sqrt(1-r**2). Confirm this by testing new integrate.integrate_fluxdisk_mu function.
-        # [DONE] Finish logic switching.
-        # [DONE] Add dlogl input.
-        # [DONE] Complete / test the workflow with pySME.
-        # [DONE] Debug faulty mu dependence in Develop_starrotator_object.
-        # [DONE] Implement spectral resolution.
-        # [DONE] Complete the plotting of basic output.
-        # [DONE] Create a suite of working (KELT-9) examples documented in readme.
-        # [DONE] Add a method of adding spots. (temperature, radius, lat, long), Can be outside of the object cascade but with a modified integrator. Including an example notebook.
-        # Add animation.
-        # Develop a numpyro model notebook.
-
-
-        # TO DO LATER:
-        # [DONE] Fix installation instructions in Readme.
-        # Fix documentation. [setup is complete. need to start populating with sections. docstring autosummaries are off because most functions have docstings that are poorly formatted]
-        # Drop small-planet-approximation in integrate.py for mu-dependence in hidden-spectrum.
-        # Add correction-polynomials for the integrals in the various functions v1,v2 to correct for the bias induced by the pixellation of the grid (approximating a circle with a grid of squares).
-        # Can be measured empirically but can probably also be evaluated analytically (though perhaps not in the pseudo-analytical limb darkening model -- or, I don't want to bother). 
-        # Add brute-force integration with no tricks, and free velocity and flux grids as input. That is v3. A spectrum index-map (that enables mu, or other variation in the spectrum).
-
-        # MAKE IT AT HABIT TO RUN PYTEST BEFORE COMMITS!
-
-    
-
-
-
+ 
 
 

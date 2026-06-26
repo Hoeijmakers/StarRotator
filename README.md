@@ -2,92 +2,175 @@
 
 # StarRotator
 
-StarRotator is a package that simulates a rotation-broadened stellar spectrum during an exoplanet transit event. The simulation is done via numerical integration of the stellar disk, with model photosphere spectra from either PHOENIX or pySME.
+StarRotator is a python package that simulates a rotation-broadened stellar spectrum during an exoplanet transit event. The simulation is done via numerical integration of the stellar disk, with model photosphere spectra from either PHOENIX or pySME (optionally). The computationally heavy algorithsm are compiled in Jax, allowing for fast evaluation and also for statistical inference using autodifferentiation and e.g. Numpyro.
 
-#### This is a minimal guide for getting StarRotator to run.
 
-StarRotator will run out of the box using a default exoplanet system defined in prepackaged configuration files (the demo `.txt` files included in the `./input/` folder).
+### This is a minimal guide for getting StarRotator installed and running.
+
 In order to install and run StarRotator, perform the following steps:
 1) Clone the repo / pull it to your machine.
-2) From the root directory, install it using `pip` as: `pip install .`.
-3) Open python and import the package: `from StarRotator import StarRotator'. You can run `pytest` from the repo's root folder. Even if not all tests pass if you don't have pySME installed, functionality with PHOENIX models is possible even without pySME.
-4) StarRotator can be called as `KELT9 = StarRotator(586.0,592.0,200.0)`. Without providing system parameters as input, this will compute a model spectrum of the Na-D lines of assuming the KELT-9 system (a fast-rotating 10,000K A-star orbited by a gas giant), computed on a grid of (2x200)x(2x200) i.e. 400x400 square pixels. To create your own input parameters, see below.
-5) Access the simulation output using attributes defined on the `KELT9` object: The wavelength axis of the model is accessed as `wl = KELT9.wl`, the out-of-transit stellar spectrum as `F_out = KELT9.stellar_spectrum`, the modelled time-series as `spectra = KELT9.spectra` and the residuals as obtained by dividing the out-of-transit spectrum out of the time-series: `residuals = KELT9.residual`. These can be blurred to some spectral resolution defined in `KELT9.R` (defined by default as 115,000 in the `demo_star.txt` parameter file), using `KELT9.convolve_spectral_resolution()`. Convolution is applied to the residuals and not to the spectra that are divided by each other, because this introduces a numerical error.
-6) The StarRotator object contains methods to plot the simulation output. You can instantly plot the residuals of the time series like `KELT9.plot_residuals()`, and an animation of the entire time-series as `KELT9.animate()`, the result of which could look like the animation below.
-7) To use the simulation output, the user has access to the `KELT9.residual` numpy array, which can be written to file and loaded it when needed in an external workflow, or used as is.
-8) To change the parameters of your exoplanet system you can create new input files. The parameters in the input files need to be given in the exact same order as in the demo files. Alternatively, you can call the StarRotator object with a dictionary that contains all these input values. See the example code block below':
+2) From the root directory, you can install the full version of this package including pySME functionality using `pip` as: `pip install ".[sme]"` or `pip install -e ".[sme]"` if you intend to make code changes. Note that this will install all dependencies, including pySME. On some systems the latest version of the package `pysme-astro` may not install correctly if a C or fortran compiler is missing on your system. In this case you can still continue to install StarRotator without pySME functionality, install without the sme tag as: `pip install .`.
+3) Open python and import the package: `from starrotator import StarRotator`.
+4) StarRotator can now be called as `KELT9 = StarRotator()`. Without providing any system parameters as input, this will compute a model spectrum of the Na-D lines of assuming an exoplanet system that loosely resembles KELT-9 (a fast-rotating 8,000K A-star orbited by a gas giant), computed on a grid of (2x150)x(2x150) i.e. 300x300 square pixels. How to pass your own input parameters is explained below.
+5) You can access the simulation output using attributes defined on the `KELT9` object: 
+  - The wavelength axis of the model is accessed as `wl = KELT9.wl`. 
+  - The ground-truth out-of-transit stellar spectrum as `F_out = KELT9.stellar_spectrum`.
+  - The ground-truth spectral time-series as `spectra = KELT9.spectra`.
+  - The out-of-transit stellar spectrum downgraded to spectral resolution `R` as: `F_out_conv = KELT9.F0`.
+  - The spectral time-series downgraded to spectral resolution `R` as: `spectra_conv = KELT9.Ft`.
+  - The white-light lightcurve and accompanying phases as: `lightcurve = KELT9.lightcurve` and `phases = KELT9.phases`.
+  - The spectral residuals and the normalised residuals as `residuals = KELT9.residuals` and `residuals_norm = KELT9.residuals_norm`. These can also be plotted using the method `KELT9.plot_residuals()`.
+
+
+### Parameter inputs
+To change the parameters of your exoplanet system you can pass input parameters in a dictionary. See the example code block below.
 
 ```python
-#When using the input files:
-Planet = StarRotator(586.0,592.0,200.0,star_path='input/demo_star.txt',planet_path='input/demo_planet.txt',obs_path='input/demo_observations.txt')
+from starrotator import StarRotator
+import numpy as np
+input = {}
+input['wavelength'] = [570,610,20000] # Wavelength min, max and N-steps.
+input['wavelength_type'] = 'constant_dlogl' # Wavelength grid mode. Constant delta-log lambda is fastest, but other options are available: 'linear', 'explicit', 'minmax'.
+input['phases'] = np.linspace(-0.1,0.1,61) # Exoplanet orbital phase array. The phases (+- 0.1 in this example) should encompass the transit event.
+input['grid_size_star'] = 300 # Number of grid points of the star on a side. So 300 results in a 300x300 grid.
+input['grid_size_planet'] = 100 # Number of grid points of the planet covering the planet on a side.
+input['sma_Rs'] = 3.153 # Semi-major axis divided by stellar radius.
+input['e'] = 0.0 # Eccentricity.
+input['omega'] = 0.0 # Longitude of ascending node, for eccentric orbits only and can be omitted if e==0.
+input['inclination'] = 89.0 # Inclination. 90 degrees is transiting.
+input['obliquity'] = 45.0 # Spin-orbit misalignment in degrees. 0.0 is perpendicular to the stellar spin axis (projected).
+input['RpRs'] = 0.1 # Transit radius (Rp/Rs)
+input['Rstar'] = 1.4 # Stellar radius in solar radii.
+input['P'] = 2.3 # Orbital period in days.
+input['mp'] = 0.0 # Mass of the planet in Jupiter masses. Can be left to 0.0 unless stellar reflex motion is important for your application.
+input['veq'] = 100.0 # Stellar equatorial velocity.
+input['stelinc'] = 90.0 # Inclination of the stellar equator. veq*sin(stelinc) = vsin(i). 90 degrees places the spin axis in the plane of the sky.
+input['T'] = 8000.0 # Stellar effective temperature.
+input['FeH'] = 0.0 # Stellar metallicity.
+input['logg'] = 4.5 # Stellar surface gravity log(g) cgs.
+input['drr'] = 0.0 # Differential rotation parameter. 0.0 is no differential rotation.
+input['u1'] = 0.93 # Limb darkening parameter linear.
+input['u2'] = -0.23 # Limb darkening parameter quadratic.
+input['R'] = 80000 # Spectral resolving power (lambda/delta-lambda).
+input['model'] = 'PHOENIX' # Model type, PHOENIX or pySME are allowed.
 
+KELT9 = StarRotator(input=input)
+KELT9.plot_residuals(588.9,590)
 
-#When using the dictionary:
-input_dict = {
-  'veq':114000.0, #
-  'stelinc':90.0, #stellar inclination axis, degrees, float
-  'drr':0.0, #Differential rotation parameter, float
-  'T':10000.0, #Stellar effective temperature, K, float
-  'FeH':0.0, #metallicity, float
-  'logg':4.0, #log(g), cgs, float
-  'u1':0.93, #limb darkening parameter 1
-  'u2':-0.23, #limb darkening parameter 2
-  'R':115000, #Spectral resolution
-  'mus':0, #number of mu angles, int. Ignored if using PHOENIX.
-  'model':'phoenix', #model type, string, either phoenix or pySME
-  'sma_Rs':3.153, #a over Rs, float
-  'e':0.0, #eccentricity, float
-  'omega':0.0, #longitude of periastron, degrees, float
-  'inclination':86.79, #degrees, float
-  'obliquity':-84.8, #degrees, float
-  'RpRs':0.08228, #Planet star radius ratio, float
-  'P':1.4811235, #Orbital period, days, float
-  'phases':[-0.02,-0.01,0.0,0.01,0.02] #numpy array, set to the orbital phases of the time series
+```
+<br>
+Depending on your computing resources, this should run in several seconds and produce the following output:
+
+![](docs/images/example.png)
+
+<!-- If you have installed [Imagemagick](https://imagemagick.org/), the output can also be animated:
+![](docs/images/demo.gif) -->
+<br><br>
+
+Alternatively, parameters can also be input as path to a JSON file, formatted as follows:
+```json
+{
+    "wavelength": [570,610,20000],
+    "wavelength_type": "constant_dlogl",
+    "phases": [-0.1,-0.09,-0.08,-0.07,-0.06,-0.05,-0.04,-0.03,-0.02,-0.01,0.0,0.01,0.02,0.03,0.04,0.05,0.06,0.07,0.08,0.09,0.1],
+    "grid_size_star": 300,
+    "grid_size_planet": 100,
+    "sma_Rs": 3.153,
+    "e": 0.0,
+    "inclination": 89.0,
+    "obliquity": 45.0,
+    "RpRs": 0.1,
+    "Rstar": 1.4,
+    "P": 2.3,
+    "mp": 0.0,
+    "veq": 100.0,
+    "stelinc": 90.0,
+    "T": 8000.0,
+    "FeH": 0.0,
+    "logg": 4.5,
+    "drr": 0.0,
+    "u1": 0.93,
+    "u2": -0.23,
+    "R": 80000,
+    "model": "PHOENIX"
 }
-
-Planet = StarRotator(586.0,592.0,200.0,input=input_dict)
 ```
 
-![](docs/images/demo.gif)
+
+
+
 
 <br><br><br>
 
 ### A typical use case: running StarRotator with pySME as a forward model.
 
-[PySME](https://github.com/AWehrhahn/SME) is used in StarRotator to allow a user to generate more precise forward-models of the Doppler-Shadow residuals for real exoplanet systems. Using known stellar parameters (T, log(g), Z, vsin i) and individual elemental abundances, in theory it should be possible to precisely forward model the residual and recalibrate observed spectra. To the broadened spectrum in the Na lines in a sodium-rich variation on the KELT-9 system with pySME, you can use the following example. Please be reminded that the provided demo line list `input\demo_linelist.dat` contains ONLY stellar lines for Na in the wavelength range of the Fraunhofer D lines. For any other wavelength range and element, see section below on VALD line lists.
-
+[PySME](https://github.com/SpectroscopyMadeEasy/PySME) is wrapped by StarRotator to allow a user to generate more precise forward-models of the Doppler-Shadow residuals. An important feature of pySME is that it allows the computation
+of spectra with varying mu-angles (mu=cos(alpha) = 1.0 at disk center), wheras using a disk-integrated PHOENIX spectrum combined with limb darkening ignores the Center-to-limb variation (CLV). A computation done with pySME and mu-resolution
+is as follows. Note that some pySME-specific keywords were added, while the limb darkening parameters (above) are removed.
 
 ```python
 
-from StarRotator import StarRotator
+input = {}
+input['wavelength'] = [580,600,10000]
+input['wavelength_type'] = 'constant_dlogl'
+input['phases'] = np.linspace(-0.1,0.1,61) 
+input['grid_size_star'] = 300 
+input['grid_size_planet'] = 100 
+input['sma_Rs'] = 3.153 
+input['e'] = 0.0 
+input['inclination'] = 89.0 
+input['obliquity'] = 45.0 
+input['RpRs'] = 0.1 
+input['Rstar'] = 1.4 
+input['P'] = 2.3 
+input['mp'] = 0.0 
+input['veq'] = 100.0 
+input['stelinc'] = 90.0 
+input['T'] = 8000.0 
+input['FeH'] = 0.0 
+input['logg'] = 4.5 
+input['drr'] = 0.0 
+# input['u1'] = 0.93 
+# input['u2'] = -0.23 
+input['R'] = 80000 
+input['model'] = 'pysme'
+input['N_mu'] = 20 # The number of mu-angles by which to resolve the stellar disk.
+input['small_planet'] = True # In the small-planet approximation, assume that the planet covers only a single mu-angle. Setting this to False is not yet supported.
+input['grid_model'] = 'atlas12.sav' # pySME requires an atmosphere model, and atlas12 is one of the pre-packaged ones. See the pySME documentation for other options.
+input['abund'] = {}
+
+KELT9 = StarRotator(input=input)
+```
+
+<br><br><br>
+
+<b> An important detail </b> when using pySME is that the software requires a linelist. To carry out the above calculation of the sodium lines, a dummy linelist was packaged along with StarRotator that contains only the two Fraunhofer D-lines (`starrotator/data/demo_linelist.dat`). In real applications, the user needs to provide their own line-list (see details below).
+
+<br><br><br>
+
+### Modified elemental abundances with pySME.
+
+pySME allows the user to calculate a stellar spectrum with custom elemental abundances. In theory, it should be possible to precisely forward model the residual and recalibrate observed spectra of stars with non-solar elemental ratios. To model the rotation broadened Na lines in a sodium-rich variation on the KELT-9 system with pySME, you can add the abundance parameter to the input dictionary used above.
+
+```python
+
 import matplotlib.pyplot as plt
-import numpy as np
+KELT9_normal = StarRotator(input=input)
+input['abund'] = ["{'Na':6.6}"] # The nominal value is 6.4, following the Asplund scale.
+KELT9_high = StarRotator(input=input)
 
-dict = {
-  'veq':114000.0,'stelinc':90.0,'drr':0.0,
-  'T':10500.0,'FeH':0.23,'logg':3.9,'u1':0.93,'u2':-0.23,
-  'R':115000,'mus':5,'model':'pySME',
-  'sma_Rs':3.153,'e':0.0,'omega':0.0,'inclination':86.79,'obliquity':-84.8,'RpRs':0.08228,
-  'P':1.4811235,'phases':np.arange(-0.03,0.03,40),'grid_model':'atlas12.sav','abund':{},
-  'linelist_path':'input/demo_linelist.dat'
-}
-
-KELT9_nominal = StarRotator(586.0,592.0,200.0,input=dict)
-
-dict['abund']=["{'Na':6.6}"]#Nominally it is 6.4
-KELT9_rich = StarRotator(586.0,592.0,200.0,input=dict)
-
-plt.plot(KELT9_nominal.wl,KELT9_nominal.stellar_spectrum,label='Nominal sodium')
-plt.plot(KELT9_rich.wl,KELT9_rich.stellar_spectrum,label='Sodium enhanced')
+plt.plot(KELT9_normal.wl,KELT9_normal.F0,label='Nominal sodium')
+plt.plot(KELT9_high.wl,KELT9_high.F0,label='Sodium enhanced')
 plt.legend(frameon=False)
 plt.xlabel('Wavelength (nm)')
 plt.ylabel('Relative flux')
 plt.show()
-
 ```
 
-This creates the following figure of the out-of-transit broadened stellar sodium lines. Adding extra broadening to account for the instrumental resolving power and  accessing the residuals can subsequently be done via `KELT9_rich.convolve_spectral_resolution()` and `KELT9_rich.residuals()`. In addition, in reality you will wish to use more complete line-lists (in VALD format) and data-driven stellar and system parameters. All this is left for the user to explore.
+This creates the following figure of the out-of-transit broadened stellar sodium lines. In addition, in reality you will wish to use more complete line-lists (in VALD format) and data-driven stellar and system parameters. All this is left for the user to explore.
 ![](docs/images/demo_spectrum.png)
+
+<br><br><br>
 
 ### VALD service for atomic and molecular data. i.e. line lists
 

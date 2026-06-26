@@ -796,141 +796,126 @@ def test_pysme_computation():
     assert len(KELT9.wl_in) == 10000
 
 
-
-#This breaks until integration, dynamics and new ways of calling these, are refactored. 
-#I.e. until a long while from now. But we're getting there!
-"""
-def test_StarRotator():
-    from starrotator import StarRotator
-    import matplotlib.pyplot as plt
-    from matplotlib import cm, colors
-    from mpl_toolkits.mplot3d import Axes3D
-    from scipy.special import sph_harm
-    import requests
-    import shutil
-    import urllib.request as request
-    from contextlib import closing
-    import os.path
-    import starrotator.lib.test as test
-    import starrotator.lib.operations as ops
-    import starrotator.lib.stellar_spectrum
-    import starrotator.lib.vgrid as vgrid
-    import starrotator.lib.integrate_depr
-    import astropy.io.fits as fits
-    import astropy.units as u
-    import scipy.interpolate as interp
-    import astropy.constants as consts
-    import numpy as np
-    import copy
-    import imp
-    import sys
+def test_custom_computation():
     from importlib.resources import files
+    from starrotator import StarRotator
+    import numpy as np
+    import matplotlib.pyplot as plt
+
+    #Read in the demo file.
+    inpath = files("starrotator.data").joinpath("demo_input_spectra.dat")
+    wl_in, *fx_in = np.loadtxt(inpath, unpack=True,comments='#')
+    fx_in = np.array(fx_in)
+
+    with open(inpath) as f:
+        f.readline()  # Skip first header
+        mu = np.array(f.readline()[4:].split(' ')[1:-1],dtype=float)  
+
+    #Run a simulation with the demo file.
+    input = {}
+    input['wavelength'] = wl_in
+    input['wavelength_type'] = 'explicit'
+    input['phases'] = np.linspace(-0.1,0.1,21)
+    input['grid_size_star'] = 350
+    input['grid_size_planet'] = 200
+    input['sma_Rs'] = 3.153
+    input['e'] = 0.0
+    input['inclination'] = 89.0
+    input['obliquity'] = 0.0
+    input['RpRs'] = 0.1
+    input['Rstar'] = 1.4
+    input['P'] = 2.3
+    input['mp'] = 0.0
+    input['veq'] = 50.0
+    input['stelinc'] = 90.0
+    input['T'] = 8000.0
+    input['FeH'] = 0.0
+    input['logg'] = 4.5
+    input['drr'] = 0.0
+    input['u1'] = 0.93
+    input['u2'] = -0.23
+    input['R'] = 0.0
+    input['model'] = 'custom'
+    input['model_fx'] = fx_in
+    input['mu_array'] = mu
+    input['omega'] = 0.0
+    input['small_planet'] = True      
+
+    KELT9 = StarRotator(input=input)
+
+    #Run a second simulation with no mu-dependence.
+    input = {}
+    input['wavelength'] = wl_in
+    input['wavelength_type'] = 'explicit'
+    input['phases'] = np.linspace(-0.1,0.1,21)
+    input['grid_size_star'] = 350
+    input['grid_size_planet'] = 200
+    input['sma_Rs'] = 3.153
+    input['e'] = 0.0
+    input['inclination'] = 89.0
+    input['obliquity'] = 0.0
+    input['RpRs'] = 0.1
+    input['Rstar'] = 1.4
+    input['P'] = 2.3
+    input['mp'] = 0.0
+    input['veq'] = 50.0
+    input['stelinc'] = 90.0
+    input['T'] = 8000.0
+    input['FeH'] = 0.0
+    input['logg'] = 4.5
+    input['drr'] = 0.0
+    input['u1'] = 0.93
+    input['u2'] = -0.23
+    input['R'] = 0.0
+    input['model'] = 'custom'
+    input['model_fx'] = fx_in[3]
+    input['omega'] = 0.0
+    input['small_planet'] = True      
+
+    KELT9 = StarRotator(input=input)
+    # custom_residual = KELT9.residual_norm
+
+    # #Check that it is the same output as what it should have,
+    # #Which is a calculation with pysme and 5 mu angles.
+    # input = {}
+    # input['wavelength'] = np.linspace(588.9,590.1,500)
+    # input['wavelength_type'] = 'explicit'
+    # input['phases'] = np.linspace(-0.1,0.1,21)
+    # input['grid_size_star'] = 350
+    # input['grid_size_planet'] = 200
+    # input['sma_Rs'] = 3.153
+    # input['e'] = 0.0
+    # input['inclination'] = 89.0
+    # input['obliquity'] = 0.0
+    # input['RpRs'] = 0.1
+    # input['Rstar'] = 1.4
+    # input['P'] = 2.3
+    # input['mp'] = 0.0
+    # input['veq'] = 50.0
+    # input['stelinc'] = 90.0
+    # input['T'] = 8000.0
+    # input['FeH'] = 0.0
+    # input['logg'] = 4.5
+    # input['drr'] = 0.0
+    # input['u1'] = 0.93
+    # input['u2'] = -0.23
+    # input['R'] = 0.0
+    # input['model'] = 'pysme'
+    # input['N_mu'] = 5
+    # input['omega'] = 0.0
+    # input['small_planet'] = True
+    # input['grid_model'] = 'atlas12.sav'
+    # input['abund'] = {}
+
+
+    # KELT10 = StarRotator(input=input)
+    # sme_residual = KELT10.residual_norm
+
+    # assert np.sum(custom_residual - sme_residual) == 0.0
+    # #Note that this test will break if pysme changes.
+    # So I commented it out.
 
 
 
 
-    KELT2 = StarRotator(586.0,592.0,50.0)
-    wl = KELT2.wl
-    F_out = KELT2.stellar_spectrum
-    spectra = KELT2.spectra
-    residuals = KELT2.residual
-    KELT2.convolve_spectral_resolution()
 
-    assert KELT2.status == 'success'
-
-
-    #Test that multiple-convolution is detected and blocked:
-    try:
-        KELT2.convolve_spectral_resolution()
-        error_trigger=1
-    except:
-        pass
-    if error_trigger==1:
-        raise Exception("ERROR: Trying convolution twice in a row should be caught.")
-    error_trigger=0
-
-    #Testing another grid and another vartype.
-    KELT3 = StarRotator(586,592.0,13)
-    KELT3.convolve_spectral_resolution()
-
-    assert KELT3.status == 'success'
-
-    #Now test the whole thing with a dictionary as input. First test that the input is well
-    #tested:
-    in_dict = {'lala':1.0}
-    try:
-        KELT4 = StarRotator(586,592.0,13,input=in_dict)
-        error_trigger=1
-    except:
-        pass
-    if error_trigger==1:
-        raise Exception("ERROR: Wrong input dictionary not caught.")
-    error_trigger=0
-
-
-    in_dict = {'veq':114000.0,
-    'stelinc':90.0,
-    'drr':0.0,'T':10000.0,'FeH':0.0,'logg':4.0,
-    'u1':0.93,'u2':-0.23,'R':115000.,'mus':0,'model':'PHOENIX','sma_Rs':3.153,
-            'e':0.0,'omega':0.0,'inclination':86.79,'obliquity':-84.8,'RpRs':0.08228,'P':1.4811235,
-            'phases':[-0.02,-0.01,0.0,0.01,0.02]}
-    KELT5 = StarRotator(586,592.0,13,input=in_dict)
-
-    assert KELT5.status == 'success'
-
-    #
-    pysme_error = 0
-    try:
-        from pysme.sme import SME_Structure as SME_Struct
-        from pysme.abund import Abund
-        from pysme.synthesize import synthesize_spectrum
-        from pysme.solve import solve
-        from pysme.linelist.vald import ValdFile
-    except:
-        print('WARNING: PYSME cannot be imported. PSME functionality will not be available.')
-        n_warnings+=1
-        pysme_error = 1
-
-
-    if pysme_error == 0:
-        in_dict = {'veq':114000.0,
-        'stelinc':90.0,
-        'drr':0.0,'T':10000.0,'FeH':0.0,'logg':4.0,
-        'u1':0.93,'u2':-0.23,'R':115000.,'mus':0,'model':'pySME','sma_Rs':3.153,
-        'e':0.0,'omega':0.0,'inclination':86.79,'obliquity':-84.8,'RpRs':0.08228,'P':1.4811235,
-        'phases':[-0.02,-0.01,0.0,0.01,0.02]}#Without setting abund and grid_model keywords.
-        try:
-            KELT9 = StarRotator(586,592.0,13,input=in_dict)
-            error_trigger=1
-        except:
-            pass
-        if error_trigger==1:
-            raise Exception("ERROR: Wrong input dictionary not caught.")
-        error_trigger=0
-
-        in_dict = {'veq':114000.0,
-        'stelinc':90.0,
-        'drr':0.0,'T':10000.0,'FeH':0.0,'logg':4.0,
-        'u1':0.93,'u2':-0.23,'R':115000.,'mus':5,'model':'pySME','sma_Rs':3.153,
-        'e':0.0,'omega':0.0,'inclination':86.79,'obliquity':-84.8,'RpRs':0.08228,'P':1.4811235,
-        'phases':[-0.02,-0.01,0.0,0.01,0.02],'grid_model':'atlas12.sav','abund':[],
-        'linelist_path':'input/demo_linelist.dat'}
-        KELT9 = StarRotator(586,592.0,13,input=in_dict)
-
-
-        in_dict = {'veq':114000.0,
-        'stelinc':90.0,
-        'drr':0.0,'T':6000.0,'FeH':0.3,'logg':4.2,
-        'u1':0.93,'u2':-0.23,'R':115000.,'mus':5,'model':'pySME','sma_Rs':3.153,
-        'e':0.0,'omega':0.0,'inclination':86.79,'obliquity':-84.8,'RpRs':0.08228,'P':1.4811235,
-        'phases':[-0.02,-0.01,0.0,0.01,0.02],'grid_model':'marcs2014.sav','abund':[],
-        'linelist_path':'input/demo_linelist.dat'}
-        KELT9 = StarRotator(586,592.0,13,input=in_dict)
-
-    print('')
-    print('')
-    print('')
-    print('Tests complete.')
-    print(f'{n_warnings} warnings triggered.')
-
-    """
