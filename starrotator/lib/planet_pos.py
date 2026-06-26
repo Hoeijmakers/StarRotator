@@ -1,3 +1,5 @@
+#THIS WHOLE SCRIPT IS TO BE DEPRICATED BY THE NEW DYNAMICS.PY.
+
 def calc_orbit_times(time_stamp, transitC, exposure_time, orb_p):
     """
     Calculates the start, end and center of the transit from the provided times

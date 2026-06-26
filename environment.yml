@@ -1,0 +1,23 @@
+name: starrotator-env
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python
+  - astropy
+  - matplotlib
+  - scipy
+  - numpy
+  - requests
+  - pytest
+  - pytest-cov
+  - platformdirs
+  - sphinx
+  - sphinx-autodoc-typehints
+  - sphinx-rtd-theme
+  - jax[cpu]
+  - grip
+  - pip
+  - pip:
+      - pysme-astro
+      - jaxoplanet

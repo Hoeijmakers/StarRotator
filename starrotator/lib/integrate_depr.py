@@ -1,19 +1,3 @@
-def statusbar(i,x):
-    """A percentage indicator for for-loops.
-        Parameters
-        ----------
-        i : float
-            The iteration number of the loop.
-
-        x : float or list
-            The list that is being iterated over in the loop, or its number of elements.
-            The former is useful if you are doing something like 'for i in list'.
-        """
-    if type(x) == int:
-        print('  '+f"{i/(float(x))*100:.1f} %", end="\r")
-    else:
-        print('  '+f"{i/(len(x))*100:.1f} %", end="\r")#Statusbar.
-
 def input_tests_local(xp,yp,RpRs):
     """This wraps input tests for the local integrator functions, as these are the same in both cases."""
     import lib.test as test
@@ -63,6 +47,9 @@ def input_tests_global(wl,fx,wlmin,wlmax,x,y,vel_grid,flux_grid,fname=''):
         raise Exception("Value error in "+fname+": wlmax (%s) is greater than max(wl) (%s) after accounting for the maximum velocity shift (%s)" % (wlmax*ops.doppler(dvm),max(wl),dvm))
     #fname should be a string.
     test.typetest(fname,str,varname='fname in input_tests_global')
+
+
+
 
 
 def build_local_spectrum_fast(xp,yp,zp,RpRs,wl,fx,wlmin,wlmax,x,y,vel_grid,flux_grid):
