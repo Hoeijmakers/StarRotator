@@ -277,10 +277,12 @@ def orbit_euclidian(phase, a = 5.0, m = 0.0, P = 4.0, e = 0.0, omega = 0.0,
     
 
     x,y,z = planet.position(phase * P) # in Rsol.
+    vx,vy,vz = planet.relative_velocity(phase * P) 
+
 
     l_rad = jnp.radians(obliquity)
     x_proj = x * jnp.cos(l_rad) - y * jnp.sin(l_rad)
     y_proj = x * jnp.sin(l_rad) + y * jnp.cos(l_rad) # Eq 4+5 of Cegla 2016.
-    return(x_proj,y_proj,z*-1) #Invert z so that negative directions are towards the observer.
+    return(x_proj,y_proj,z*-1,vz* -1 * R_sun / d_in_seconds) #Invert z so that negative directions are towards the observer.
 
 

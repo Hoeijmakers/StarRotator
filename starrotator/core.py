@@ -335,7 +335,7 @@ class StarRotator(object):
         A wrapper for calling jaxoplanet Keplerian solver.
         Output is maintained as class attributes.
         """
-        xp, yp, zp = dynamics.orbit_euclidian(self.phases, 
+        xp, yp, zp, rv = dynamics.orbit_euclidian(self.phases, 
                                                 a = self.sma_Rs * self.Rstar, 
                                                 m = self.mp, 
                                                 P = self.orb_p, 
@@ -408,7 +408,7 @@ class StarRotator(object):
                 fx_model = fx_wide[(wl_wide > np.min(wl_input)) & (wl_wide < np.max(wl_input))]
             else:
                 wl_model = wl_input
-                fx_model = np.interp(wl_input,wl_wide,fx_wide)
+                fx_model = np.interp(wl_input,wl_wide,fx_wide) #THIS IS AN ERROR IF NWL IS SMALL!
 
 
 

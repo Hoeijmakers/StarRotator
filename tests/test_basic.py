@@ -506,7 +506,7 @@ def test_orbit():
     import numpy as np
     from starrotator.lib.dynamics import orbit_euclidian
     phase = np.linspace(-0.5,0.5,1000)
-    x,y,z = orbit_euclidian(phase, a = 5.0, m = 0.0, P = 4.0, e = 0.5, omega = 0.0,i=90.0)
+    x,y,z,rv = orbit_euclidian(phase, a = 5.0, m = 0.0, P = 4.0, e = 0.5, omega = 0.0,i=90.0)
     num_error = np.mean(np.abs(y))
     assert num_error < 1e-6
     assert np.abs(np.max(x-7.5)) < 1e-4
