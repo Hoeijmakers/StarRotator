@@ -2,7 +2,7 @@
 
 # StarRotator
 
-StarRotator is a python package that simulates a rotation-broadened stellar spectrum during an exoplanet transit event. The simulation is done via numerical integration of the stellar disk, with model photosphere spectra from either PHOENIX or pySME (optionally). The computationally heavy algorithsm are compiled in Jax, allowing for fast evaluation and also for statistical inference using autodifferentiation and e.g. Numpyro.
+StarRotator is a python package that simulates a rotation-broadened stellar spectrum during an exoplanet transit event. The simulation is done via numerical integration of the stellar disk, with model photosphere spectra from either PHOENIX or pySME (optionally). The computationally heavy algorithms are JIT-compiled in Jax, allowing for fast evaluation and also for statistical inference using autodifferentiation e.g. using Numpyro.
 
 
 ### This is a minimal guide for getting StarRotator installed and running.
@@ -144,7 +144,7 @@ KELT9 = StarRotator(input=input)
 
 <br><br><br>
 
-<b> An important detail </b> when using pySME is that the software requires a linelist. To carry out the above calculation of the sodium lines, a dummy linelist was packaged along with StarRotator that contains only the two Fraunhofer D-lines (`starrotator/data/demo_linelist.dat`). In real applications, the user needs to provide their own line-list (see details below).
+<b> An important detail: </b> pySME requires a linelist as input. To carry out the above calculation of the sodium lines, a dummy linelist was packaged along with StarRotator that contains only the two Fraunhofer D-lines (`starrotator/data/demo_linelist.dat`). In real applications, the user needs to provide their own line-list in VALD format (see details below), as this format is hardcoded in StarRotator.
 
 <br><br><br>
 
@@ -233,14 +233,4 @@ Elm Ion       WL_air(A)  log gf* E_low(eV) J lo  E_up(eV) J up   lower   upper  
   3. Kurucz obs. energy level: O 4
   4. Kurucz obs. energy level: Cr 2
 [...can be many references...]
-```
-
-To import the line list into your PySME code, use this code snippet:
-
-```
-from pysme.sme import SME_Structure
-sme = SME_Structure()
-
-from pysme.linelist.vald import ValdFile
-sme.linelist = ValdFile(vald_line_list_file_name)
 ```
