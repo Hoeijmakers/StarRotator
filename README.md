@@ -234,3 +234,37 @@ Elm Ion       WL_air(A)  log gf* E_low(eV) J lo  E_up(eV) J up   lower   upper  
   4. Kurucz obs. energy level: Cr 2
 [...can be many references...]
 ```
+
+
+
+### Running StarRotator with your own model
+
+Finally, it is possible to supply your own stellar spectrum, or mu-resolved stellar spectra. The below code example reads in a pre-packaged mu-resolved spectrum generated with pySME with 5 mu angles, and passes it into the input dictionary. For clarity, only the relevant dictionary keywords are shown, 
+and are assumed to be the same as earlier.
+
+```python
+from importlib.resources import files
+from starrotator import StarRotator
+import numpy as np
+import matplotlib.pyplot as plt
+
+#Below is the location of the input spectrum file, which is an ascii table.
+inpath = files("starrotator.data").joinpath("demo_input_spectra.dat")
+wl_in, *fx_in = np.loadtxt(inpath, unpack=True,comments='#')
+fx_in = np.array(fx_in)
+
+with open(inpath) as f:
+    f.readline()  # Skip first header
+    mu = np.array(f.readline()[4:].split(' ')[1:-1],dtype=float) #This parses the mu angles in the second line of the file.
+
+
+#Run a simulation with the demo file.
+input = {}
+input['wavelength'] = wl_in # This is a numpy array that contains your wavelength grid, matching the flux grid.
+input['wavelength_type'] = 'explicit'
+input['model'] = 'custom'
+input['model_fx'] = fx_in # This is 
+input['mu_array'] = mu   
+
+KELT9 = StarRotator(input=input)
+```
