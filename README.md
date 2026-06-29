@@ -1,4 +1,4 @@
-[![CI](https://github.com/Hoeijmakers/StarRotator/actions/workflows/ci.yml/badge.svg?branch=refactor)](https://github.com/Hoeijmakers/StarRotator/actions/workflows/ci.yml) [![codecov](https://codecov.io/gh/Hoeijmakers/StarRotator/branch/refactor/graph/badge.svg?token=HYVVP4722Y)](https://codecov.io/gh/Hoeijmakers/StarRotator)
+[![CI](https://github.com/Hoeijmakers/StarRotator/actions/workflows/ci.yml/badge.svg?branch=refactor)](https://github.com/Hoeijmakers/StarRotator/actions/workflows/ci.yml) [![codecov](https://codecov.io/gh/Hoeijmakers/StarRotator/branch/refactor/graph/badge.svg?token=HYVVP4722Y)](https://codecov.io/gh/Hoeijmakers/StarRotator) [![Hits](https://hits.sh/github.com/Hoeijmakers/StarRotator.svg?label=visits)](https://hits.sh/github.com/Hoeijmakers/StarRotator/)
 
 # StarRotator
 
