@@ -150,6 +150,8 @@ KELT9 = StarRotator(input=input)
 
 <br><br><br>
 
+> **_HELP:_**  Sometimes when installing pySME and running it for the first time, errors can emerge when it tries to download necessary grid files from its remote servers. If this happens, try deleting your SME cache folder typically located at `~/.sme/` and importing pySME in python again via `import pysme.sme` to repeat the downloads.
+
 ### Modified elemental abundances with pySME.
 
 pySME allows the user to calculate a stellar spectrum with custom elemental abundances. In theory, it should be possible to precisely forward model the residual and recalibrate observed spectra of stars with non-solar elemental ratios. To model the rotation broadened Na lines in a sodium-rich variation on the KELT-9 system with pySME, you can add the abundance parameter to the input dictionary used above.
